@@ -6,6 +6,8 @@ mod control;
 pub mod limits;
 #[cfg(any(unix, test))]
 mod network;
+#[cfg(any(unix, test))]
+mod os_dns;
 pub mod protocol;
 #[cfg(any(unix, test))]
 mod traffic;

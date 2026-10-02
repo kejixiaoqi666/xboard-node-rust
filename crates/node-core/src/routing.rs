@@ -507,7 +507,11 @@ pub fn from_node(node: &NodeSpec) -> Result<(Route, Vec<Outbound>), ConfigError>
         };
         for s in &panel.matches {
             let s = s.trim().trim_start_matches("*.");
-            if s.contains('/') {
+            if let Ok(ip) = s.parse::<IpAddr>() {
+                let ip = canonical(ip);
+                ips.ip_cidr
+                    .push(format!("{ip}/{}", if ip.is_ipv4() { 32 } else { 128 }));
+            } else if s.contains('/') {
                 ips.ip_cidr.push(s.into());
             } else {
                 domains.domain_suffix.push(s.into());

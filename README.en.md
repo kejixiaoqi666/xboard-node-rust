@@ -71,6 +71,8 @@ Replace example addresses, then run `xboard-rust check` and `xboard-rust restart
 
 The shared custom cache respects TTL, capped at 300 seconds for positive and 30 seconds for negative answers. `cache_size` counts responses; 0 disables caching. OS caching remains OS-managed. Bounds: 8 servers, 4,096 hosts, 32 returned IPs, 256 simultaneous network lookups per data process; overload fails. Timeout range: 100–10,000 ms, with a separate overall TCP handshake/connect deadline.
 
+OS DNS uses two dedicated workers and 64 waiting slots, separate from accounting storage workers. A timeout ends client waiting; a running OS lookup retains its slot until it actually returns, preventing repeated cancellations from building an unbounded queue.
+
 These fields belong to the **panel node response**, not `runtime.json`. Your panel must provide an interface that emits them; this project does not add a panel UI:
 
 ```json
@@ -94,7 +96,7 @@ Precedence is `custom_route_rules`, then `custom_routes`, then `routes`; first m
 
 | Input | Supported semantics |
 | --- | --- |
-| `routes` | Suffix domains including `*.example.com`, or CIDRs in `match`; `direct`, `block`/`reject`, or `proxy` with an outbound tag in `action_value` |
+| `routes` | Suffix domains including `*.example.com`, bare IPs, or CIDRs in `match`; `direct`, `block`/`reject`, or `proxy` with an outbound tag in `action_value` |
 | `custom_route_rules` | Preserves upstream **OR** across `domains`, `domain_suffixes`, `ip_cidrs`, `ports`, `networks`, `source_cidrs`, `source_ports`; skips `disabled=true` |
 | Structured actions | `direct`, `block`, or `route`; only `route` uses `action.target` |
 | `custom_routes` | `domain`, `domain_suffix`, `ip_cidr`, `port`, `port_range`, `network`, `source_ip_cidr`, `source_port`, `source_port_range`, `outbound`; address predicates OR, combined with port/network/source groups using AND; no predicates matches all |

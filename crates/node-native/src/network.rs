@@ -9,6 +9,7 @@ use node_core::routing::{self, DnsConfig, IpStrategy, Outbound, Policy, Route};
 use std::{
     collections::BTreeMap,
     net::{IpAddr, SocketAddr},
+    sync::{Arc, OnceLock},
     time::Duration,
 };
 use tokio::{
@@ -21,7 +22,8 @@ pub(crate) struct Network {
     resolver: Option<TokioResolver>,
     dns: DnsConfig,
     hosts: BTreeMap<String, Vec<IpAddr>>,
-    queries: tokio::sync::Semaphore,
+    queries: Arc<tokio::sync::Semaphore>,
+    os: OnceLock<Result<crate::os_dns::OsResolver, std::io::Error>>,
 }
 impl Network {
     pub fn new(
@@ -78,7 +80,8 @@ impl Network {
             resolver,
             dns,
             hosts,
-            queries: tokio::sync::Semaphore::new(256),
+            queries: Arc::new(tokio::sync::Semaphore::new(256)),
+            os: OnceLock::new(),
         })
     }
     #[cfg(test)]
@@ -105,9 +108,12 @@ impl Network {
         let mut ips = if let Some(ips) = self.hosts.get(&name) {
             ips.clone()
         } else {
-            let _permit = self.queries.try_acquire().map_err(|_| Error::Limited)?;
+            let permit = Arc::clone(&self.queries)
+                .try_acquire_owned()
+                .map_err(|_| Error::Limited)?;
             tokio::time::timeout(Duration::from_millis(self.dns.timeout_ms), async {
                 if let Some(resolver) = &self.resolver {
+                    let _permit = permit;
                     // Absolute query, no OS search suffix or fallback to the system resolver.
                     Ok::<_, Error>(
                         resolver
@@ -119,11 +125,15 @@ impl Network {
                             .collect(),
                     )
                 } else {
-                    Ok(tokio::net::lookup_host((name.as_str(), 0))
-                        .await?
-                        .take(32)
-                        .map(|s| s.ip())
-                        .collect())
+                    let resolver = self
+                        .os
+                        .get_or_init(crate::os_dns::OsResolver::new)
+                        .as_ref()
+                        .map_err(|_| Error::Dns)?;
+                    resolver
+                        .submit(name.clone(), permit)?
+                        .await
+                        .map_err(|_| Error::Dns)?
                 }
             })
             .await

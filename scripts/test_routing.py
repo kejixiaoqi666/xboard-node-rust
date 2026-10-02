@@ -37,7 +37,7 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
             counts[transport + ':' + name] += 1
         if name == 'truncated.test' and transport == 'udp':
             return query[:2] + struct.pack('!HHHHH', 0x8380, 1, 0, 0, 0) + question
-        if name == 'missing.test':
+        if name in ['missing.test', 'localhost']:
             return query[:2] + struct.pack('!HHHHH', 0x8183, 1, 0, 0, 0) + question
         if qtype != 1 or qclass != 1:
             return query[:2] + struct.pack('!HHHHH', 0x8180, 1, 0, 0, 0) + question
@@ -97,10 +97,25 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
             except (OSError, ConnectionError):
                 pass
 
+    class PrivateOrigin(socketserver.BaseRequestHandler):
+        def handle(self):
+            self.request.settimeout(8)
+            try:
+                while True:
+                    body = self.request.recv(65536)
+                    if not body:
+                        return
+                    with lock:
+                        counts['private-origin-bytes'] += len(body)
+                    self.request.sendall(body)
+            except OSError:
+                pass
+
     dns_udp = UDP(('127.0.0.1', 0), DNSUDP)
     dns_tcp = TCP(dns_udp.server_address, DNSTCP)
     socks = TCP(('127.0.0.1', 0), Socks)
-    servers = [dns_udp, dns_tcp, socks]
+    private_origin = TCP(('127.0.0.2', echo_port), PrivateOrigin)
+    servers = [dns_udp, dns_tcp, socks, private_origin]
     for server in servers:
         threading.Thread(target=server.serve_forever, daemon=True).start()
     runtime_before = runtime_path.read_bytes()
@@ -151,6 +166,8 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
         time.sleep(1.1); roundtrip('ttl.test')
         assert counts['udp:ttl.test'] > before
         assert denied('missing.test')
+        assert denied('localhost'), 'An OS-resolvable name must not bypass custom NXDOMAIN'
+        fetch()
         roundtrip('udp.test', port=udp_origin[1], udp=True)
         cases.append('installed-shared-DNS-cache-TTL-expiry-static-hosts-NXDOMAIN-and-TCP-UDP-origin-payload')
         roundtrip('truncated.test')
@@ -159,6 +176,10 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
         roundtrip('tcp-only.test')
         assert counts['tcp:tcp-only.test'] >= 1 and counts['udp:tcp-only.test'] == 0
         cases.append('installed-DNS-UDP-truncation-falls-back-to-TCP-and-explicit-TCP-only-works')
+
+        roundtrip('private.test')
+        private_bytes_before_block = counts['private-origin-bytes']
+        assert private_bytes_before_block > 0
 
         original_pid, old_children = parent(), child_ids()
         config['custom_outbounds'] = [{'tag': 'upstream', 'protocol': 'socks', 'settings': {
@@ -172,6 +193,7 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
         wait(lambda: child_ids() != old_children and roundtrip('proxy.test'))
         assert parent() == original_pid and targets[-1] == ['127.0.0.1', echo_port]
         assert denied('sub.blocked.test') and denied('private.test')
+        assert counts['private-origin-bytes'] == private_bytes_before_block
         assert denied('proxy.test', port=udp_origin[1], udp=True)
         roundtrip('good.test'); roundtrip('good.test', port=udp_origin[1], udp=True)
         cases.append('installed-panel-route-update-replaces-child-keeps-controller-and-routes-TCP-via-authenticated-SOCKS5')

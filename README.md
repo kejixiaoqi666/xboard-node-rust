@@ -122,6 +122,8 @@ REALITY、Vision、mux/XUDP、VMess、Shadowsocks、AnyTLS、TUIC、Hysteria2、
 
 `hosts` 优先于网络查询。指定 DNS 后，不再暗中回退到系统 DNS。自定义解析器跨连接共享缓存，按服务器 TTL 过期，正向最长 300 秒、负向最长 30 秒；`cache_size` 是缓存响应数量，0 关闭缓存。系统解析的缓存由操作系统管理。最多 8 个 DNS 服务器、4,096 个 hosts 条目、每次最多 32 个结果；每个数据进程同时最多 256 个网络查询，超限请求失败。DNS 超时范围为 100–10,000 毫秒，TCP 握手与连接建立另有总时限。
 
+系统 DNS 使用独立的 2 个工作线程和 64 个等待位置，不占用流量落盘线程。解析超时会结束客户端等待；已经进入操作系统的解析调用仍占用名额，直到实际返回，避免反复超时积累无限任务。
+
 ### 面板下发的分流规则
 
 以下是节点配置接口里的字段示例，不是整个 `runtime.json`。面板需能下发这些高级字段；本项目不自动给面板新增编辑界面。
@@ -147,7 +149,7 @@ SOCKS5 服务器目前必须填写 IP；`settings` 可同时添加 `username` �
 
 | 字段 | 匹配与动作 |
 | --- | --- |
-| `routes` | `match` 中域名按后缀匹配，支持 `*.example.com` 和 CIDR；`action` 为 `direct`、`block`/`reject`，或 `proxy` 配合 `action_value` 出站标签 |
+| `routes` | `match` 中域名按后缀匹配，支持 `*.example.com`、裸 IP 和 CIDR；`action` 为 `direct`、`block`/`reject`，或 `proxy` 配合 `action_value` 出站标签 |
 | `custom_route_rules` | 保留原版结构化规则的 **OR**：`domains`、`domain_suffixes`、`ip_cidrs`、`ports`、`networks`、`source_cidrs`、`source_ports` 任一组命中即可；`disabled=true` 跳过 |
 | 结构化动作 | `action.type` 为 `direct`、`block` 或 `route`；仅 `route` 使用 `action.target` 指定出站标签 |
 | `custom_routes` | 支持上例字段及 `port`、`port_range`、`source_ip_cidr`、`source_port`、`source_port_range`；地址条件之间 OR，与端口/网络/来源条件之间 AND；空条件为全匹配 |

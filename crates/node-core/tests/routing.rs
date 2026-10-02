@@ -188,3 +188,25 @@ fn unsupported_routes_dns_and_credentials_are_rejected_before_activation() {
     o.username = Some("user".into());
     assert!(o.validate().is_err());
 }
+
+#[test]
+fn panel_bare_ips_block_literal_and_resolved_destinations_including_mapped_ipv4() {
+    let mut node = NodeSpec::new("vless", 443);
+    node.routes =
+        serde_json::from_value(json!([{"match":["127.0.0.1","2001:db8::1"],"action":"block"}]))
+            .unwrap();
+    let (r, o) = from_node(&node).unwrap();
+    let p = Policy::new(&r, &o).unwrap();
+    for ip in ["127.0.0.1", "::ffff:127.0.0.1", "2001:db8::1"] {
+        for name in [None, Some("resolved.test")] {
+            assert_eq!(
+                selected(&p, name, ip, 443, "tcp", "127.0.0.1:9000"),
+                "block"
+            );
+        }
+    }
+    assert_eq!(
+        selected(&p, None, "127.0.0.2", 443, "tcp", "127.0.0.1:9000"),
+        "direct"
+    );
+}
