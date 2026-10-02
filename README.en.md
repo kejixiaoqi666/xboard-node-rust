@@ -4,7 +4,7 @@
 
 A Rust node backend for Xboard. It runs on a Linux VPS, synchronizes node configuration and users with the panel, authenticates clients, forwards supported proxy traffic, and reports collected payload counters.
 
-This project continues the Rust migration of [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). **`v0.1.0-preview.1` is a preview with a limited protocol and feature set.** It includes a standalone Rust server and an installer. Full upstream parity is still in progress.
+This project continues the Rust migration of [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). **`v0.1.0-preview.2` adds VLESS/Trojan UDP, shared per-user rate limits and active source-IP admission.** It includes a standalone Rust server and an installer. Full upstream parity is still in progress.
 
 ## Install
 
@@ -26,6 +26,9 @@ After installation, `xboard-rust` opens the management menu. Use an actual clien
 | --- | --- |
 | VLESS | TCP, UUID authentication; optional file TLS |
 | Trojan | TCP authentication and file TLS |
+| UDP | VLESS fixed destinations and Trojan multiple destinations; IPv4, IPv6, system domain resolution and file TLS |
+| User rate limits | Decimal Mbps, shared across every connection and both payload directions; 0 means unlimited |
+| Device/source-IP limits | Distinct active source IPs per user on this node; same-IP connections share one slot; 0 means unlimited |
 | Panel synchronization | Xboard v2 machine or v1 legacy REST; one explicitly configured node |
 | WebSocket | Trusted-origin checks, reconnect and node-specific resync hints; REST remains authoritative |
 | User updates | Atomic authentication snapshots; already authenticated connections survive user-only updates |
@@ -35,7 +38,13 @@ After installation, `xboard-rust` opens the management menu. Use an actual clien
 
 The control and data plane use the same Rust executable in separate processes. Default installation does not depend on Go, Xray, or an external sing-box server.
 
-Not yet migrated: REALITY/Vision, UDP/mux, VMess, Shadowsocks, AnyTLS, TUIC, Hysteria2, non-TCP transports, custom routes/outbounds/DNS, rate/device/IP enforcement, multiple nodes/panels in one process, and automatic ACME. Unsupported nonzero limits/settings are explicitly rejected. The Rust runtime JSON is not interchangeable with the original Go YAML.
+`speed_limit=8` means a shared 1,000,000 payload bytes/second budget across upload, download and all connections for that user, with one second of burst credit and a 64 KiB minimum burst. Reconnecting does not reset the shared budget. Only payload bytes are counted, not total network-interface traffic.
+
+`device_limit=2` admits two distinct active source IPs on this node. Devices behind the same public IP share one slot; this is not physical device identification or a cross-node limit. The last connection from an IP releases its slot. User-only policy updates retain authenticated sessions: rate changes apply to them, while lowering IP limits blocks new sources without disconnecting existing ones. Removed users cannot authenticate again; established sessions retain their last observed rate.
+
+UDP associations close after 60 seconds without successful payload activity. Each association tracks at most 64 destination endpoints, with at most 1,024 UDP associations on the node. These are resource bounds, not benchmarked capacity claims.
+
+Not yet migrated: REALITY/Vision, mux/XUDP, VMess, Shadowsocks, AnyTLS, TUIC, Hysteria2, other transports, custom routes/outbounds/DNS, multiple nodes/panels in one process, online-IP reporting to the panel, and automatic ACME. Unsupported settings are explicitly rejected. Native Rust mode enforces supported user limits; the optional legacy external adapter still rejects nonzero limits. The Rust runtime JSON is not interchangeable with the original Go YAML.
 
 For TLS, provide local certificate/key files and set the corresponding panel `cert_mode=file`, `cert_file`, and `key_file`. Existing certificate tooling handles issuance and renewal.
 
@@ -61,13 +70,13 @@ Configuration is at `/etc/xboard-node-rust/runtime.json`. Credentials are stored
 
 Install/update options include `--version TAG`, `--token-file FILE`, `--token-env NAME`, `--yes`, `--no-start`, and offline `--package FILE --checksums FILE`. `--root ABSOLUTE_PATH` stages files without controlling host systemd. HTTP panel URLs are permitted only for literal loopback test addresses. See `bash install.sh --help` and the [Chinese installation guide](docs/INSTALL_ZH.md).
 
-Startup failure during a version switch restores the previous program link and attempts to restart the previous service. This does not reverse panel billing or restore historical traffic state. Cross-format state migrations need explicit release instructions.
+Startup failure during a version switch restores the previous program link and attempts to restart the previous service. This does not reverse panel billing or restore historical traffic state. Rollback to preview.1 requires settings supported by that version, including zero rate/device limits and TCP; cross-version tests use this common configuration. Cross-format state migrations need explicit release instructions.
 
 ## Validation and limits
 
 The retained migration baseline passed Rust formatting, serial workspace tests and strict clippy. Linux ARM64 baseline evidence covers real protocol/TLS connections, user updates, recovery, payload accounting and durability. Those historical GNU binary hashes do not identify the new musl release files.
 
-Release builds separately verify AMD64/ARM64 compilation, installer lifecycle, private permissions, archive rejection, configuration retention, program rollback, and a fresh systemd installation with a synthetic loopback panel and real VLESS/Trojan TCP/TLS payload forwarding. `installer-tests-*.json` and `systemd-tests-*.json` accompany the release assets.
+Release builds separately verify AMD64/ARM64 compilation, installer lifecycle, private permissions, archive rejection, configuration retention and rollback. A fresh systemd installation uses a synthetic loopback panel and real TCP/TLS/UDP echoes, including IPv4, domain and IPv6 targets, zero-length and 65,507-byte datagrams. It measures bidirectional shared limits across two connections and checks live IP/rate policy changes without restarting either process. Upgrade and two-way rollback use the actual published preview.1 binary and retain configuration and native counter identity. `installer-tests-*.json` and `systemd-tests-*.json` accompany the release assets and measurements.
 
 Unpersisted crash-tail bytes can still be lost; periodic checkpoints do not guarantee zero loss on power failure. Ambiguous report delivery pauses the batch until reconciled. API acceptance does not prove billing-database reconciliation. The tests do not establish maximum TCP capacity, WAN speed or long-running production stability.
 

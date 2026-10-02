@@ -31,6 +31,8 @@ use tokio::{net::TcpListener, task::JoinSet};
 use tokio_rustls::TlsAcceptor;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tls_backpressure;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -334,6 +336,7 @@ async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
         .map_err(|_| Error::Protocol)??;
     if protocol == config::Protocol::Vless {
         inbound.write_all(&[0, 0]).await?;
+        inbound.flush().await?;
     }
     if request.command == protocol::Command::Udp {
         return udp::relay(inbound, request, protocol, &lease, users, counter).await;
@@ -379,6 +382,10 @@ where
             }
             lease.charge(size, users).await;
             writer.write_all(&buffer[..size]).await?;
+            // TLS may accept plaintext while ciphertext still waits for the
+            // socket. Flush before waiting for the next read, so a request/
+            // response protocol cannot strand the last chunk under backpressure.
+            writer.flush().await?;
         }
     }
     tokio::try_join!(copy(ir, ow, lease, users), copy(or, iw, lease, users))?;

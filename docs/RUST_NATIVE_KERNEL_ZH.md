@@ -1,6 +1,6 @@
 # Rust 原生协议数据层
 
-本文记录前一轮 rn3 的冻结协议验证结果；最新流量记账候选及新的交付版本见 [流量统计与持久队列](RUST_TRAFFIC_ZH.md)。下文 rn3 二进制哈希与资源数字仅属于该历史片段。
+本文记录前一轮 rn3 的冻结协议验证结果。preview.2 已增加 UDP、共享限速和来源 IP 限制，当前支持范围与发行测试见 [项目首页](../README.md)；流量语义见 [流量统计与持久队列](RUST_TRAFFIC_ZH.md)。下文 rn3 的范围、二进制哈希与资源数字仅属于该历史片段。
 
 本片段把此前仍由 Go 执行的已支持协议数据层迁入 Rust workspace，新增 `crates/node-native`。控制层、协议解析、认证、TLS 和 TCP 转发都由同一份 `xboard-node-rust` 二进制执行；默认配置无需 sing-box、xray 或 `xbord-native-users` 服务端。仍以控制/数据两个 Rust 进程隔离故障，用户只需提供一个程序文件。
 

@@ -79,10 +79,14 @@ async fn resolve(address: &Address, port: u16) -> Result<SocketAddr, Error> {
     match address {
         Address::Ip(ip) => Ok(canonical(SocketAddr::new(*ip, port))),
         Address::Domain(name) => {
-            let addresses: Vec<_> = tokio::net::lookup_host((name.as_str(), port))
-                .await?
-                .take(32)
-                .collect();
+            let addresses: Vec<_> = tokio::time::timeout(
+                Duration::from_secs(10),
+                tokio::net::lookup_host((name.as_str(), port)),
+            )
+            .await
+            .map_err(|_| Error::Protocol)??
+            .take(32)
+            .collect();
             addresses
                 .iter()
                 .find(|address| address.is_ipv4())
@@ -205,6 +209,7 @@ pub(crate) async fn relay<S: AsyncRead + AsyncWrite + Unpin>(
             lease.charge(size, users).await;
             writer.write_all(&header(protocol, source, size)).await?;
             write_payload(&mut writer, body, counter.as_ref()).await?;
+            writer.flush().await?;
             *last.lock().unwrap_or_else(|e| e.into_inner()) = Instant::now();
         }
     };

@@ -45,6 +45,7 @@ struct Account {
     ips: Mutex<HashMap<IpAddr, usize>>,
     bucket: tokio::sync::Mutex<Bucket>,
     last_speed: std::sync::atomic::AtomicU64,
+    last_devices: std::sync::atomic::AtomicU32,
 }
 
 impl Registry {
@@ -79,6 +80,30 @@ impl Registry {
         if registry.len() >= 65536 && !registry.contains_key(&name) {
             return Err(Error::Limited);
         }
+        let existing = registry.get(&name).cloned();
+        let observed = self
+            .users
+            .as_ref()
+            .and_then(|users| users.load().policy(&name));
+        // Authentication may have completed before a policy change/removal,
+        // while the remaining request header arrived later. A stale handshake
+        // must not overwrite an existing user's most recently observed limits.
+        let policy = if self.users.is_some() {
+            observed
+                .or_else(|| {
+                    existing.as_ref().map(|account| Policy {
+                        bytes_per_second: account
+                            .last_speed
+                            .load(std::sync::atomic::Ordering::Acquire),
+                        devices: account
+                            .last_devices
+                            .load(std::sync::atomic::Ordering::Acquire),
+                    })
+                })
+                .unwrap_or(policy)
+        } else {
+            policy
+        };
         let account = registry.entry(Arc::clone(&name)).or_default().clone();
         let mut ips = account.ips.lock().unwrap_or_else(|e| e.into_inner());
         if !ips.contains_key(&ip) && policy.devices > 0 && ips.len() >= policy.devices as usize {
@@ -90,6 +115,9 @@ impl Registry {
             policy.bytes_per_second,
             std::sync::atomic::Ordering::Release,
         );
+        account
+            .last_devices
+            .store(policy.devices, std::sync::atomic::Ordering::Release);
         drop(ips);
         drop(registry);
         Ok(Lease { name, ip, account })
@@ -124,6 +152,9 @@ impl Lease {
         let speed = || {
             use std::sync::atomic::Ordering;
             if let Some(policy) = users.load().policy(&self.name) {
+                self.account
+                    .last_devices
+                    .store(policy.devices, Ordering::Release);
                 self.account
                     .last_speed
                     .store(policy.bytes_per_second, Ordering::Release);
@@ -253,6 +284,46 @@ mod tests {
         };
         let started = Instant::now();
         tokio::join!(a.charge(125_000, &users), change);
+        assert!(started.elapsed() <= Duration::from_millis(101));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn deleted_user_stale_handshake_cannot_reset_last_observed_limits() {
+        let users = users(0);
+        let registry = Arc::new(Registry::new(Arc::clone(&users)));
+        let stale = Policy::new(0, 0).unwrap();
+        let lease = registry
+            .acquire("7".into(), "127.0.0.1".parse().unwrap(), stale)
+            .unwrap();
+        let limited = crate::tests::config(serde_json::json!([{
+            "name":"7", "uuid":"00000000-0000-4000-8000-000000000007", "speed_limit":1, "device_limit":1
+        }]));
+        users.store(
+            crate::config::decode(limited.to_string().as_bytes())
+                .unwrap()
+                .auth,
+        );
+        lease.charge(125_000, &users).await;
+        users.store(
+            crate::config::decode(
+                crate::tests::config(serde_json::json!([]))
+                    .to_string()
+                    .as_bytes(),
+            )
+            .unwrap()
+            .auth,
+        );
+        let late = registry
+            .acquire("7".into(), "127.0.0.1".parse().unwrap(), stale)
+            .unwrap();
+        assert!(
+            registry
+                .acquire("7".into(), "127.0.0.2".parse().unwrap(), stale)
+                .is_err()
+        );
+        let started = Instant::now();
+        late.charge(12_500, &users).await;
+        assert!(started.elapsed() >= Duration::from_millis(100));
         assert!(started.elapsed() <= Duration::from_millis(101));
     }
     #[test]

@@ -68,7 +68,10 @@ def main():
     parser = argparse.ArgumentParser()
     for name in ['binary', 'package', 'checksums', 'output']:
         parser.add_argument('--' + name, type=Path, required=True)
+    parser.add_argument('--previous-package', type=Path)
+    parser.add_argument('--previous-checksums', type=Path)
     args = parser.parse_args()
+    assert bool(args.previous_package) == bool(args.previous_checksums)
     assert os.geteuid() == 0 and Path('/run/systemd/system').is_dir()
     managed_paths = [CONFIG_DIR, STATE_DIR, LIB_DIR, Path('/usr/local/bin/xboard-rust'),
         Path('/usr/local/bin/xboard-node-rust'), Path('/etc/systemd/system') / UNIT]
@@ -106,6 +109,7 @@ def main():
 
         class DatagramServer(socketserver.ThreadingUDPServer):
             daemon_threads = True
+            max_packet_size = 65536
 
         class DatagramServer6(DatagramServer):
             address_family = socket.AF_INET6
@@ -307,7 +311,8 @@ def main():
                                 assert reply_ip == ip and reply_port == port
                             reply_size = struct.unpack('!H', receive(stream, 2))[0]
                             if protocol == 'trojan': assert receive(stream, 2) == b'\r\n'
-                            assert reply_size == size and receive(stream, size) == body
+                            assert reply_size == size, (protocol, ip, size, reply_size)
+                            assert receive(stream, size) == body, (protocol, ip, size, 'payload differs')
                     finally:
                         if shared is None: stream.close()
             finally:
@@ -348,6 +353,37 @@ def main():
             assert systemctl('show', UNIT, '-p', 'Result', '--value').stdout.strip() == 'start-limit-hit'
             run('start'); wait(fetch)
             cases.append('real-systemd-start-limit-reproduced-and-explicit-manager-start-recovers')
+            if args.previous_package:
+                prior = read_package(args.previous_package)
+                prior_info = json.loads(prior['BUILDINFO.json'])
+                assert prior_info['version'] == 'v0.1.0-preview.1'
+                assert prior_info['commit'] == 'cb3f01fc6a7cefa0afa43fc4a46b3cd9d597304f'
+                assert prior_info['binary_sha256'] != sha(args.binary.read_bytes())
+                assert prior_info['state_format'] == json.loads(files['BUILDINFO.json'])['state_format']
+                run('stop')
+                book = json.loads((STATE_DIR / 'native-traffic.json').read_text())
+                config_hashes = {name: sha((CONFIG_DIR / name).read_bytes()) for name in ['runtime.json', 'panel.env']}
+                run('update', '--package', args.previous_package.resolve(), '--checksums', args.previous_checksums.resolve())
+                wait(fetch)
+                assert sha((CURRENT / 'bin/xboard-node-rust').read_bytes()) == prior_info['binary_sha256']
+                run('update', '--package', args.package.resolve(), '--checksums', args.checksums.resolve())
+                wait(fetch)
+                assert sha((CURRENT / 'bin/xboard-node-rust').read_bytes()) == sha(args.binary.read_bytes())
+                run('rollback'); wait(fetch)
+                assert sha((CURRENT / 'bin/xboard-node-rust').read_bytes()) == prior_info['binary_sha256']
+                run('rollback'); wait(fetch)
+                assert sha((CURRENT / 'bin/xboard-node-rust').read_bytes()) == sha(args.binary.read_bytes())
+                run('stop')
+                after_book = json.loads((STATE_DIR / 'native-traffic.json').read_text())
+                assert all(book[key] == after_book[key] for key in ['version', 'destination', 'epoch'])
+                assert after_book['sequence'] > book['sequence']
+                assert config_hashes == {name: sha((CONFIG_DIR / name).read_bytes()) for name in config_hashes}
+                run('start'); wait(fetch)
+                measurements['actual_previous_release'] = {
+                    'version': prior_info['version'], 'commit': prior_info['commit'],
+                    'previous_binary_sha256': prior_info['binary_sha256'], 'new_binary_sha256': sha(args.binary.read_bytes()),
+                    'native_counter_epoch_retained': True, 'sequence_before': book['sequence'], 'sequence_after': after_book['sequence']}
+                cases.append('actual-preview1-to-new-binary-upgrade-and-two-way-rollback-preserve-config-and-native-counter-identity')
             live_limits()
             # PrivateTmp hides /tmp from the service; test TLS material lives in its managed state directory.
             cert = STATE_DIR / 'fixture-cert.pem'; key = STATE_DIR / 'fixture-key.pem'

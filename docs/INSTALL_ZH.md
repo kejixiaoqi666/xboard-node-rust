@@ -6,7 +6,7 @@
 
 - Linux AMD64 或 ARM64，已运行 systemd，使用 root。推荐 Debian 12/13、Ubuntu 22.04/24.04。
 - 已有 Xboard 面板和一个明确的节点 ID；v2 machine 模式还需要服务器 ID 与对应 token。
-- 面板给该节点配置当前支持的 VLESS/Trojan TCP。REALITY、非 TCP、非零限速/设备限制等未迁移设置会被拒绝。
+- 面板给该节点配置当前支持的 VLESS/Trojan；TCP 和协议内 UDP 已支持，原生 Rust 模式执行用户限速和来源 IP 限制。REALITY、Vision、mux 和其他未迁移配置会被拒绝。
 - TLS 需要已有证书和私钥文件，并在面板填入 file 证书配置。推荐放在 `/etc/ssl/` 或 `/etc/letsencrypt/`，本服务启用了 `ProtectHome=true`。
 - 需要按面板设置开放节点端口；脚本不会修改防火墙或其他网络参数。
 
@@ -34,8 +34,8 @@ apt-get install -y ca-certificates curl
 先下载安装器，再运行指定版本：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.1/install.sh -o install.sh
-bash install.sh install --version v0.1.0-preview.1
+curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.2/install.sh -o install.sh
+bash install.sh install --version v0.1.0-preview.2
 ```
 
 自动化安装时，从权限为 0600 的文件或指定环境变量读取 token，避免把 token 直接写在命令参数中。例如先用编辑器准备 `/root/panel-token`：
@@ -69,7 +69,7 @@ ARM64 改用 `xboard-node-rust-linux-arm64.tar.gz`。归档在解压前校验，
 xboard-rust                 # 菜单
 xboard-rust configure       # 重新配置；空 token 沿用已有 token
 xboard-rust update          # 最新有本架构文件的已发布版，含预览版
-xboard-rust update --version v0.1.0-preview.1
+xboard-rust update --version v0.1.0-preview.2
 xboard-rust rollback        # 上一个程序版本；检查声明的状态格式
 xboard-rust start
 xboard-rust stop
@@ -99,7 +99,9 @@ xboard-rust uninstall
 | 找不到对应架构下载 | 确认 Release 已公开，并包含这台 VPS 的 AMD64/ARM64 文件 |
 | 安装路径已存在但无所有权标记 | 检查目录是谁创建的；不要为了安装覆盖他人的文件 |
 | 本地检查成功，客户端仍不能连接 | 查看日志，确认面板配置/用户已获取、节点协议受支持、端口和证书可用 |
-| 非零限制导致配置被拒绝 | 当前限速/设备/IP 执行尚未迁移；不要把没有执行限制解释成等价支持 |
+| 非零限制导致配置被拒绝 | 确认使用 preview.2 或更高的原生 Rust 模式；旧 preview.1 和可选外部内核 adapter 不执行这些限制，仍会拒绝 |
+| 设置限速后单连接速率与预期不同 | 同一用户所有连接的上传和下载共用预算，单位是十进制 Mbps；有一秒突发额度，最小 64 KiB |
+| 同一 IP 多设备仍能连接 | 限制统计本节点不同来源 IP，同一个公网 IP 共用名额，不能识别实际设备数量 |
 | 文件证书不可读 | 检查文件路径与权限；`ProtectHome` 会隐藏家目录，私钥应放在服务可读取的位置 |
 | 用户删除后旧连接还在 | 当前仅拒绝新认证；已认证会话不会被强制断开 |
 | 上报批次显示 uncertain | 停机后用 `traffic-status` 看批次，先与实际面板记录核对；不盲目重发 |
