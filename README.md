@@ -4,7 +4,7 @@
 
 **用 Rust 重构的 Xboard 节点后端。** 安装在 Linux VPS 上，向 Xboard 面板获取节点配置和用户列表，并提供当前已迁移的代理协议、用户同步和流量统计能力。
 
-本项目从 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3) 的迁移工作继续开发，目标是保留原版的使用流程，改进运行架构、配置更新和资源管理。**`v0.1.0-preview.4`** 增加文件 TLS 下的 VLESS Vision TCP：支持填充、去填充和内层 TLS 1.3 的双向直通切换。保留 TCP/UDP、共享限速、来源 IP 限制、路由、自定义 DNS 和 SOCKS5 TCP 上游。Rust 服务端可独立运行，一键安装和管理入口已提供，完整原版功能仍在迁移。
+本项目从 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3) 的迁移工作继续开发，目标是保留原版的使用流程，改进运行架构、配置更新和资源管理。**`v0.1.0-preview.5`** 增加文件 TLS 下的 VLESS Vision TCP：支持填充、去填充和内层 TLS 1.3 的双向直通切换。保留 TCP/UDP、共享限速、来源 IP 限制、路由、自定义 DNS 和 SOCKS5 TCP 上游。Rust 服务端可独立运行，一键安装和管理入口已提供，完整原版功能仍在迁移。
 
 ## 先了解它做什么
 

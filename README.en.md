@@ -4,7 +4,7 @@
 
 A Rust node backend for Xboard. It runs on a Linux VPS, synchronizes node configuration and users with the panel, authenticates clients, forwards supported proxy traffic, and reports collected payload counters.
 
-This project continues the Rust migration of [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). **`v0.1.0-preview.4` adds native VLESS Vision TCP over file TLS 1.3**, including padding, unpadding and bidirectional inner-TLS-1.3 direct switching. It retains TCP/UDP, shared rate/IP limits, routing, custom DNS and SOCKS5 TCP outbounds. It includes a standalone Rust server and an installer. Full upstream parity is still in progress.
+This project continues the Rust migration of [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). **`v0.1.0-preview.5` adds native VLESS Vision TCP over file TLS 1.3**, including padding, unpadding and bidirectional inner-TLS-1.3 direct switching. It retains TCP/UDP, shared rate/IP limits, routing, custom DNS and SOCKS5 TCP outbounds. It includes a standalone Rust server and an installer. Full upstream parity is still in progress.
 
 ## Install
 

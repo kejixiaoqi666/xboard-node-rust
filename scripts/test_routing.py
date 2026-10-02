@@ -224,8 +224,17 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
             held.bind(('127.0.0.1', 0))
             held.settimeout(8)
             peer_port = held.getsockname()[1]
-            config['custom_routes'].insert(0, {'source_port': [peer_port], 'outbound': 'block'})
-            old_children = child_ids(); wait(lambda: child_ids() != old_children and fetch())
+            # A replacement child may belong to an earlier in-flight panel
+            # response. Prove this exact candidate is active before using the
+            # held source port; PID change alone is not a policy receipt.
+            activation_marker = 'port-rule-ready-' + uuid.uuid4().hex + '.test'
+            old_children = child_ids()
+            config['custom_routes'] = [
+                {'source_port': [peer_port], 'outbound': 'block'},
+                {'domain': [activation_marker], 'outbound': 'block'},
+                *config['custom_routes'],
+            ]
+            wait(lambda: child_ids() != old_children and denied(activation_marker) and fetch())
             held.connect(node_address)
             rejected = False
             try:
@@ -238,7 +247,8 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
         measurements['routing_dns'] = {'dns_requests': dict(counts), 'socks_pinned_destinations': targets,
             'system_only_name': system_only_name, 'installed_ELF_system_hosts_positive': True,
             'custom_NXDOMAIN_did_not_fall_back_to_system': True,
-            'controller_retained_during_panel_route_updates': True, 'invalid_route_retained_native_child': True}
+            'controller_retained_during_panel_route_updates': True, 'invalid_route_retained_native_child': True,
+            'source_port_rule_activation_barrier': 'unique marker block and ordinary payload success before held-port attempt'}
     finally:
         try:
             for key in ['custom_outbounds', 'custom_routes']:

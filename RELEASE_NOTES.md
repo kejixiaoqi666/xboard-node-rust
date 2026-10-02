@@ -1,4 +1,4 @@
-# Xboard Node Rust v0.1.0-preview.4
+# Xboard Node Rust v0.1.0-preview.5
 
 增加 **VLESS Vision TCP + 文件 TLS 1.3**，保持现有 Rust 控制/数据层、路由、DNS、SOCKS5 TCP、UDP、共享限速、来源 IP 名额、持久计数及一键安装管理。
 
@@ -10,6 +10,8 @@
 - 保持既有的有效载荷计数和共享限速。HTTPS 有效载荷包含内层 TLS 记录，排除 Vision 填充和外层 TLS 开销；不是文件明文大小。
 - 双架构实际安装验收使用固定官方 Xray v26.3.27 客户端：普通 TCP、内层 TLS1.3 双向 DIRECT、TLS1.2、线上字节捕获证明的 HRR、缺 flow/错 UUID 不连接目标。客户端仅用于测试，不随服务器交付。
 - Vision 模块窄提取自 MIT 许可的 cfal/shoes，保留确切来源提交、文件摘要和原许可；未引入完整 shoes 服务或自定义 TLS 加密实现。
+
+来源端口回归测试现在先验证同一候选中的唯一域名阻断规则已生效，并确认普通业务仍成功，再尝试固定来源端口。preview.4 标签第一次验收暴露了旧测试把子进程更换当规则生效的竞态；该标签保留且未公开 release，修正后以 preview.5 交付。
 
 ## 安装与升级
 

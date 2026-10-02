@@ -70,7 +70,7 @@ WS 与 REST 没有共同的面板版本号，因此运行时不把本地到达�
 | REALITY、AnyTLS、TUIC、Hysteria2、VMess、SS | 模型可表达部分配置；当前运行 adapter 尚不支持 |
 | 自定义路由、出站、DNS | preview.3 增加受限有序规则、UDP/TCP/系统 DNS、hosts/TTL 缓存和 SOCKS5 TCP；明确边界见首页 |
 | 非 TCP transport | 尚未实现；未知设置明确拒绝 |
-| Vision TCP | preview.4 在文件 TLS1.3 下支持填充、去填充、TLS1.3 双向 DIRECT；官方客户端双架构回环验收，非生产吞吐声明 |
+| Vision TCP | preview.5 在文件 TLS1.3 下支持填充、去填充、TLS1.3 双向 DIRECT；官方客户端双架构回环验收，非生产吞吐声明 |
 | xray、多节点/多面板、ACME、持久恢复 | 未接入；当前程序不宣称完整 Go 功能等价 |
 
 默认 Rust 模式的仅用户更新保持已认证连接；删除用户禁止新的认证，不强制断开已有会话。其他配置变更仍是可恢复的 stop/start。TCP ready 只证明监听存在；完整协议验收需要真实客户端，不能由进程存活代替。当前默认路径详见 [Rust 原生协议数据层](RUST_NATIVE_KERNEL_ZH.md)，此前 Go 过渡方案测量见 [历史用户热更新报告](RUST_NATIVE_USERS_ZH.md)。

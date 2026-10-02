@@ -34,8 +34,8 @@ apt-get install -y ca-certificates curl
 先下载安装器，再运行指定版本：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.4/install.sh -o install.sh
-bash install.sh install --version v0.1.0-preview.4
+curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.5/install.sh -o install.sh
+bash install.sh install --version v0.1.0-preview.5
 ```
 
 自动化安装时，从权限为 0600 的文件或指定环境变量读取 token，避免把 token 直接写在命令参数中。例如先用编辑器准备 `/root/panel-token`：
@@ -69,7 +69,7 @@ ARM64 改用 `xboard-node-rust-linux-arm64.tar.gz`。归档在解压前校验，
 xboard-rust                 # 菜单
 xboard-rust configure       # 重新配置；空 token 沿用已有 token
 xboard-rust update          # 最新有本架构文件的已发布版，含预览版
-xboard-rust update --version v0.1.0-preview.4
+xboard-rust update --version v0.1.0-preview.5
 xboard-rust rollback        # 上一个程序版本；检查声明的状态格式
 xboard-rust start
 xboard-rust stop
