@@ -1,28 +1,30 @@
-# Xboard Node Rust v0.1.0-preview.2
+# Xboard Node Rust v0.1.0-preview.3
 
-在首个独立 Rust 预览版上补齐 UDP、用户共享限速和来源 IP 名额，继续沿用一键安装和 systemd 管理。
+本版继续补齐 Rust 原生网络能力：自定义路由、DNS 和 SOCKS5 TCP 上游。保留 preview.2 的 TCP/UDP、文件 TLS、共享限速、来源 IP 限制、持久流量统计及一键安装管理。
 
-## 本版内容
+## 新增功能
 
-- VLESS/Trojan TCP 与协议内 UDP；IPv4、IPv6、系统域名解析、文件 TLS。Trojan UDP 支持一个关联访问多个目标，VLESS UDP 使用固定目标。
-- 用户 `speed_limit` 以十进制 Mbps 设置；所有连接的上传加下载共用预算，重连不刷新额度。0 表示不限速，突发额度为一秒、最小 64 KiB。
-- `device_limit` 限制本节点每个用户同时活跃的不同来源 IP；同 IP 多连接共用名额，最后一条连接结束时释放。它不识别物理设备，也不是跨节点计数。
-- 用户政策热更新：已有连接采用新限速；降低 IP 名额时保留已有连接，拒绝超额新来源。删除后的迟到握手不会覆盖已有会话最后观察到的限制。
-- 修复异步 TLS 发送背压下尾部数据可能滞留的问题，使用真实 Rustls 流与 512 字节传输缓冲区作 TCP/UDP 回归。
-- Xboard 单节点 REST 同步、WS 重同步提示、原子用户更新、候选配置校验和数据层恢复。
-- 有效载荷计数、原生持久快照/采集回执、有界存储工作及持久待报队列。
-- Linux AMD64/ARM64 静态 musl 包，发行与包内文件 SHA-256、构建元数据、源码绑定及第三方许可说明。
-- 交互菜单、安装/配置/升级/程序回退、systemd 启停/状态/日志、停机队列查看和保留数据的卸载。
-- 两架构实际安装与 systemd 测试：TCP/TLS/UDP 回显、域名/IPv6、空包及 65,507 字节大包、双连接双向共享限速、IP 名额及热更新，另用已公开 preview.1 实际程序验证升级和双向回退。报告与计时 JSON 随附件提供。
+- 按域名、域名后缀、IPv4/IPv6 CIDR、目标端口、TCP/UDP、来源 IP/端口匹配路由；支持直连、阻断及 SOCKS5 TCP（可用用户名/密码）。
+- 支持面板 `routes`、`custom_route_rules` 和受限 `custom_routes`；结构化规则保留原版 OR 含义，原始规则支持组合条件，首条命中生效。
+- 本地 `runtime.json` 可设置 DNS 服务器、UDP/TCP、TCP-only、静态 hosts、IPv4/IPv6 策略、超时和共享 TTL 缓存。
+- DNS 结果先经过路由检查，实际连接使用同一个 IP；指定 DNS 失败时不回退系统 DNS，UDP 命中代理不会偷偷直连。
+- 面板路由变化预检查通过后更换数据进程；错误配置保留原服务和路由。仅用户变化继续热更新。DNS 本地配置变化需重启服务。
+- 新增真实安装后 DNS 缓存/过期、截断转 TCP、静态 hosts、NXDOMAIN、认证 SOCKS5、路由更新、错误候选保留、来源端口规则验证；继续运行旧版 TCP/TLS/UDP、流量、安装/升级/双向回退回归。
 
-安装：
+## 安装和升级
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/main/install.sh) install
+# 已安装：
+xboard-rust update
 ```
+
+Linux AMD64/ARM64 静态包、SHA-256、构建信息、精确依赖许可和安装/systemd 测试报告随附件提供。详细配置见 [中文首页](https://github.com/kejixiaoqi666/xboard-node-rust#路由与-dns-怎么用) 和 [English README](https://github.com/kejixiaoqi666/xboard-node-rust/blob/main/README.en.md)。
 
 ## 当前边界
 
-这是预览版，尚未迁完 REALITY/Vision、mux/XUDP、其他协议和传输、完整路由/DNS、单进程多节点、在线 IP 面板上报和自动 ACME。UDP 每个关联最多 64 个目标，全节点最多 1,024 个 UDP 关联，无成功载荷活动 60 秒后释放；这些上限不是已测承载能力。Rust JSON 与原 Go YAML 不直接互换。未落盘强杀尾部、未知上报对账和实际面板计费仍有明确边界。升级/回退保留当前流量状态，不回滚计费。回退 preview.1 前，面板需使用旧版支持的配置（含零限速和零设备限制）。
+仍是预览版。REALITY/Vision、mux/XUDP、其他协议和传输、GeoIP/GeoSite/正则/规则集、其他代理出站、SOCKS5 UDP、代理链、DoH/DoT、单进程多节点、在线 IP 上报和 ACME 尚未迁完。SOCKS5 服务器目前填写 IP；域名由本节点解析，SOCKS5 凭据需要可信链路。结构化规则任一匹配组生效；不默认加入私网阻断规则。Rust JSON 与原 Go YAML 不直接互换。
 
-English: This preview adds VLESS/Trojan UDP, aggregate per-user rate budgets, active source-IP admission and live policy changes. Real TLS backpressure regressions prevent buffered response tails from stalling. Linux AMD64/ARM64 assets include installer/service tests and timing measurements, including upgrade/rollback with the actual preview.1 binary. IP admission counts source IPs on this node, not physical devices or cross-node totals. REALITY/Vision, mux and other protocols, full routing/DNS, multinode and ACME remain in progress. Production billing reconciliation, WAN capacity and long-term stability are not claimed. See [English README](https://github.com/kejixiaoqi666/xboard-node-rust/blob/main/README.en.md) for details.
+回退 preview.1/2 前，删除本版新增 DNS/路由/出站配置，并使用旧版支持的用户限制。升级/回退保留当前流量状态，不回滚计费。未落盘强杀尾部、未知上报对账和真实面板计费仍有原有边界；回环验证不代表公网最大吞吐或长期生产稳定性。
+
+English: Adds native domain/IP/port/source routing, custom UDP/TCP DNS with shared TTL caching and hosts, and authenticated SOCKS5 TCP outbounds. The routed IP is pinned for I/O; unsupported UDP proxying fails without direct fallback. Invalid route candidates retain the old running child. Structured panel rules preserve upstream OR semantics. Tests exercise real installed Linux binaries, DNS fixtures, proxy forwarding and prior lifecycle/accounting behavior. Full protocol parity, encrypted DNS, production billing reconciliation, WAN capacity and long-term stability remain unclaimed. See the English README for exact configuration and bounds.

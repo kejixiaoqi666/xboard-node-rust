@@ -19,6 +19,8 @@ use traffic::{Outbox, TrafficError};
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeConfig {
+    #[serde(default)]
+    pub dns: Option<node_core::routing::DnsConfig>,
     pub panel_url: String,
     /// Explicit local fixture support; remote panels continue to require HTTPS.
     #[serde(default)]
@@ -56,6 +58,12 @@ fn default_poll() -> u64 {
 }
 impl RuntimeConfig {
     pub fn validate(&self) -> Result<(), RuntimeError> {
+        if let Some(dns) = &self.dns {
+            if self.singbox_executable.is_some() {
+                return Err(RuntimeError::Config);
+            }
+            dns.validate().map_err(|_| RuntimeError::Config)?;
+        }
         if self.node_id == 0
             || ((self.native_user_updates || self.singbox_executable.is_none()) && !cfg!(unix))
             || self.machine_id == Some(0)

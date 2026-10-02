@@ -4,7 +4,7 @@
 
 A Rust node backend for Xboard. It runs on a Linux VPS, synchronizes node configuration and users with the panel, authenticates clients, forwards supported proxy traffic, and reports collected payload counters.
 
-This project continues the Rust migration of [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). **`v0.1.0-preview.2` adds VLESS/Trojan UDP, shared per-user rate limits and active source-IP admission.** It includes a standalone Rust server and an installer. Full upstream parity is still in progress.
+This project continues the Rust migration of [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). **`v0.1.0-preview.3` adds domain/IP/port routing, custom DNS and SOCKS5 TCP outbounds** to the existing TCP/UDP, shared per-user rate limits and source-IP admission. It includes a standalone Rust server and an installer. Full upstream parity is still in progress.
 
 ## Install
 
@@ -44,9 +44,63 @@ The control and data plane use the same Rust executable in separate processes. D
 
 UDP associations close after 60 seconds without successful payload activity. Each association tracks at most 64 destination endpoints, with at most 1,024 UDP associations on the node. These are resource bounds, not benchmarked capacity claims.
 
-Not yet migrated: REALITY/Vision, mux/XUDP, VMess, Shadowsocks, AnyTLS, TUIC, Hysteria2, other transports, custom routes/outbounds/DNS, multiple nodes/panels in one process, online-IP reporting to the panel, and automatic ACME. Unsupported settings are explicitly rejected. Native Rust mode enforces supported user limits; the optional legacy external adapter still rejects nonzero limits. The Rust runtime JSON is not interchangeable with the original Go YAML.
+Not yet migrated: REALITY/Vision, mux/XUDP, VMess, Shadowsocks, AnyTLS, TUIC, Hysteria2, other transports, GeoIP/GeoSite, regex/rule sets, other proxy outbounds, encrypted DNS, multiple nodes/panels in one process, online-IP reporting to the panel, and automatic ACME. Unsupported settings are explicitly rejected. Native Rust mode enforces supported user limits; the optional legacy external adapter still rejects nonzero limits and native routing/DNS options. The Rust runtime JSON is not interchangeable with the original Go YAML.
 
 For TLS, provide local certificate/key files and set the corresponding panel `cert_mode=file`, `cert_file`, and `key_file`. Existing certificate tooling handles issuance and renewal.
+
+## Routing and DNS
+
+Routes can send selected traffic directly, block it, or use a SOCKS5 TCP upstream. They affect client proxy traffic, not the controller's Xboard connection.
+
+Merge this `dns` field into `/etc/xboard-node-rust/runtime.json`, retaining existing panel/node fields and backing up the file first:
+
+```json
+{
+  "dns": {
+    "servers": ["1.1.1.1:53", "8.8.8.8:53"],
+    "tcp_only": false,
+    "strategy": "prefer_ipv4",
+    "timeout_ms": 3000,
+    "cache_size": 1024,
+    "hosts": {"internal.example.com": ["192.0.2.10"]}
+  }
+}
+```
+
+Replace example addresses, then run `xboard-rust check` and `xboard-rust restart`. Server addresses support IPv4 and `[IPv6]:port`. With no custom servers, resolution uses the OS. Custom servers use UDP with TCP fallback for truncated replies, or TCP exclusively when `tcp_only=true`. There is no fallback to OS DNS when custom resolution fails. Explicit hosts take priority. Strategies are `prefer_ipv4`, `prefer_ipv6`, `ipv4_only`, and `ipv6_only`; they filter/sort domain answers, not literal client IP destinations.
+
+The shared custom cache respects TTL, capped at 300 seconds for positive and 30 seconds for negative answers. `cache_size` counts responses; 0 disables caching. OS caching remains OS-managed. Bounds: 8 servers, 4,096 hosts, 32 returned IPs, 256 simultaneous network lookups per data process; overload fails. Timeout range: 100–10,000 ms, with a separate overall TCP handshake/connect deadline.
+
+These fields belong to the **panel node response**, not `runtime.json`. Your panel must provide an interface that emits them; this project does not add a panel UI:
+
+```json
+{
+  "custom_outbounds": [
+    {"tag": "upstream", "protocol": "socks", "settings": {
+      "server": "192.0.2.20", "server_port": 1080
+    }}
+  ],
+  "custom_routes": [
+    {"domain_suffix": ["blocked.example"], "outbound": "block"},
+    {"ip_cidr": ["10.0.0.0/8"], "outbound": "block"},
+    {"domain": ["proxy.example"], "network": ["tcp"], "outbound": "upstream"}
+  ]
+}
+```
+
+SOCKS5 servers currently require an IP. Optional `username` and `password` must appear together; SOCKS5 does not encrypt these credentials, so use a trusted link. The exact IP checked by the local route policy is used for direct I/O or sent to SOCKS5. UDP selecting a proxy is rejected rather than bypassing the proxy. VLESS UDP pins its destination for the association; Trojan UDP evaluates each datagram, closing the association on a blocked destination or resolution failure.
+
+Precedence is `custom_route_rules`, then `custom_routes`, then `routes`; first matching rule wins, default direct. No implicit private-network block is added in this preview. Configure explicit CIDRs when needed.
+
+| Input | Supported semantics |
+| --- | --- |
+| `routes` | Suffix domains including `*.example.com`, or CIDRs in `match`; `direct`, `block`/`reject`, or `proxy` with an outbound tag in `action_value` |
+| `custom_route_rules` | Preserves upstream **OR** across `domains`, `domain_suffixes`, `ip_cidrs`, `ports`, `networks`, `source_cidrs`, `source_ports`; skips `disabled=true` |
+| Structured actions | `direct`, `block`, or `route`; only `route` uses `action.target` |
+| `custom_routes` | `domain`, `domain_suffix`, `ip_cidr`, `port`, `port_range`, `network`, `source_ip_cidr`, `source_port`, `source_port_range`, `outbound`; address predicates OR, combined with port/network/source groups using AND; no predicates matches all |
+| Values | Port numbers or `80:90`/`80-90` ranges; case-insensitive domains with terminal dots normalized and label-boundary suffix matching |
+
+Bounds: 4,096 compiled rules, 16,384 match values, 256 outbounds. Valid panel routing changes replace the native child and disconnect its sessions; invalid candidates preserve the prior child. User-only updates remain hot. Local DNS changes require a service restart. Before downgrading to preview.1/2, remove new routing/outbound/DNS fields and use that version's supported limits.
 
 ## Manage
 

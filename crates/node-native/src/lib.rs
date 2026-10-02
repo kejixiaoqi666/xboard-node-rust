@@ -4,6 +4,8 @@ pub mod config;
 #[cfg(unix)]
 mod control;
 pub mod limits;
+#[cfg(any(unix, test))]
+mod network;
 pub mod protocol;
 #[cfg(any(unix, test))]
 mod traffic;
@@ -21,14 +23,13 @@ use std::sync::Arc;
 use std::{net::SocketAddr, time::Duration};
 use thiserror::Error;
 #[cfg(any(unix, test))]
-use tokio::{
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
-    net::TcpStream,
-};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 #[cfg(unix)]
 use tokio::{net::TcpListener, task::JoinSet};
 #[cfg(unix)]
 use tokio_rustls::TlsAcceptor;
+#[cfg(test)]
+mod network_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
@@ -42,6 +43,10 @@ pub enum Error {
     Unsupported,
     #[error("user device limit reached")]
     Limited,
+    #[error("destination blocked by routing policy")]
+    Blocked,
+    #[error("DNS resolution failed")]
+    Dns,
     #[error("invalid or duplicate authentication data")]
     Auth,
     #[error("invalid TCP protocol request")]
@@ -145,6 +150,11 @@ async fn serve(
     checkpoint_period: Duration,
 ) -> Result<(), Error> {
     let control = control::bind(&path, &socket)?;
+    let network = Arc::new(network::Network::new(
+        &initial.base.route,
+        &initial.base.outbounds,
+        initial.base.dns.as_ref(),
+    )?);
     let mut listener =
         Some(TcpListener::bind(SocketAddr::new(initial.base.listen, initial.base.port)).await?);
     let protocol = initial.base.protocol;
@@ -225,13 +235,15 @@ async fn serve(
                 let traffic=Arc::clone(&traffic);
                 let limits=Arc::clone(&limits);
                 let udp_slots=Arc::clone(&udp_slots);
+                let network=Arc::clone(&network);
                 connections.spawn(async move {
                     let _=stream.set_nodelay(true);
+                    let context=ConnectionContext { users: &users, traffic: &traffic, source, limits: &limits, udp_slots: &udp_slots, network: &network };
                     if let Some(tls)=tls {
                         if let Ok(Ok(stream))=tokio::time::timeout(Duration::from_secs(10),tls.accept(stream)).await {
-                            let _=connection(stream,protocol,&users,&traffic,source.ip(),&limits,&udp_slots).await;
+                            let _=connection_routed(stream,protocol,context).await;
                         }
-                    } else { let _=connection(stream,protocol,&users,&traffic,source.ip(),&limits,&udp_slots).await; }
+                    } else { let _=connection_routed(stream,protocol,context).await; }
                 });
             }
         }
@@ -280,9 +292,9 @@ fn accept_retry_delay(error: &std::io::Error) -> Option<Duration> {
     None
 }
 
-#[cfg(any(unix, test))]
+#[cfg(test)]
 async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
-    mut inbound: S,
+    inbound: S,
     protocol: config::Protocol,
     users: &auth::Users,
     traffic: &Arc<traffic::Traffic>,
@@ -290,11 +302,51 @@ async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
     limits: &Arc<limits::Registry>,
     udp_slots: &Arc<tokio::sync::Semaphore>,
 ) -> Result<(), Error> {
+    let network = network::Network::direct();
+    connection_routed(
+        inbound,
+        protocol,
+        ConnectionContext {
+            users,
+            traffic,
+            source: SocketAddr::new(source, 12345),
+            limits,
+            udp_slots,
+            network: &network,
+        },
+    )
+    .await
+}
+
+#[cfg(any(unix, test))]
+struct ConnectionContext<'a> {
+    users: &'a auth::Users,
+    traffic: &'a Arc<traffic::Traffic>,
+    source: SocketAddr,
+    limits: &'a Arc<limits::Registry>,
+    udp_slots: &'a Arc<tokio::sync::Semaphore>,
+    network: &'a network::Network,
+}
+
+#[cfg(any(unix, test))]
+async fn connection_routed<S: AsyncRead + AsyncWrite + Unpin>(
+    mut inbound: S,
+    protocol: config::Protocol,
+    context: ConnectionContext<'_>,
+) -> Result<(), Error> {
+    let ConnectionContext {
+        users,
+        traffic,
+        source,
+        limits,
+        udp_slots,
+        network,
+    } = context;
     let (request, outbound, counter, lease, _udp_slot) =
         tokio::time::timeout(Duration::from_secs(10), async {
             let request = protocol::handshake(&mut inbound, protocol, users).await?;
             let current_policy = users.load().policy(&request.user).unwrap_or(request.policy);
-            let lease = limits.acquire(Arc::clone(&request.user), source, current_policy)?;
+            let lease = limits.acquire(Arc::clone(&request.user), source.ip(), current_policy)?;
             let udp_slot = if request.command == protocol::Command::Udp {
                 Some(
                     Arc::clone(udp_slots)
@@ -305,14 +357,11 @@ async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
                 None
             };
             let outbound = if request.command == protocol::Command::Tcp {
-                Some(match &request.address {
-                    protocol::Address::Ip(ip) => {
-                        TcpStream::connect(SocketAddr::new(*ip, request.port)).await?
-                    }
-                    protocol::Address::Domain(name) => {
-                        TcpStream::connect((name.as_str(), request.port)).await?
-                    }
-                })
+                Some(
+                    network
+                        .connect(&request.address, request.port, source)
+                        .await?,
+                )
             } else {
                 None
             };
@@ -339,7 +388,16 @@ async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
         inbound.flush().await?;
     }
     if request.command == protocol::Command::Udp {
-        return udp::relay(inbound, request, protocol, &lease, users, counter).await;
+        return udp::relay(
+            inbound,
+            request,
+            protocol,
+            &lease,
+            users,
+            counter,
+            udp::RouteContext { network, source },
+        )
+        .await;
     }
     let outbound = outbound.ok_or(Error::Config)?;
     let _ = outbound.set_nodelay(true);

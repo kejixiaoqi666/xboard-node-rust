@@ -5,6 +5,7 @@ use thiserror::Error;
 
 mod traffic;
 pub use traffic::{MAX_TRAFFIC_ROWS, TrafficSnapshot};
+pub mod routing;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ConfigError {

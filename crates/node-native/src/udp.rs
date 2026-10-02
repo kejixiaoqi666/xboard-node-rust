@@ -75,27 +75,9 @@ fn canonical(address: SocketAddr) -> SocketAddr {
     address
 }
 
-async fn resolve(address: &Address, port: u16) -> Result<SocketAddr, Error> {
-    match address {
-        Address::Ip(ip) => Ok(canonical(SocketAddr::new(*ip, port))),
-        Address::Domain(name) => {
-            let addresses: Vec<_> = tokio::time::timeout(
-                Duration::from_secs(10),
-                tokio::net::lookup_host((name.as_str(), port)),
-            )
-            .await
-            .map_err(|_| Error::Protocol)??
-            .take(32)
-            .collect();
-            addresses
-                .iter()
-                .find(|address| address.is_ipv4())
-                .or(addresses.first())
-                .copied()
-                .map(canonical)
-                .ok_or(Error::Protocol)
-        }
-    }
+pub(crate) struct RouteContext<'a> {
+    pub network: &'a crate::network::Network,
+    pub source: SocketAddr,
 }
 
 fn header(protocol: Protocol, source: SocketAddr, size: usize) -> Vec<u8> {
@@ -146,12 +128,18 @@ pub(crate) async fn relay<S: AsyncRead + AsyncWrite + Unpin>(
     lease: &Lease,
     users: &Users,
     counter: Option<Arc<Counter>>,
+    routing: RouteContext<'_>,
 ) -> Result<(), Error> {
     let socket4 = UdpSocket::bind("0.0.0.0:0").await?;
     let socket6 = UdpSocket::bind("[::]:0").await.ok();
     let fixed = (request.address, request.port);
     let destination = if protocol == Protocol::Vless {
-        Some(resolve(&fixed.0, fixed.1).await?)
+        Some(
+            routing
+                .network
+                .udp_destination(&fixed.0, fixed.1, routing.source)
+                .await?,
+        )
     } else {
         None
     };
@@ -164,7 +152,12 @@ pub(crate) async fn relay<S: AsyncRead + AsyncWrite + Unpin>(
         while let Some(packet) = packet(&mut reader, protocol, &fixed).await? {
             let destination = match destination {
                 Some(destination) => destination,
-                None => resolve(&packet.address, packet.port).await?,
+                None => {
+                    routing
+                        .network
+                        .udp_destination(&packet.address, packet.port, routing.source)
+                        .await?
+                }
             };
             let socket = if destination.is_ipv4() {
                 &socket4

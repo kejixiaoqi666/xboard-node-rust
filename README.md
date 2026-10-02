@@ -4,7 +4,7 @@
 
 **用 Rust 重构的 Xboard 节点后端。** 安装在 Linux VPS 上，向 Xboard 面板获取节点配置和用户列表，并提供当前已迁移的代理协议、用户同步和流量统计能力。
 
-本项目从 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3) 的迁移工作继续开发，目标是保留原版的使用流程，改进运行架构、配置更新和资源管理。**`v0.1.0-preview.2`** 在首个预览版上补充 VLESS/Trojan UDP、按用户共享限速和在线来源 IP 限制。Rust 服务端可独立运行，一键安装和管理入口已提供，完整原版功能仍在迁移。
+本项目从 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3) 的迁移工作继续开发，目标是保留原版的使用流程，改进运行架构、配置更新和资源管理。**`v0.1.0-preview.3`** 在 TCP/UDP、共享限速和来源 IP 限制的基础上，增加域名/IP/端口路由、自定义 DNS 和 SOCKS5 TCP 上游。Rust 服务端可独立运行，一键安装和管理入口已提供，完整原版功能仍在迁移。
 
 ## 先了解它做什么
 
@@ -65,13 +65,16 @@ xboard-rust
 | VLESS TCP | 已实现；UUID 认证和 TCP 转发 |
 | VLESS TCP + TLS | 已实现；使用本机已有证书与私钥文件 |
 | Trojan TCP + TLS | 已实现；认证、文件 TLS 和转发 |
-| VLESS / Trojan UDP | 已实现；通过协议连接转发 UDP，支持 IPv4、IPv6、系统域名解析和文件 TLS |
+| VLESS / Trojan UDP | 已实现；通过协议连接转发 UDP，支持 IPv4、IPv6、域名解析和文件 TLS |
+| 路由 | 域名、域名后缀、IPv4/IPv6 CIDR、目标端口/范围、TCP/UDP、来源 IP/端口；按顺序匹配 |
+| 出站 | 直连、阻断、SOCKS5 TCP 上游（可用用户名/密码）；不支持 SOCKS5 UDP 或代理链 |
+| DNS | 默认系统解析；可指定 UDP/TCP DNS、静态 hosts、地址族偏好、超时和共享缓存 |
 | 用户限速 | `speed_limit` 按 Mbps；同一用户的连接、上传和下载共用一个预算，0 表示不限速 |
 | 设备 / 来源 IP 限制 | `device_limit` 限制本节点同一用户同时活跃的不同来源 IP；同一 IP 多条连接共用名额，0 表示不限 |
 | Xboard 配置与用户同步 | v2 machine / v1 legacy REST；固定一个明确的节点 ID |
 | WebSocket | 可信地址校验、重连及目标节点重同步提示；实际数据重新从 REST 拉取 |
 | 仅用户变更 | 原子更新认证表，保持已认证连接；删除用户阻止新认证 |
-| 配置变更与恢复 | 候选预检查；监听/TLS/协议变化仍需停止并重启数据层 |
+| 配置变更与恢复 | 候选预检查；监听/TLS/协议/路由变化重启数据层，错误候选保留旧服务 |
 | 流量统计 | 按稳定用户身份记录成功转发的有效载荷；不是网卡总流量 |
 | 持久化 | 原生周期存档、冻结快照/采集回执、持久待报队列及确认停止流程 |
 | 交付与管理 | AMD64/ARM64 安装包、SHA-256 校验、systemd、升级、程序回退、配置备份 |
@@ -88,11 +91,69 @@ VLESS UDP 每个连接使用固定目标；Trojan UDP 一个连接可访问多�
 
 ### 还没有迁完的部分
 
-REALITY、Vision、mux/XUDP、VMess、Shadowsocks、AnyTLS、TUIC、Hysteria2、其他传输方式、自定义路由/出站/DNS、单进程多节点/多面板、在线 IP 向面板上报和自动 ACME 证书管理仍未完成。**当前不能视作原版的完整替换。**
+REALITY、Vision、mux/XUDP、VMess、Shadowsocks、AnyTLS、TUIC、Hysteria2、其他传输方式、GeoIP/GeoSite、正则/规则集、其他代理出站、加密 DNS、单进程多节点/多面板、在线 IP 向面板上报和自动 ACME 证书管理仍未完成。**当前不能视作原版的完整替换。**
 
 未支持的协议和配置会明确拒绝。原生 Rust 模式会执行上述非零用户限制；可选的旧外部内核适配器仍拒绝非零限制，避免没有执行却声称支持。当前 JSON 运行配置与原版 Go `config.yml` 不直接互换。面板已绑定的旧节点不会被安装器自动迁移或停掉。
 
 文件 TLS 需要先在 VPS 上准备证书，并在面板对应配置中指定 `cert_mode=file`、`cert_file`、`key_file`。证书申请和续期由你现有的证书工具负责；此版不声称内置自动申请。
+
+## 路由与 DNS 怎么用
+
+例如，你可以让某些域名走 SOCKS5 上游，拒绝访问某个 IP 段，其他请求继续直连。配置只影响用户代理流量，不改变控制层访问 Xboard 面板的路线。
+
+### 自定义 DNS
+
+把以下 `dns` 字段合并到 `/etc/xboard-node-rust/runtime.json`，保留原来的面板地址、节点 ID 等字段；修改前先备份文件。省略 `dns` 或让 `servers` 为空时使用系统解析。
+
+```json
+{
+  "dns": {
+    "servers": ["1.1.1.1:53", "8.8.8.8:53"],
+    "tcp_only": false,
+    "strategy": "prefer_ipv4",
+    "timeout_ms": 3000,
+    "cache_size": 1024,
+    "hosts": {"internal.example.com": ["192.0.2.10"]}
+  }
+}
+```
+
+随后执行 `xboard-rust check` 和 `xboard-rust restart`。`192.0.2.10` 是文档示例地址，应换成你的目标 IP。DNS 服务器可填 IPv4 或 `[IPv6]:端口`；默认使用 UDP，截断响应可转 TCP；`tcp_only=true` 强制 TCP。`strategy` 可选 `prefer_ipv4`、`prefer_ipv6`、`ipv4_only`、`ipv6_only`，只约束域名解析结果，不改变客户端直接指定的 IP。
+
+`hosts` 优先于网络查询。指定 DNS 后，不再暗中回退到系统 DNS。自定义解析器跨连接共享缓存，按服务器 TTL 过期，正向最长 300 秒、负向最长 30 秒；`cache_size` 是缓存响应数量，0 关闭缓存。系统解析的缓存由操作系统管理。最多 8 个 DNS 服务器、4,096 个 hosts 条目、每次最多 32 个结果；每个数据进程同时最多 256 个网络查询，超限请求失败。DNS 超时范围为 100–10,000 毫秒，TCP 握手与连接建立另有总时限。
+
+### 面板下发的分流规则
+
+以下是节点配置接口里的字段示例，不是整个 `runtime.json`。面板需能下发这些高级字段；本项目不自动给面板新增编辑界面。
+
+```json
+{
+  "custom_outbounds": [
+    {"tag": "upstream", "protocol": "socks", "settings": {
+      "server": "192.0.2.20", "server_port": 1080
+    }}
+  ],
+  "custom_routes": [
+    {"domain_suffix": ["blocked.example"], "outbound": "block"},
+    {"ip_cidr": ["10.0.0.0/8"], "outbound": "block"},
+    {"domain": ["proxy.example"], "network": ["tcp"], "outbound": "upstream"}
+  ]
+}
+```
+
+SOCKS5 服务器目前必须填写 IP；`settings` 可同时添加 `username` 和 `password`。SOCKS5 本身不加密凭据，使用可信链路。域名先在本节点解析，规则检查通过的**同一个 IP**用于直连或交给 SOCKS5，避免再次解析后绕过 IP 规则。命中代理规则的 UDP 会被拒绝，不会变成直连。VLESS UDP 在关联开始时选定目标；Trojan UDP 逐包选择目标，阻断或解析失败会关闭该关联。
+
+规则优先级为 `custom_route_rules` → `custom_routes` → `routes`，每组保持原有顺序，首条命中生效，未命中默认直连。此预览版不隐式插入私网屏蔽规则；需要时显式设置 CIDR 规则。
+
+| 字段 | 匹配与动作 |
+| --- | --- |
+| `routes` | `match` 中域名按后缀匹配，支持 `*.example.com` 和 CIDR；`action` 为 `direct`、`block`/`reject`，或 `proxy` 配合 `action_value` 出站标签 |
+| `custom_route_rules` | 保留原版结构化规则的 **OR**：`domains`、`domain_suffixes`、`ip_cidrs`、`ports`、`networks`、`source_cidrs`、`source_ports` 任一组命中即可；`disabled=true` 跳过 |
+| 结构化动作 | `action.type` 为 `direct`、`block` 或 `route`；仅 `route` 使用 `action.target` 指定出站标签 |
+| `custom_routes` | 支持上例字段及 `port`、`port_range`、`source_ip_cidr`、`source_port`、`source_port_range`；地址条件之间 OR，与端口/网络/来源条件之间 AND；空条件为全匹配 |
+| 端口与域名 | 单端口或 `80:90` / `80-90` 范围；域名忽略大小写和末尾点，后缀按标签边界匹配，`badexample.com` 不属于 `example.com` |
+
+最多 4,096 条编译后规则、16,384 个匹配值、256 个出站。面板路由变化通过预检查后更换数据进程，会断开已有连接；仅用户更新继续热生效。本地 DNS 修改需要重启整个服务。回退到 preview.1/2 前需删除新增路由、出站和 DNS 字段，并使用该版本支持的用户限制。
 
 ## 日常管理
 
@@ -130,7 +191,7 @@ REALITY、Vision、mux/XUDP、VMess、Shadowsocks、AnyTLS、TUIC、Hysteria2、
 | `node-core` | 配置/用户模型、校验、身份哈希与状态转换 |
 | `node-panel` | REST、ETag、wire 转换、WS 地址及重连 |
 | `node-kernel` | 流式生成配置、预检查、生命周期和用户更新控制 |
-| `node-native` | VLESS/Trojan、Rustls、认证快照、TCP/UDP、共享限速、来源 IP 名额与计数 |
+| `node-native` | VLESS/Trojan、Rustls、认证快照、TCP/UDP、路由/DNS/SOCKS5、共享限速、来源 IP 名额与计数 |
 | `node-runtime` | 串行同步、事务提交、恢复、持久上报队列和停止协调 |
 
 已完成的优化包括借用式流式配置序列化、编码后大小限制、控制层单线程异步执行、有界磁盘工作、认证快照热更新和 release 体积配置。优化数据按对应源码、内核和负载记录；不会把有限协议的 Rust 子集与全功能 Go 程序直接比较，得出“语言一定更快”的结论。

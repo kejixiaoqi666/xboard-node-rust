@@ -401,6 +401,9 @@ def main():
                     'native_counter_epoch_retained': True, 'sequence_before': book['sequence'], 'sequence_after': after_book['sequence']}
                 cases.append('actual-preview1-to-new-binary-upgrade-and-two-way-rollback-preserve-config-and-native-counter-identity')
             live_limits()
+            from test_routing import exercise
+            exercise(config, CONFIG_DIR / 'runtime.json', run, wait, fetch, connect, parent, child_ids,
+                cases, measurements, echo_port, udp_origins[0].server_address[:2], USER)
             # PrivateTmp hides /tmp from the service; test TLS material lives in its managed state directory.
             cert = STATE_DIR / 'fixture-cert.pem'; key = STATE_DIR / 'fixture-key.pem'
             subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost',

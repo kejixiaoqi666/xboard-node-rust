@@ -8,6 +8,7 @@ use std::io::Write;
 #[derive(Clone, Debug, Default)]
 pub struct SingBoxConfigBuilder {
     native: bool,
+    dns: Option<node_core::routing::DnsConfig>,
 }
 
 impl SingBoxConfigBuilder {
@@ -16,7 +17,14 @@ impl SingBoxConfigBuilder {
     }
     /// Emit limits only for the embedded Rust kernel that enforces them.
     pub fn native() -> Self {
-        Self { native: true }
+        Self {
+            native: true,
+            dns: None,
+        }
+    }
+    pub fn with_dns(mut self, dns: Option<node_core::routing::DnsConfig>) -> Self {
+        self.dns = dns;
+        self
     }
 
     pub fn build(&self, node: &NodeSpec, users: &[UserSpec]) -> Result<Value, KernelError> {
@@ -58,6 +66,21 @@ impl SingBoxConfigBuilder {
         supported.tls = node.tls;
         supported.cert_config = node.cert_config.clone();
         supported.server_name = node.server_name.clone();
+        if self.native {
+            supported.routes = node.routes.clone();
+            supported.custom_routes = node.custom_routes.clone();
+            supported.custom_route_rules = node.custom_route_rules.clone();
+            supported.custom_outbounds = node.custom_outbounds.clone();
+        }
+        if let Some(dns) = &self.dns {
+            if !self.native {
+                return Err(KernelError::Invalid(
+                    "custom DNS requires the native Rust kernel".into(),
+                ));
+            }
+            dns.validate()
+                .map_err(|e| KernelError::Invalid(e.to_string()))?;
+        }
         if node != &supported
             || node
                 .network
@@ -176,7 +199,10 @@ impl SingBoxConfigBuilder {
                 return Err(KernelError::Invalid("duplicate user credential".into()));
             }
         }
+        let (route, outbounds) =
+            node_core::routing::from_node(node).map_err(|e| KernelError::Invalid(e.to_string()))?;
         Ok(SingBoxConfig {
+            dns: self.dns.clone(),
             inbounds: [Inbound {
                 listen: node.listen_ip.as_deref().unwrap_or("::"),
                 listen_port: node.server_port,
@@ -197,13 +223,8 @@ impl SingBoxConfigBuilder {
                 level: node.kernel_log_level.as_deref().unwrap_or("info"),
                 timestamp: true,
             },
-            outbounds: [Outbound {
-                tag: "direct",
-                kind: "direct",
-            }],
-            route: Route {
-                final_outbound: "direct",
-            },
+            outbounds,
+            route,
         })
     }
 }
@@ -212,10 +233,12 @@ impl SingBoxConfigBuilder {
 // historical string form of user IDs. Only the small TLS object is owned.
 #[derive(Serialize)]
 pub(crate) struct SingBoxConfig<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dns: Option<node_core::routing::DnsConfig>,
     inbounds: [Inbound<'a>; 1],
     log: Log<'a>,
-    outbounds: [Outbound; 1],
-    route: Route,
+    outbounds: Vec<node_core::routing::Outbound>,
+    route: node_core::routing::Route,
 }
 
 #[derive(Serialize)]
@@ -234,19 +257,6 @@ struct Inbound<'a> {
 struct Log<'a> {
     level: &'a str,
     timestamp: bool,
-}
-
-#[derive(Serialize)]
-struct Outbound {
-    tag: &'static str,
-    #[serde(rename = "type")]
-    kind: &'static str,
-}
-
-#[derive(Serialize)]
-struct Route {
-    #[serde(rename = "final")]
-    final_outbound: &'static str,
 }
 
 struct Users<'a> {

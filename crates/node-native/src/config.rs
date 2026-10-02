@@ -1,4 +1,5 @@
 use crate::{Error, auth::Snapshot};
+use node_core::routing::{DnsConfig, Outbound, Policy, Route};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -54,22 +55,9 @@ struct Log {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Outbound {
-    #[serde(rename = "type")]
-    kind: String,
-    tag: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Route {
-    #[serde(rename = "final")]
-    final_outbound: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct Config {
+    #[serde(default)]
+    dns: Option<DnsConfig>,
     inbounds: Vec<Inbound>,
     outbounds: Vec<Outbound>,
     route: Route,
@@ -84,6 +72,9 @@ pub enum Protocol {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Base {
+    pub dns: Option<DnsConfig>,
+    pub route: Route,
+    pub outbounds: Vec<Outbound>,
     pub protocol: Protocol,
     pub tag: String,
     pub listen: IpAddr,
@@ -113,16 +104,16 @@ pub fn decode(data: &[u8]) -> Result<Candidate, Error> {
     }
     let mut config: Config = serde_json::from_slice(data).map_err(|_| Error::Config)?;
     if config.inbounds.len() != 1
-        || config.outbounds.len() != 1
-        || config.outbounds[0].kind != "direct"
-        || config.outbounds[0].tag != "direct"
-        || config.route.final_outbound != "direct"
         || !matches!(
             config.log.level.as_str(),
             "trace" | "debug" | "info" | "warn" | "error" | "fatal" | "panic"
         )
     {
         return Err(Error::Unsupported);
+    }
+    Policy::new(&config.route, &config.outbounds).map_err(|_| Error::Config)?;
+    if let Some(dns) = &config.dns {
+        dns.validate().map_err(|_| Error::Config)?;
     }
     let inbound = config.inbounds.pop().ok_or(Error::Config)?;
     if inbound.tag.is_empty() || inbound.listen_port == 0 {
@@ -146,6 +137,9 @@ pub fn decode(data: &[u8]) -> Result<Candidate, Error> {
     let auth = Arc::new(Snapshot::new(protocol, inbound.users)?);
     Ok(Candidate {
         base: Base {
+            dns: config.dns,
+            route: config.route,
+            outbounds: config.outbounds,
             protocol,
             tag: inbound.tag,
             listen: inbound.listen,

@@ -141,7 +141,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             readiness_addr: None,
         },
         if builtin {
-            SingBoxConfigBuilder::native()
+            SingBoxConfigBuilder::native().with_dns(config.dns.clone())
         } else {
             SingBoxConfigBuilder::new()
         },
