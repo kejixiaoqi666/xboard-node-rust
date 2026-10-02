@@ -168,6 +168,22 @@ def main():
             assert result
             return result
 
+        def running_binary(expected_hash, phase):
+            executable = CURRENT / 'bin/xboard-node-rust'
+            assert sha(executable.read_bytes()) == expected_hash
+            pid = parent()
+            native_children = child_ids()
+            actual = {}
+            for process in [str(pid), *sorted(native_children)]:
+                image = Path('/proc') / process / 'exe'
+                assert image.samefile(executable), (phase, process, 'running inode differs')
+                digest = sha(image.read_bytes())
+                assert digest == expected_hash, (phase, process, 'running ELF hash differs')
+                actual[process] = digest
+            measurements.setdefault('running_version_stages', []).append({
+                'phase': phase, 'controller_pid': pid, 'native_child_pids': sorted(native_children),
+                'running_ELF_sha256_by_pid': actual, 'expected_binary_sha256': expected_hash})
+
         def connect(tls=False, source='127.0.0.1'):
             stream = socket.create_connection(('127.0.0.1', node_port), timeout=8, source_address=(source, 0))
             stream.settimeout(8)
@@ -365,14 +381,14 @@ def main():
                 config_hashes = {name: sha((CONFIG_DIR / name).read_bytes()) for name in ['runtime.json', 'panel.env']}
                 run('update', '--package', args.previous_package.resolve(), '--checksums', args.previous_checksums.resolve())
                 wait(fetch)
-                assert sha((CURRENT / 'bin/xboard-node-rust').read_bytes()) == prior_info['binary_sha256']
+                running_binary(prior_info['binary_sha256'], 'switch-to-published-preview1')
                 run('update', '--package', args.package.resolve(), '--checksums', args.checksums.resolve())
                 wait(fetch)
-                assert sha((CURRENT / 'bin/xboard-node-rust').read_bytes()) == sha(args.binary.read_bytes())
+                running_binary(sha(args.binary.read_bytes()), 'upgrade-actual-preview1-to-new')
                 run('rollback'); wait(fetch)
-                assert sha((CURRENT / 'bin/xboard-node-rust').read_bytes()) == prior_info['binary_sha256']
+                running_binary(prior_info['binary_sha256'], 'rollback-to-actual-preview1')
                 run('rollback'); wait(fetch)
-                assert sha((CURRENT / 'bin/xboard-node-rust').read_bytes()) == sha(args.binary.read_bytes())
+                running_binary(sha(args.binary.read_bytes()), 'rollback-again-to-new')
                 run('stop')
                 after_book = json.loads((STATE_DIR / 'native-traffic.json').read_text())
                 assert all(book[key] == after_book[key] for key in ['version', 'destination', 'epoch'])
