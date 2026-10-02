@@ -214,9 +214,23 @@ def main():
             assert once.exists() and (CURRENT / 'VERSION').read_bytes() == files['VERSION']
             wait(fetch)
             cases.append('injected-systemd-start-failure-restores-old-program-and-real-forwarding')
+            real_mv = shutil.which('mv')
+            commit_once = temp / 'metadata-commit-failed-once'
+            (shim / 'mv').write_text('#!/bin/bash\nlast=${!#}\nif [[ $last == /usr/local/bin/xboard-rust && ! -e ' + str(commit_once) + ' ]]; then touch ' + str(commit_once) + '; exit 19; fi\nexec ' + real_mv + ' "$@"\n')
+            (shim / 'mv').chmod(0o755)
+            commit_failure, commit_sums = fixture_package(temp / 'commit-failure', files, 'v0.1.0-systemd-fixture.4')
+            run('update', '--package', commit_failure, '--checksums', commit_sums, success=False, environment=injected)
+            assert commit_once.exists() and (CURRENT / 'VERSION').read_bytes() == files['VERSION']
+            assert Path('/usr/local/bin/xboard-rust').read_bytes() == files['install.sh']
+            wait(fetch)
+            cases.append('injected-manager-commit-failure-restores-coherent-old-manager-program-and-service')
+            final_children = set()
+            for path in (Path('/proc') / str(parent()) / 'task').glob('*/children'):
+                final_children.update(path.read_text().split())
+            assert final_children
             run('stop')
             assert parent() == 0
-            for child in children:
+            for child in children | final_children:
                 assert not (Path('/proc') / child).exists()
             assert any(reports)
             cases.append('graceful-systemd-stop-child-cleanup-and-synthetic-report')

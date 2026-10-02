@@ -3,6 +3,7 @@ name: Rust experimental runtime
 on:
   push:
     branches: [main, 'codex/rust-*']
+    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/rust.yml']
   pull_request:
     branches: [main]
   workflow_dispatch:

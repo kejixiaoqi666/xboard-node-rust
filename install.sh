@@ -23,10 +23,15 @@ TOKEN_VAR=
 YES=false
 NO_START=false
 WORK=
+STAGED_FILES=()
 
 fail() { printf '错误：%s\n' "$*" >&2; exit 1; }
 say() { printf '%s\n' "$*"; }
-cleanup() { [[ -z ${WORK:-} ]] || rm -rf -- "$WORK"; }
+cleanup() {
+    [[ -z ${WORK:-} ]] || rm -rf -- "$WORK"
+    local path
+    for path in "${STAGED_FILES[@]}"; do rm -f -- "$path"; done
+}
 trap cleanup EXIT
 
 usage() {
@@ -126,11 +131,11 @@ owned() {
 
 paths_safe() {
     local p
-    for p in "$CONFIG_DIR" "$CONFIG_DIR/backups" "$STATE_DIR" "$LIB_DIR" "$LIB_DIR/releases" "$UNIT_PATH" "$CONFIG" "$ENV_FILE" "$MANAGER" "$LIB_DIR/previous"; do
+    for p in "$CONFIG_DIR" "$CONFIG_DIR/backups" "$STATE_DIR" "$LIB_DIR" "$LIB_DIR/releases" "$UNIT_PATH" "$CONFIG" "$ENV_FILE" "$MANAGER" "$LIB_DIR/previous" "$ROOT/run/lock" "$ROOT/run/lock/xboard-node-rust.lock"; do
         [[ ! -L $p ]] || fail "拒绝修改符号链接：$p"
     done
     # Validate all parent components, including /usr/local/lib and staging roots.
-    python3 - "$CONFIG_DIR" "$CONFIG_DIR/backups" "$STATE_DIR" "$LIB_DIR" "$LIB_DIR/releases" "$UNIT_PATH" "$MANAGER" "$LINK" <<'PY'
+    python3 - "$CONFIG_DIR" "$CONFIG_DIR/backups" "$STATE_DIR" "$LIB_DIR" "$LIB_DIR/releases" "$UNIT_PATH" "$MANAGER" "$LINK" "$ROOT/run/lock/xboard-node-rust.lock" <<'PY'
 import pathlib, sys
 for name in sys.argv[1:]:
     p = pathlib.Path(name)
@@ -162,6 +167,30 @@ if unit.exists():
     expected = ['Description=Xboard Rust node', 'ExecStart=' + str(current / 'bin/xboard-node-rust') + ' --config ' + str(config), 'EnvironmentFile=' + str(env)]
     if any(text.count(line) != 1 for line in expected):
         sys.exit('服务文件已被其他项目接管，拒绝覆盖/删除')
+PY
+    if [[ -L $CURRENT ]]; then validate_release "$(readlink -f -- "$CURRENT")"; fi
+}
+
+validate_release() {
+    python3 - "$LIB_DIR/releases" "$1" <<'PY'
+import hashlib, json, pathlib, re, sys
+base, target = map(pathlib.Path, sys.argv[1:])
+if target.is_symlink() or target.resolve() != target or target.parent != base or not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?', target.name):
+    sys.exit('版本路径超出 releases 或含符号链接/非规范路径')
+actual = {}
+for path in target.rglob('*'):
+    if path.is_symlink(): sys.exit('版本目录包含符号链接')
+    if path.is_file(): actual[path.relative_to(target).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+checks = {}
+for line in (target / 'SHA256SUMS').read_text().splitlines():
+    match = re.fullmatch(r'([0-9a-f]{64})  (\S+)', line)
+    if not match or match[2] in checks: sys.exit('版本校验清单不合法')
+    checks[match[2]] = match[1]
+if set(checks) != set(actual) - {'SHA256SUMS'} or any(actual.get(name) != digest for name, digest in checks.items()):
+    sys.exit('版本文件发生变化，拒绝执行或切换')
+meta = json.loads((target / 'BUILDINFO.json').read_text())
+if meta.get('repository') != 'kejixiaoqi666/xboard-node-rust' or meta.get('version') != target.name:
+    sys.exit('版本来源不匹配')
 PY
 }
 
@@ -315,7 +344,8 @@ SERVICE
 
 switch_current() {
     local target=$1
-    [[ $target == "$LIB_DIR"/releases/v* && -f $target/bin/xboard-node-rust && ! -L $target ]] || { say '程序版本路径不合法' >&2; return 1; }
+    validate_release "$target" || return 1
+    if [[ -L $CURRENT && $(readlink -- "$CURRENT") == "$target" ]]; then return 0; fi
     ln -s -- "$target" "$LIB_DIR/.current.$$" || return 1
     if ! mv -Tf -- "$LIB_DIR/.current.$$" "$CURRENT"; then
         rm -f -- "$LIB_DIR/.current.$$"
@@ -425,7 +455,8 @@ PY
 }
 
 backup_config() {
-    local backup=$CONFIG_DIR/backups/$(date -u +%Y%m%dT%H%M%SZ)-$$
+    local backup
+    backup=$CONFIG_DIR/backups/$(date -u +%Y%m%dT%H%M%SZ)-$$
     install -d -m 700 "$backup"
     [[ ! -f $CONFIG ]] || install -m 600 "$CONFIG" "$backup/runtime.json"
     [[ ! -f $ENV_FILE ]] || install -m 600 "$ENV_FILE" "$backup/panel.env"
@@ -465,6 +496,40 @@ old, new = (json.load(open(path)) for path in sys.argv[1:])
 if not old.get('state_format') or old['state_format'] != new.get('state_format'):
     sys.exit('版本的状态格式不同；请按发行说明迁移，不能直接回退或更新')
 PY
+}
+
+prepare_switch_metadata() {
+    local next=$1 previous=$2
+    NEXT_MANAGER=$(mktemp "$ROOT/usr/local/bin/.xboard-rust.next.XXXXXXXX")
+    STAGED_FILES+=("$NEXT_MANAGER")
+    RESTORE_MANAGER=$(mktemp "$ROOT/usr/local/bin/.xboard-rust.restore.XXXXXXXX")
+    STAGED_FILES+=("$RESTORE_MANAGER")
+    NEXT_PREVIOUS=$(mktemp "$LIB_DIR/.previous.next.XXXXXXXX")
+    STAGED_FILES+=("$NEXT_PREVIOUS")
+    RESTORE_PREVIOUS=$(mktemp "$LIB_DIR/.previous.restore.XXXXXXXX")
+    STAGED_FILES+=("$RESTORE_PREVIOUS")
+    install -m 755 "$next/install.sh" "$NEXT_MANAGER"
+    install -m 755 "$MANAGER" "$RESTORE_MANAGER"
+    printf '%s\n' "$previous" > "$NEXT_PREVIOUS"
+    HAD_PREVIOUS=false
+    if [[ -f $LIB_DIR/previous ]]; then
+        HAD_PREVIOUS=true
+        cp -- "$LIB_DIR/previous" "$RESTORE_PREVIOUS"
+    fi
+}
+
+commit_switch_metadata() {
+    mv -Tf -- "$NEXT_MANAGER" "$MANAGER" || return 1
+    mv -Tf -- "$NEXT_PREVIOUS" "$LIB_DIR/previous" || return 1
+}
+
+restore_switch_metadata() {
+    mv -Tf -- "$RESTORE_MANAGER" "$MANAGER" || return 1
+    if $HAD_PREVIOUS; then
+        mv -Tf -- "$RESTORE_PREVIOUS" "$LIB_DIR/previous" || return 1
+    else
+        rm -f -- "$LIB_DIR/previous" || return 1
+    fi
 }
 
 install_node() {
@@ -521,16 +586,16 @@ update_node() {
     same_state_format "$previous" "$WORK/payload"
     "$WORK/payload/bin/xboard-node-rust" --config "$CONFIG" --check >/dev/null || fail '新版本不接受当前配置'
     stage_release
+    prepare_switch_metadata "$LIB_DIR/releases/$VERSION" "$previous"
     local was_active=false
     if [[ -z $ROOT ]] && systemctl is-active --quiet "$UNIT"; then was_active=true; systemctl stop "$UNIT"; fi
-    if ! switch_current "$LIB_DIR/releases/$VERSION" || ! activate; then
+    if ! switch_current "$LIB_DIR/releases/$VERSION" || ! commit_switch_metadata || ! activate; then
         if [[ -z $ROOT ]]; then systemctl stop "$UNIT" || true; fi
         switch_current "$previous" || fail '旧程序链接恢复失败；服务保持停止，请检查版本目录'
+        restore_switch_metadata || fail '管理入口恢复失败；服务保持停止，请检查备份文件'
         if $was_active; then systemctl start "$UNIT" || true; fi
         fail '新版本启动失败，已恢复原程序链接；配置和流量数据保持原位'
     fi
-    printf '%s\n' "$previous" > "$LIB_DIR/previous"
-    install -m 755 "$CURRENT/install.sh" "$MANAGER"
     say "已更新到 $VERSION。回退：xboard-rust rollback"
     say '程序回退不回滚计费/持久状态；跨版本状态兼容要求见对应发行说明。'
 }
@@ -541,19 +606,19 @@ rollback_node() {
     local previous current
     previous=$(cat "$LIB_DIR/previous")
     current=$(readlink -f -- "$CURRENT")
-    [[ $previous == "$LIB_DIR"/releases/v* && -f $previous/VERSION && ! -L $previous ]] || fail '回退路径不属于本安装器'
+    validate_release "$previous" || fail '回退路径或文件不属于本安装器'
     same_state_format "$current" "$previous"
     "$previous/bin/xboard-node-rust" --config "$CONFIG" --check >/dev/null || fail '旧程序不接受当前配置'
+    prepare_switch_metadata "$previous" "$current"
     local was_active=false
     if [[ -z $ROOT ]] && systemctl is-active --quiet "$UNIT"; then was_active=true; systemctl stop "$UNIT"; fi
-    if ! switch_current "$previous" || ! activate; then
+    if ! switch_current "$previous" || ! commit_switch_metadata || ! activate; then
         if [[ -z $ROOT ]]; then systemctl stop "$UNIT" || true; fi
         switch_current "$current" || fail '当前程序链接恢复失败；服务保持停止，请检查版本目录'
+        restore_switch_metadata || fail '管理入口恢复失败；服务保持停止，请检查备份文件'
         if $was_active; then systemctl start "$UNIT" || true; fi
         fail '回退程序未启动，已恢复当前程序链接'
     fi
-    printf '%s\n' "$current" > "$LIB_DIR/previous"
-    install -m 755 "$CURRENT/install.sh" "$MANAGER"
     say "程序已回退至 $(cat "$CURRENT/VERSION")；配置和流量数据未回滚。"
 }
 

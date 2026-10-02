@@ -28,6 +28,7 @@ def fixture_package(directory, files, version=None, unsafe=False):
         meta['version'] = version
         files['BUILDINFO.json'] = (json.dumps(meta) + '\n').encode()
         files['VERSION'] = (version + '\n').encode()
+        files['install.sh'] += ('\n# installer fixture ' + version + '\n').encode()
     files['SHA256SUMS'] = ''.join(sha(data) + '  ' + name + '\n' for name, data in sorted(files.items()) if name != 'SHA256SUMS').encode()
     name = 'xboard-node-rust-linux-' + json.loads(files['BUILDINFO.json'])['architecture'] + '.tar.gz'
     path = directory / name
@@ -118,6 +119,41 @@ def main():
         run('update', '--package', mismatch, '--checksums', mismatch_sums, success=False)
         assert current.resolve() == before_link
         cases.append('incompatible-state-format-refused-before-switch')
+        # Ensure rollback validates the entire candidate path before executing it.
+        previous = current.parent / 'previous'
+        previous_bytes = previous.read_bytes()
+        stub = current.parent / 'releases/v0.1.0-path-fixture'
+        stub.mkdir()
+        external = temp / 'external/v0.1.0-escape'; (external / 'bin').mkdir(parents=True)
+        sentinel = temp / 'external-executed'
+        executable = external / 'bin/xboard-node-rust'
+        executable.write_text('#!/bin/bash\ntouch ' + str(sentinel) + '\n')
+        executable.chmod(0o755)
+        (external / 'BUILDINFO.json').write_bytes(files['BUILDINFO.json'])
+        (external / 'VERSION').write_bytes(files['VERSION'])
+        malicious = str(stub) + '/' + os.path.relpath(external, stub)
+        previous.write_text(malicious + '\n')
+        run('rollback', success=False)
+        assert not sentinel.exists() and current.resolve() == before_link
+        previous.write_bytes(previous_bytes)
+        cases.append('rollback-path-traversal-refused-before-candidate-execution')
+        # Stop a leftover ownership marker from authorizing an unrelated replacement.
+        manager = target / 'usr/local/bin/xboard-rust'
+        manager_bytes = manager.read_bytes()
+        manager.write_text('#!/bin/bash\n# unrelated replacement\n')
+        run('uninstall', success=False)
+        assert current.is_symlink() and (target / 'etc/systemd/system/xboard-node-rust.service').exists()
+        manager.write_bytes(manager_bytes)
+        cases.append('foreign-manager-refused-despite-owned-marker')
+        release_dir = current.parent / 'releases'
+        preserved_releases = temp / 'preserved-releases'
+        release_dir.rename(preserved_releases)
+        escape = temp / 'release-escape'; escape.mkdir()
+        release_dir.symlink_to(escape, target_is_directory=True)
+        run('update', '--package', replacement, '--checksums', replacement_sums, success=False)
+        assert not list(escape.iterdir())
+        release_dir.unlink(); preserved_releases.rename(release_dir)
+        cases.append('symlink-release-parent-refused')
         # Tampering is rejected before creating the installation directories.
         corrupt = temp / args.package.name
         corrupt.write_bytes(args.package.read_bytes() + b'corruption')
@@ -140,6 +176,14 @@ def main():
         run('install', *common, *config_args, success=False, root=symlink_root)
         assert not list(real.iterdir())
         cases.append('symlink-install-root-refused')
+        lock_root = temp / 'lock-root'
+        (lock_root / 'run').mkdir(parents=True)
+        lock_escape = temp / 'lock-escape'; lock_escape.mkdir(mode=0o751)
+        initial_mode = stat.S_IMODE(lock_escape.stat().st_mode)
+        (lock_root / 'run/lock').symlink_to(lock_escape, target_is_directory=True)
+        run('install', *common, *config_args, success=False, root=lock_root)
+        assert not list(lock_escape.iterdir()) and stat.S_IMODE(lock_escape.stat().st_mode) == initial_mode
+        cases.append('symlink-lock-parent-refused-without-external-write-or-chmod')
         run('check'); run('version')
         run('uninstall')
         assert not current.is_symlink() and not (target / 'usr/local/bin/xboard-rust').exists()
