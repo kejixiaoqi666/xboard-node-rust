@@ -82,7 +82,7 @@ cargo test --workspace --locked -- --test-threads=1
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 ```
 
-Windows module builds/tests are supported; the default native runtime requires Unix sockets. Linux is the release deployment platform.
+Windows module builds/tests are supported; the default native runtime requires Unix sockets. Linux is the release deployment platform. Local panel fixtures may explicitly set `allow_loopback_http=true`; remote HTTP is still rejected and the default remains HTTPS.
 
 ## License
 

@@ -58,7 +58,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     {
         // Destination validation uses a synthetic credential; no real token or
         // panel request is needed to inspect/reconcile the private local outbox.
-        let panel = Panel::new(&config.panel_url, auth(&config, "local-inspection".into()))?;
+        let panel = panel_for_config(&config, auth(&config, "local-inspection".into()))?;
         let mut outbox =
             node_runtime::traffic::Outbox::open(&config.state_dir, panel.traffic_identity())?;
         if args[2] == "--traffic-resolve" {
@@ -73,14 +73,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     if args.last().is_some_and(|arg| arg == "--check") {
         // Validate URL/auth shape using a placeholder, without reading real credentials.
         let auth = auth(&config, "configuration-check-placeholder".into());
-        Panel::new(&config.panel_url, auth)?;
+        panel_for_config(&config, auth)?;
         println!("runtime settings valid; kernel/panel compatibility not tested");
         return Ok(());
     }
     let token =
         std::env::var(&config.token_env).map_err(|_| "token environment variable is missing")?;
     let auth = auth(&config, token);
-    let panel = Panel::new(&config.panel_url, auth.clone())?;
+    let panel = panel_for_config(&config, auth.clone())?;
     let ws = if config.websocket {
         match panel.handshake().await {
             Ok(handshake) if handshake.websocket.enabled => match WsClient::for_panel(
@@ -170,6 +170,14 @@ fn auth(config: &RuntimeConfig, token: String) -> Auth {
             config.node_id,
             config.node_type.clone().unwrap_or_default(),
         ),
+    }
+}
+
+fn panel_for_config(config: &RuntimeConfig, auth: Auth) -> Result<Panel, node_panel::PanelError> {
+    if config.allow_loopback_http {
+        Panel::new_for_test(&config.panel_url, auth)
+    } else {
+        Panel::new(&config.panel_url, auth)
     }
 }
 

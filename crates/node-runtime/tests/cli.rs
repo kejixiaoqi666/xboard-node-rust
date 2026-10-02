@@ -4,6 +4,36 @@ use serde_json::json;
 use std::process::Command;
 
 #[test]
+fn loopback_http_is_opt_in_and_remote_http_remains_rejected() {
+    let dir = support::TestDir::new();
+    let path = dir.0.join("loopback.json");
+    for (url, enabled, accepted) in [
+        ("http://127.0.0.1:18080", false, false),
+        ("http://127.0.0.1:18080", true, true),
+        ("http://[::1]:18080", true, true),
+        ("http://example.invalid", true, false),
+        ("http://127.0.0.1.evil.invalid", true, false),
+        ("http://127.0.0.1:18080@evil.invalid", true, false),
+        ("https://panel.example.com", false, true),
+    ] {
+        std::fs::write(
+            &path,
+            json!({"panel_url":url,"allow_loopback_http":enabled,"token_env":"XBORD_LOOPBACK_TEST_UNUSED",
+                "node_id":7,"machine_id":1,"singbox_executable":dir.0.join("unused-kernel"),"state_dir":dir.0.join("unused-state")})
+                .to_string(),
+        )
+        .unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_xboard-node-rust"))
+            .args(["--config", path.to_str().unwrap(), "--check"])
+            .env_remove("XBORD_LOOPBACK_TEST_UNUSED")
+            .output()
+            .unwrap();
+        assert_eq!(output.status.success(), accepted, "{url}, opt-in={enabled}");
+    }
+    assert!(!dir.0.join("unused-state").exists());
+}
+
+#[test]
 fn check_validates_settings_without_a_token_or_external_side_effects() {
     let dir = support::TestDir::new();
     let config = dir.0.join("runtime.json");

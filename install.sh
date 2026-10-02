@@ -436,7 +436,7 @@ if kind:
     config['node_type'] = kind
 if not config.get('machine_id') and not config.get('node_type'):
     sys.exit('请提供 machine-id 或 legacy node-type')
-config.update(state_dir=str(state), token_env='XBORD_PANEL_TOKEN')
+config.update(state_dir=str(state), token_env='XBORD_PANEL_TOKEN', allow_loopback_http=(url.scheme == 'http' and loopback))
 config.pop('singbox_executable', None)
 token = os.environ['INSTALL_TOKEN']
 if token:

@@ -20,6 +20,9 @@ use traffic::{Outbox, TrafficError};
 #[serde(deny_unknown_fields)]
 pub struct RuntimeConfig {
     pub panel_url: String,
+    /// Explicit local fixture support; remote panels continue to require HTTPS.
+    #[serde(default)]
+    pub allow_loopback_http: bool,
     pub token_env: String,
     pub node_id: u32,
     #[serde(default)]

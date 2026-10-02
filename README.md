@@ -153,6 +153,8 @@ cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
 Windows 可以进行模块构建和测试；默认原生数据层需要 Unix 控制 socket，本版一键部署仅支持 Linux。
 
+本地模拟面板可以显式配置 `allow_loopback_http=true` 使用回环 HTTP；默认仍要求 HTTPS。安装器只在 literal 回环 IP 的 HTTP 地址下设置该选项。远程 HTTP 地址会被拒绝。
+
 ## 开源与来源
 
 本项目遵循 **[MPL-2.0](LICENSE)**，保留原版来源及许可证，没有额外添加用途或商业使用限制。运行包包含第三方依赖与 Rust/musl 工具链的许可说明。
