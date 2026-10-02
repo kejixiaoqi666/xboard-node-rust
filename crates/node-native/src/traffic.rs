@@ -20,7 +20,7 @@ pub(crate) struct Counter {
     dirty: Arc<AtomicBool>,
 }
 impl Counter {
-    fn add(&self, direction: usize, size: usize) {
+    pub(crate) fn add(&self, direction: usize, size: usize) {
         if size == 0 {
             return;
         }

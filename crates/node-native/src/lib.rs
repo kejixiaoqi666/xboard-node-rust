@@ -3,11 +3,14 @@ pub mod auth;
 pub mod config;
 #[cfg(unix)]
 mod control;
+pub mod limits;
 pub mod protocol;
 #[cfg(any(unix, test))]
 mod traffic;
 #[cfg(any(unix, test))]
 mod traffic_store;
+#[cfg(any(unix, test))]
+mod udp;
 
 #[cfg(unix)]
 use arc_swap::ArcSwap;
@@ -35,6 +38,8 @@ pub enum Error {
     Config,
     #[error("unsupported Rust kernel feature")]
     Unsupported,
+    #[error("user device limit reached")]
+    Limited,
     #[error("invalid or duplicate authentication data")]
     Auth,
     #[error("invalid TCP protocol request")]
@@ -165,6 +170,8 @@ async fn serve(
         },
     ));
     let tls = tls.map(TlsAcceptor::from);
+    let limits = Arc::new(limits::Registry::new(Arc::clone(&users)));
+    let udp_slots = Arc::new(tokio::sync::Semaphore::new(1024));
     const MAX_CONNECTIONS: usize = 16384;
     let mut connections = JoinSet::new();
     let mut accept_after = tokio::time::Instant::now();
@@ -201,7 +208,7 @@ async fn serve(
                 tokio::time::sleep_until(accept_after).await;
                 listener.as_ref().expect("enabled listener").accept().await
             }, if listener.is_some() && connections.len() < MAX_CONNECTIONS => {
-                let (stream,_)=match accepted {
+                let (stream,source)=match accepted {
                     Ok(pair)=>pair,
                     Err(error)=> {
                         if let Some(delay)=accept_retry_delay(&error) {
@@ -214,13 +221,15 @@ async fn serve(
                 let users=Arc::clone(&users);
                 let tls=tls.clone();
                 let traffic=Arc::clone(&traffic);
+                let limits=Arc::clone(&limits);
+                let udp_slots=Arc::clone(&udp_slots);
                 connections.spawn(async move {
                     let _=stream.set_nodelay(true);
                     if let Some(tls)=tls {
                         if let Ok(Ok(stream))=tokio::time::timeout(Duration::from_secs(10),tls.accept(stream)).await {
-                            let _=connection(stream,protocol,&users,&traffic).await;
+                            let _=connection(stream,protocol,&users,&traffic,source.ip(),&limits,&udp_slots).await;
                         }
-                    } else { let _=connection(stream,protocol,&users,&traffic).await; }
+                    } else { let _=connection(stream,protocol,&users,&traffic,source.ip(),&limits,&udp_slots).await; }
                 });
             }
         }
@@ -275,47 +284,104 @@ async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
     protocol: config::Protocol,
     users: &auth::Users,
     traffic: &Arc<traffic::Traffic>,
+    source: std::net::IpAddr,
+    limits: &Arc<limits::Registry>,
+    udp_slots: &Arc<tokio::sync::Semaphore>,
 ) -> Result<(), Error> {
-    let (outbound, counter) = tokio::time::timeout(Duration::from_secs(10), async {
-        let request = protocol::handshake(&mut inbound, protocol, users).await?;
-        let outbound = match &request.address {
-            protocol::Address::Ip(ip) => {
-                TcpStream::connect(SocketAddr::new(*ip, request.port)).await?
-            }
-            protocol::Address::Domain(name) => {
-                TcpStream::connect((name.as_str(), request.port)).await?
-            }
-        };
-        // The registry lock can be held by a durable fsync. Never take it on
-        // the single-thread async executor: cancellation, signals and other
-        // payload connections must keep making progress while storage waits.
-        let counter = if traffic.enabled() {
-            Some(
-                traffic
-                    .blocking(move |t| t.user(request.user))
-                    .await
-                    .map_err(|_| Error::Task)??,
-            )
-        } else {
-            None
-        };
-        Ok::<_, Error>((outbound, counter))
-    })
-    .await
-    .map_err(|_| Error::Protocol)??;
-    let _ = outbound.set_nodelay(true);
+    let (request, outbound, counter, lease, _udp_slot) =
+        tokio::time::timeout(Duration::from_secs(10), async {
+            let request = protocol::handshake(&mut inbound, protocol, users).await?;
+            let current_policy = users.load().policy(&request.user).unwrap_or(request.policy);
+            let lease = limits.acquire(Arc::clone(&request.user), source, current_policy)?;
+            let udp_slot = if request.command == protocol::Command::Udp {
+                Some(
+                    Arc::clone(udp_slots)
+                        .try_acquire_owned()
+                        .map_err(|_| Error::Limited)?,
+                )
+            } else {
+                None
+            };
+            let outbound = if request.command == protocol::Command::Tcp {
+                Some(match &request.address {
+                    protocol::Address::Ip(ip) => {
+                        TcpStream::connect(SocketAddr::new(*ip, request.port)).await?
+                    }
+                    protocol::Address::Domain(name) => {
+                        TcpStream::connect((name.as_str(), request.port)).await?
+                    }
+                })
+            } else {
+                None
+            };
+            // The registry lock can be held by a durable fsync. Never take it on
+            // the single-thread async executor: cancellation, signals and other
+            // payload connections must keep making progress while storage waits.
+            let counter = if traffic.enabled() {
+                let user = Arc::clone(&request.user);
+                Some(
+                    traffic
+                        .blocking(move |t| t.user(user))
+                        .await
+                        .map_err(|_| Error::Task)??,
+                )
+            } else {
+                None
+            };
+            Ok::<_, Error>((request, outbound, counter, lease, udp_slot))
+        })
+        .await
+        .map_err(|_| Error::Protocol)??;
     if protocol == config::Protocol::Vless {
         inbound.write_all(&[0, 0]).await?;
     }
+    if request.command == protocol::Command::Udp {
+        return udp::relay(inbound, request, protocol, &lease, users, counter).await;
+    }
+    let outbound = outbound.ok_or(Error::Config)?;
+    let _ = outbound.set_nodelay(true);
     let Some(counter) = counter else {
-        let mut outbound = outbound;
-        tokio::io::copy_bidirectional(&mut inbound, &mut outbound).await?;
+        relay(inbound, outbound, &lease, users).await?;
         return Ok(());
     };
     // Tokio propagates each half-close while continuing the opposite direction.
-    let mut inbound = traffic::Counted::new(inbound, Arc::clone(&counter), 1);
-    let mut outbound = traffic::Counted::new(outbound, counter, 0);
-    tokio::io::copy_bidirectional(&mut inbound, &mut outbound).await?;
+    let inbound = traffic::Counted::new(inbound, Arc::clone(&counter), 1);
+    let outbound = traffic::Counted::new(outbound, counter, 0);
+    relay(inbound, outbound, &lease, users).await?;
+    Ok(())
+}
+
+#[cfg(any(unix, test))]
+async fn relay<A, B>(
+    inbound: A,
+    outbound: B,
+    lease: &limits::Lease,
+    users: &auth::Users,
+) -> std::io::Result<()>
+where
+    A: AsyncRead + AsyncWrite + Unpin,
+    B: AsyncRead + AsyncWrite + Unpin,
+{
+    let (ir, iw) = tokio::io::split(inbound);
+    let (or, ow) = tokio::io::split(outbound);
+    async fn copy<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
+        mut reader: R,
+        mut writer: W,
+        lease: &limits::Lease,
+        users: &auth::Users,
+    ) -> std::io::Result<()> {
+        use tokio::io::AsyncReadExt;
+        let mut buffer = [0_u8; 8192];
+        loop {
+            let size = reader.read(&mut buffer).await?;
+            if size == 0 {
+                return writer.shutdown().await;
+            }
+            lease.charge(size, users).await;
+            writer.write_all(&buffer[..size]).await?;
+        }
+    }
+    tokio::try_join!(copy(ir, ow, lease, users), copy(or, iw, lease, users))?;
     Ok(())
 }
 

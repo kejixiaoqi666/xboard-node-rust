@@ -26,6 +26,10 @@ pub struct User {
     pub password: Option<String>,
     #[serde(default)]
     pub flow: Option<String>,
+    #[serde(default)]
+    pub speed_limit: i64,
+    #[serde(default)]
+    pub device_limit: i64,
 }
 
 #[derive(Debug, Deserialize)]

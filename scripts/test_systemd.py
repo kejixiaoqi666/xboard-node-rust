@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Fresh systemd installation with a synthetic loopback panel and real TCP/TLS."""
+"""Fresh systemd install with real TCP/TLS/UDP and live shared user limits."""
 import argparse
+import concurrent.futures
 import hashlib
 import http.server
 import json
@@ -42,7 +43,7 @@ def wait(predicate, timeout=20):
     while time.monotonic() < deadline:
         try:
             if predicate(): return
-        except (OSError, ValueError, AssertionError, subprocess.CalledProcessError):
+        except (OSError, EOFError, ValueError, AssertionError, subprocess.CalledProcessError):
             pass
         time.sleep(0.1)
     raise AssertionError('Bounded systemd/business condition timed out')
@@ -74,7 +75,7 @@ def main():
     assert all(not p.exists() and not p.is_symlink() for p in managed_paths), 'Refuse to change an existing installation'
     existing_units = ['nginx.service', 'ssh.service', 'sshd.service']
     before = {unit: systemctl('show', unit, '-p', 'MainPID', '-p', 'ActiveState', check=False).stdout for unit in existing_units}
-    cases, reports = [], []
+    cases, reports, measurements = [], [], {}
     files = read_package(args.package)
     assert sha(args.binary.read_bytes()) == json.loads(files['BUILDINFO.json'])['binary_sha256']
     with tempfile.TemporaryDirectory(prefix='xbr-systemd-test-') as temp:
@@ -86,7 +87,7 @@ def main():
 
         class Echo(socketserver.BaseRequestHandler):
             def handle(self):
-                self.request.settimeout(5)
+                self.request.settimeout(20)
                 while True:
                     body = self.request.recv(65536)
                     if not body: return
@@ -97,6 +98,20 @@ def main():
 
         echo = Server(('127.0.0.1', 0), Echo)
         echo_port = echo.server_address[1]
+
+        class DatagramEcho(socketserver.BaseRequestHandler):
+            def handle(self):
+                body, sock = self.request
+                sock.sendto(body, self.client_address)
+
+        class DatagramServer(socketserver.ThreadingUDPServer):
+            daemon_threads = True
+
+        class DatagramServer6(DatagramServer):
+            address_family = socket.AF_INET6
+
+        udp_origins = [DatagramServer(('127.0.0.1', 0), DatagramEcho),
+            DatagramServer(('127.0.0.1', 0), DatagramEcho), DatagramServer6(('::1', 0), DatagramEcho)]
 
         class Panel(http.server.BaseHTTPRequestHandler):
             def log_message(self, *_): pass
@@ -127,7 +142,7 @@ def main():
 
         panel = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Panel)
         panel.daemon_threads = True
-        for server in [echo, panel]:
+        for server in [echo, panel, *udp_origins]:
             threading.Thread(target=server.serve_forever, daemon=True).start()
         token = temp / 'token'; token.write_text(TOKEN); token.chmod(0o600)
 
@@ -142,22 +157,162 @@ def main():
         def parent():
             return int(systemctl('show', UNIT, '-p', 'MainPID', '--value').stdout.strip())
 
-        def fetch(protocol='vless', tls=False):
-            with socket.create_connection(('127.0.0.1', node_port), timeout=3) as stream:
-                stream.settimeout(3)
-                if tls:
-                    context = ssl.create_default_context(cafile=str(temp / 'cert.pem'))
-                    stream = context.wrap_socket(stream, server_hostname='localhost')
+        def child_ids():
+            result = set()
+            for path in (Path('/proc') / str(parent()) / 'task').glob('*/children'):
+                result.update(path.read_text().split())
+            assert result
+            return result
+
+        def connect(tls=False, source='127.0.0.1'):
+            stream = socket.create_connection(('127.0.0.1', node_port), timeout=8, source_address=(source, 0))
+            stream.settimeout(8)
+            if tls:
+                context = ssl.create_default_context(cafile=str(temp / 'cert.pem'))
+                stream = context.wrap_socket(stream, server_hostname='localhost')
+            return stream
+
+        def tcp_session(protocol='vless', tls=False, source='127.0.0.1'):
+            stream = connect(tls, source)
+            try:
                 if protocol == 'vless':
                     head = b'\0' + uuid.UUID(USER).bytes + b'\0\1' + struct.pack('!H', echo_port) + b'\1' + socket.inet_aton('127.0.0.1')
-                    stream.sendall(head + PAYLOAD)
+                    stream.sendall(head)
                     assert receive(stream, 2) == b'\0\0'
                 else:
                     head = hashlib.sha224(USER.encode()).hexdigest().encode() + b'\r\n\1\1' + socket.inet_aton('127.0.0.1') + struct.pack('!H', echo_port) + b'\r\n'
-                    stream.sendall(head + PAYLOAD)
-                assert receive(stream, len(PAYLOAD)) == PAYLOAD
+                    stream.sendall(head)
+                return stream
+            except BaseException:
                 stream.close()
+                raise
+
+        def echo_bytes(stream, body):
+            stream.sendall(body)
+            assert receive(stream, len(body)) == body
+
+        def fetch(protocol='vless', tls=False):
+            with tcp_session(protocol, tls) as stream:
+                echo_bytes(stream, PAYLOAD)
                 return True
+
+        def live_limits():
+            nonlocal users
+            runtime_path = CONFIG_DIR / 'runtime.json'
+            runtime = json.loads(runtime_path.read_text())
+            runtime['poll_seconds'] = 1
+            runtime_path.write_text(json.dumps(runtime) + '\n')
+            runtime_path.chmod(0o600)
+            run('restart'); wait(fetch)
+            original_pid, original_children = parent(), child_ids()
+            a = tcp_session(source='127.0.0.1')
+            b = tcp_session(source='127.0.0.2')
+            try:
+                echo_bytes(a, b'already-established-A')
+                echo_bytes(b, b'already-established-B')
+                users = [{'id': 1, 'uuid': USER, 'speed_limit': 1, 'device_limit': 1}]
+
+                def denied():
+                    try:
+                        with tcp_session(source='127.0.0.3') as extra:
+                            echo_bytes(extra, b'new-distinct-IP-probe')
+                        return False
+                    except (EOFError, ConnectionResetError, BrokenPipeError):
+                        return True
+
+                wait(denied)
+                # Lowering the allowance retains established connections; a new
+                # connection from an already active IP does not consume a slot.
+                echo_bytes(a, b'A-still-live')
+                echo_bytes(b, b'B-still-live')
+                with tcp_session(source='127.0.0.1') as same_ip:
+                    echo_bytes(same_ip, b'same-IP-another-connection')
+                assert parent() == original_pid and child_ids() == original_children
+                cases.append('live-distinct-IP-gate-same-IP-sharing-and-lowered-limit-retains-established-sessions')
+
+                body = b'R' * (96 * 1024)
+                started = time.monotonic()
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                    jobs = [pool.submit(echo_bytes, stream, body) for stream in [a, b]]
+                    for job in jobs: job.result(timeout=8)
+                elapsed = time.monotonic() - started
+                # Both directions of both connections share 125000 bytes/sec
+                # and at most one second of burst; per-connection buckets would
+                # finish far below this lower bound on the same loopback path.
+                assert 1.8 <= elapsed <= 8, f'aggregate limit took {elapsed:.3f}s'
+                measurements['shared_1Mbps_two_connection_echo'] = {
+                    'payload_bytes_each_way_per_connection': len(body), 'combined_payload_bytes': 4 * len(body),
+                    'seconds': elapsed, 'expected_bytes_per_second': 125000, 'initial_burst_bytes': 125000}
+                cases.append('real-two-connection-bidirectional-payload-obeys-one-shared-1Mbps-budget')
+
+                users = [{'id': 1, 'uuid': USER, 'speed_limit': 0, 'device_limit': 0}]
+
+                def live_unlimited():
+                    started = time.monotonic()
+                    echo_bytes(a, b'U' * (128 * 1024))
+                    duration = time.monotonic() - started
+                    measurements['same_session_after_live_unlimited_seconds'] = duration
+                    return duration < 0.6
+
+                wait(live_unlimited)
+                assert parent() == original_pid and child_ids() == original_children
+                cases.append('hot-unlimited-policy-applies-to-existing-stream-without-restarting-controller-or-native-child')
+
+                # Restore a single-IP limit before disconnecting the existing
+                # streams, then prove a new source gets the freed allowance.
+                users = [{'id': 1, 'uuid': USER, 'speed_limit': 0, 'device_limit': 1}]
+                wait(denied)
+            finally:
+                a.close(); b.close()
+
+            def released():
+                with tcp_session(source='127.0.0.3') as new_source:
+                    echo_bytes(new_source, b'last-reference-released')
+                return True
+
+            wait(released)
+            assert parent() == original_pid and child_ids() == original_children
+            cases.append('closing-last-sessions-releases-IP-slot-for-a-new-source')
+            users = [{'id': 1, 'uuid': USER, 'speed_limit': 0, 'device_limit': 0}]
+
+        def udp_roundtrip(protocol):
+            # TLS authenticates the same installed native process used by TCP.
+            # Trojan uses one association for multiple IPv4 ports, a domain and
+            # IPv6; VLESS creates one fixed-destination session per endpoint.
+            shared = connect(True) if protocol == 'trojan' else None
+            try:
+                if shared:
+                    shared.sendall(hashlib.sha224(USER.encode()).hexdigest().encode() + b'\r\n\3\1' + b'\0' * 6 + b'\r\n')
+                for index, origin in enumerate(udp_origins):
+                    ip, port = origin.server_address[:2]
+                    packed = socket.inet_pton(socket.AF_INET6 if ':' in ip else socket.AF_INET, ip)
+                    domain = index == 1
+                    address = bytes([3 if protocol == 'trojan' else 2, 9]) + b'localhost' if domain else bytes([4 if ':' in ip else 1]) + packed
+                    # VLESS IPv6 uses address type 3, unlike Trojan's type 4.
+                    if protocol == 'vless' and ':' in ip: address = b'\3' + packed
+                    stream = shared or connect(True)
+                    try:
+                        if protocol == 'vless':
+                            stream.sendall(b'\0' + uuid.UUID(USER).bytes + b'\0\2' + struct.pack('!H', port) + address)
+                            assert receive(stream, 2) == b'\0\0'
+                        for size in [0, 37, 65507]:
+                            body = bytes([index + 31]) * size
+                            framing = struct.pack('!H', size) if protocol == 'vless' else address + struct.pack('!HH', port, size) + b'\r\n'
+                            stream.sendall(framing + body)
+                            if protocol == 'trojan':
+                                kind = receive(stream, 1)[0]
+                                assert kind in [1, 4]
+                                reply_ip = socket.inet_ntop(socket.AF_INET if kind == 1 else socket.AF_INET6, receive(stream, 4 if kind == 1 else 16))
+                                reply_port = struct.unpack('!H', receive(stream, 2))[0]
+                                assert reply_ip == ip and reply_port == port
+                            reply_size = struct.unpack('!H', receive(stream, 2))[0]
+                            if protocol == 'trojan': assert receive(stream, 2) == b'\r\n'
+                            assert reply_size == size and receive(stream, size) == body
+                    finally:
+                        if shared is None: stream.close()
+            finally:
+                if shared is not None: shared.close()
+            cases.append('installed-' + protocol + '-TLS-UDP-real-IPv4-domain-IPv6-zero-and-maximum-datagrams')
 
         installed = False
         try:
@@ -193,6 +348,7 @@ def main():
             assert systemctl('show', UNIT, '-p', 'Result', '--value').stdout.strip() == 'start-limit-hit'
             run('start'); wait(fetch)
             cases.append('real-systemd-start-limit-reproduced-and-explicit-manager-start-recovers')
+            live_limits()
             # PrivateTmp hides /tmp from the service; test TLS material lives in its managed state directory.
             cert = STATE_DIR / 'fixture-cert.pem'; key = STATE_DIR / 'fixture-key.pem'
             subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost',
@@ -201,9 +357,11 @@ def main():
             config.update(tls=1, server_name='localhost', cert_config={'cert_mode': 'file', 'cert_file': str(cert), 'key_file': str(key)})
             run('restart'); wait(lambda: fetch(tls=True))
             cases.append('installed-native-VLESS-file-TLS-with-verified-certificate')
+            udp_roundtrip('vless')
             config['protocol'] = 'trojan'
             run('restart'); wait(lambda: fetch('trojan', True))
             cases.append('installed-native-Trojan-file-TLS-with-real-echo-bytes')
+            udp_roundtrip('trojan')
             config['protocol'] = 'vless'; config.pop('tls'); config.pop('server_name'); config.pop('cert_config')
             run('restart'); wait(fetch)
             before_hashes = {name: sha((CONFIG_DIR / name).read_bytes()) for name in ['runtime.json', 'panel.env']}
@@ -263,9 +421,10 @@ def main():
                 if path.exists():
                     assert not path.is_symlink() and path in managed_paths
                     shutil.rmtree(path)
-            for server in [panel, echo]:
+            for server in [panel, echo, *udp_origins]:
                 server.shutdown(); server.server_close()
-    report = {'result': 'PASS', 'scope': 'Fresh exact-asset Linux systemd installation, loopback synthetic Xboard v2 panel, real VLESS/Trojan payload and TLS verification; no production panel or billing validation',
+    report = {'result': 'PASS', 'scope': 'Fresh exact-asset Linux systemd install, synthetic Xboard v2 panel, real TCP/TLS/UDP IPv4/IPv6, shared-rate timing and live source-IP policy; no production panel or billing validation',
+        'measurements': measurements,
         'cases': cases, 'binary_sha256': sha(args.binary.read_bytes()), 'package_sha256': sha(args.package.read_bytes()), 'installer_sha256': sha((ROOT / 'install.sh').read_bytes()),
         'temporary_service_removed': True, 'managed_fixture_data_removed': True, 'existing_service_identities_preserved': True}
     args.output.parent.mkdir(parents=True, exist_ok=True)

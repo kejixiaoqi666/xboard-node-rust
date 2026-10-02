@@ -145,7 +145,7 @@ async fn fragmented_vless_preserves_coalesced_payload() {
 #[tokio::test]
 async fn invalid_vless_version_command_and_addons_never_pass() {
     let users = snapshot("100", UUID_A);
-    for (offset, value) in [(0, 1), (17, 1), (18, 2)] {
+    for (offset, value) in [(0, 1), (17, 1), (18, 3)] {
         let mut header = vless(443);
         header[offset] = value;
         assert!(
@@ -204,6 +204,8 @@ async fn trojan_fragmented_authentication_keeps_identity_after_removal() {
                 uuid: None,
                 password: Some(password.into()),
                 flow: None,
+                speed_limit: 0,
+                device_limit: 0,
             }],
         )
         .unwrap(),
@@ -263,10 +265,18 @@ async fn slow_metadata_storage_does_not_block_cancellation_or_forward_late_paylo
     wire.extend(b"must never forward after cancellation");
     client.write_all(&wire).await.unwrap();
     let users = snapshot("100", UUID_A);
-    let proxy =
-        tokio::spawn(
-            async move { connection(server, config::Protocol::Vless, &users, &traffic).await },
-        );
+    let proxy = tokio::spawn(async move {
+        connection(
+            server,
+            config::Protocol::Vless,
+            &users,
+            &traffic,
+            "127.0.0.1".parse().unwrap(),
+            &Arc::new(limits::Registry::default()),
+            &Arc::new(tokio::sync::Semaphore::new(1024)),
+        )
+        .await
+    });
     let started = std::time::Instant::now();
     let (mut outbound, _) = tokio::time::timeout(Duration::from_millis(500), target.accept())
         .await
@@ -318,9 +328,17 @@ async fn tcp_half_close_retains_reverse_payload() {
         let traffic = Arc::new(traffic::Traffic::new_with_enabled("a".repeat(32), enabled));
         let connection_traffic = Arc::clone(&traffic);
         let proxy = tokio::spawn(async move {
-            connection(server, config::Protocol::Vless, &users, &connection_traffic)
-                .await
-                .unwrap()
+            connection(
+                server,
+                config::Protocol::Vless,
+                &users,
+                &connection_traffic,
+                "127.0.0.1".parse().unwrap(),
+                &Arc::new(limits::Registry::default()),
+                &Arc::new(tokio::sync::Semaphore::new(1024)),
+            )
+            .await
+            .unwrap()
         });
         let mut request = vless(port);
         request.extend(b"request until EOF");

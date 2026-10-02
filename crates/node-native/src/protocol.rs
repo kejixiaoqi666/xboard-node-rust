@@ -6,17 +6,26 @@ use std::{
 };
 use tokio::io::{AsyncRead, AsyncReadExt};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Address {
     Ip(IpAddr),
     Domain(String),
 }
 pub struct Request {
     pub user: Arc<str>,
+    pub policy: crate::limits::Policy,
     pub address: Address,
     pub port: u16,
+    pub command: Command,
 }
 
-async fn address<R: AsyncRead + Unpin>(
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Command {
+    Tcp,
+    Udp,
+}
+
+pub(crate) async fn address<R: AsyncRead + Unpin>(
     reader: &mut R,
     kind: u8,
     domain: u8,
@@ -66,11 +75,19 @@ pub async fn handshake<R: AsyncRead + Unpin>(
             }
             let mut key = [0; 16];
             reader.read_exact(&mut key).await?;
-            let user = users.load().vless(&key).ok_or(Error::Auth)?;
+            let snapshot = users.load();
+            let user = snapshot.vless(&key).ok_or(Error::Auth)?;
+            let policy = snapshot.policy(&user).ok_or(Error::Auth)?;
+            drop(snapshot);
             // Nonempty addons may carry flow/extension behavior we do not implement.
-            if reader.read_u8().await? != 0 || reader.read_u8().await? != 1 {
+            if reader.read_u8().await? != 0 {
                 return Err(Error::Unsupported);
             }
+            let command = match reader.read_u8().await? {
+                1 => Command::Tcp,
+                2 => Command::Udp,
+                _ => return Err(Error::Unsupported),
+            };
             let port = reader.read_u16().await?;
             let kind = reader.read_u8().await?;
             let address = address(reader, kind, 2, 3).await?;
@@ -79,27 +96,39 @@ pub async fn handshake<R: AsyncRead + Unpin>(
             }
             Ok(Request {
                 user,
+                policy,
                 address,
                 port,
+                command,
             })
         }
         Protocol::Trojan => {
             let mut key = [0; 56];
             reader.read_exact(&mut key).await?;
-            let user = users.load().trojan(&key).ok_or(Error::Auth)?;
-            if reader.read_u16().await? != 0x0d0a || reader.read_u8().await? != 1 {
+            let snapshot = users.load();
+            let user = snapshot.trojan(&key).ok_or(Error::Auth)?;
+            let policy = snapshot.policy(&user).ok_or(Error::Auth)?;
+            drop(snapshot);
+            if reader.read_u16().await? != 0x0d0a {
                 return Err(Error::Unsupported);
             }
+            let command = match reader.read_u8().await? {
+                1 => Command::Tcp,
+                3 => Command::Udp,
+                _ => return Err(Error::Unsupported),
+            };
             let kind = reader.read_u8().await?;
             let address = address(reader, kind, 3, 4).await?;
             let port = reader.read_u16().await?;
-            if port == 0 || reader.read_u16().await? != 0x0d0a {
+            if port == 0 && command == Command::Tcp || reader.read_u16().await? != 0x0d0a {
                 return Err(Error::Protocol);
             }
             Ok(Request {
                 user,
+                policy,
                 address,
                 port,
+                command,
             })
         }
     }

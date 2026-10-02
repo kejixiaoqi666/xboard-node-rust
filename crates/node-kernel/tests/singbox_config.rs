@@ -7,6 +7,29 @@ fn user(id: i64, uuid: &str) -> UserSpec {
 }
 
 #[test]
+fn native_enforcement_preserves_limits_and_stock_adapter_refuses_them() {
+    let user = UserSpec::new(7, "00000000-0000-4000-8000-000000000007").with_limits(8, 2);
+    let node = NodeSpec::new("vless", 443);
+    let native = SingBoxConfigBuilder::native()
+        .build(&node, std::slice::from_ref(&user))
+        .unwrap();
+    assert_eq!(native["inbounds"][0]["users"][0]["speed_limit"], 8);
+    assert_eq!(native["inbounds"][0]["users"][0]["device_limit"], 2);
+    assert!(
+        SingBoxConfigBuilder::new()
+            .build(&node, std::slice::from_ref(&user))
+            .is_err()
+    );
+    for (speed, devices) in [(-1, 0), (0, -1), (i64::MAX, 0), (0, i64::MAX)] {
+        assert!(
+            SingBoxConfigBuilder::native()
+                .build(&node, &[user.clone().with_limits(speed, devices)])
+                .is_err()
+        );
+    }
+}
+
+#[test]
 fn builds_vless_inbound_with_users_and_direct_outbound() {
     let config = SingBoxConfigBuilder::new()
         .build(

@@ -140,7 +140,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             readiness_timeout: Duration::from_secs(5),
             readiness_addr: None,
         },
-        SingBoxConfigBuilder::new(),
+        if builtin {
+            SingBoxConfigBuilder::native()
+        } else {
+            SingBoxConfigBuilder::new()
+        },
     )
     .without_environment([config.token_env.clone()]);
     if builtin || config.native_user_updates {

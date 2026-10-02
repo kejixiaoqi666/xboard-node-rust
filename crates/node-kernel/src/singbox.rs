@@ -6,11 +6,17 @@ use serde_json::{Value, json};
 use std::io::Write;
 
 #[derive(Clone, Debug, Default)]
-pub struct SingBoxConfigBuilder;
+pub struct SingBoxConfigBuilder {
+    native: bool,
+}
 
 impl SingBoxConfigBuilder {
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+    /// Emit limits only for the embedded Rust kernel that enforces them.
+    pub fn native() -> Self {
+        Self { native: true }
     }
 
     pub fn build(&self, node: &NodeSpec, users: &[UserSpec]) -> Result<Value, KernelError> {
@@ -72,9 +78,10 @@ impl SingBoxConfigBuilder {
                 "node contains options not supported by the Rust adapter".into(),
             ));
         }
-        if users
-            .iter()
-            .any(|user| user.speed_limit != 0 || user.device_limit != 0)
+        if !self.native
+            && users
+                .iter()
+                .any(|user| user.speed_limit != 0 || user.device_limit != 0)
         {
             return Err(KernelError::Invalid(
                 "speed/device enforcement is not implemented".into(),
@@ -136,6 +143,16 @@ impl SingBoxConfigBuilder {
         let mut passwords =
             std::collections::HashSet::with_capacity(if vless { 0 } else { users.len() });
         for user in users {
+            if user.speed_limit < 0
+                || user.device_limit < 0
+                || u64::try_from(user.speed_limit)
+                    .ok()
+                    .and_then(|n| n.checked_mul(125_000))
+                    .is_none()
+                || u32::try_from(user.device_limit).is_err()
+            {
+                return Err(KernelError::Invalid("invalid speed/device policy".into()));
+            }
             if user.uuid.trim().is_empty() {
                 return Err(KernelError::Invalid(format!(
                     "empty user UUID for id {}",
@@ -173,6 +190,7 @@ impl SingBoxConfigBuilder {
                 users: Users {
                     users,
                     vless: node.protocol == "vless",
+                    native: self.native,
                 },
             }],
             log: Log {
@@ -234,6 +252,7 @@ struct Route {
 struct Users<'a> {
     users: &'a [UserSpec],
     vless: bool,
+    native: bool,
 }
 
 impl Serialize for Users<'_> {
@@ -243,6 +262,7 @@ impl Serialize for Users<'_> {
             sequence.serialize_element(&User {
                 user,
                 vless: self.vless,
+                native: self.native,
             })?;
         }
         sequence.end()
@@ -252,12 +272,19 @@ impl Serialize for Users<'_> {
 struct User<'a> {
     user: &'a UserSpec,
     vless: bool,
+    native: bool,
 }
 
 impl Serialize for User<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut map = serializer.serialize_map(Some(2))?;
+        let mut map = serializer.serialize_map(None)?;
+        if self.native && self.user.device_limit > 0 {
+            map.serialize_entry("device_limit", &self.user.device_limit)?;
+        }
         map.serialize_entry("name", &UserName(self.user.id))?;
+        if self.native && self.user.speed_limit > 0 {
+            map.serialize_entry("speed_limit", &self.user.speed_limit)?;
+        }
         map.serialize_entry(
             if self.vless { "uuid" } else { "password" },
             &self.user.uuid,

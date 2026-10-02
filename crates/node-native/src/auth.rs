@@ -12,6 +12,7 @@ use std::{
 pub struct Snapshot {
     vless: HashMap<[u8; 16], Arc<str>>,
     trojan: HashMap<[u8; 56], Arc<str>>,
+    policies: HashMap<Arc<str>, crate::limits::Policy>,
 }
 
 impl Snapshot {
@@ -19,6 +20,7 @@ impl Snapshot {
         let mut snapshot = Self {
             vless: HashMap::new(),
             trojan: HashMap::new(),
+            policies: HashMap::new(),
         };
         let mut names = HashSet::with_capacity(users.len());
         for user in users {
@@ -30,7 +32,9 @@ impl Snapshot {
             {
                 return Err(Error::Auth);
             }
+            let policy = crate::limits::Policy::new(user.speed_limit, user.device_limit)?;
             let name: Arc<str> = user.name.into();
+            snapshot.policies.insert(Arc::clone(&name), policy);
             match protocol {
                 Protocol::Vless => {
                     if user.password.is_some() {
@@ -66,6 +70,9 @@ impl Snapshot {
     }
     pub fn trojan(&self, key: &[u8; 56]) -> Option<Arc<str>> {
         self.trojan.get(key).cloned()
+    }
+    pub fn policy(&self, name: &str) -> Option<crate::limits::Policy> {
+        self.policies.get(name).copied()
     }
 }
 
