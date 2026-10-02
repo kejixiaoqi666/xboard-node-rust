@@ -353,6 +353,13 @@ switch_current() {
     fi
 }
 
+start_service() {
+    # Explicit operator actions may follow many starts in a short time. Keep the
+    # automatic crash-loop limit, but clear this unit's counter before recovery.
+    systemctl reset-failed "$UNIT" || return 1
+    systemctl start "$UNIT"
+}
+
 activate() {
     if [[ -n $ROOT ]] || $NO_START; then
         say '文件已准备，服务未启动。'
@@ -360,7 +367,7 @@ activate() {
     fi
     systemctl daemon-reload || return 1
     systemctl enable "$UNIT" >/dev/null || return 1
-    systemctl start "$UNIT" || return 1
+    start_service || return 1
     sleep 2
     systemctl is-active --quiet "$UNIT"
 }
@@ -569,7 +576,7 @@ configure_node() {
         if [[ -z $ROOT ]]; then systemctl stop "$UNIT" || true; fi
         install -m 600 "$BACKUP/runtime.json" "$CONFIG" || fail '配置恢复失败；服务保持停止，请从私有备份恢复'
         install -m 600 "$BACKUP/panel.env" "$ENV_FILE" || fail '凭据恢复失败；服务保持停止，请从私有备份恢复'
-        if $was_active; then systemctl start "$UNIT" || true; fi
+        if $was_active; then start_service || true; fi
         fail '新配置未启动，已恢复原配置。请查看日志并核对面板支持范围。'
     fi
     say '配置已保存。本地检查只验证配置格式；请另测实际节点连接。'
@@ -593,7 +600,7 @@ update_node() {
         if [[ -z $ROOT ]]; then systemctl stop "$UNIT" || true; fi
         switch_current "$previous" || fail '旧程序链接恢复失败；服务保持停止，请检查版本目录'
         restore_switch_metadata || fail '管理入口恢复失败；服务保持停止，请检查备份文件'
-        if $was_active; then systemctl start "$UNIT" || true; fi
+        if $was_active; then start_service || true; fi
         fail '新版本启动失败，已恢复原程序链接；配置和流量数据保持原位'
     fi
     say "已更新到 $VERSION。回退：xboard-rust rollback"
@@ -616,7 +623,7 @@ rollback_node() {
         if [[ -z $ROOT ]]; then systemctl stop "$UNIT" || true; fi
         switch_current "$current" || fail '当前程序链接恢复失败；服务保持停止，请检查版本目录'
         restore_switch_metadata || fail '管理入口恢复失败；服务保持停止，请检查备份文件'
-        if $was_active; then systemctl start "$UNIT" || true; fi
+        if $was_active; then start_service || true; fi
         fail '回退程序未启动，已恢复当前程序链接'
     fi
     say "程序已回退至 $(cat "$CURRENT/VERSION")；配置和流量数据未回滚。"
@@ -641,7 +648,11 @@ service_action() {
     owned
     [[ -z $ROOT ]] || fail '离线目录模式不控制系统服务'
     case "$ACTION" in
-        start|stop|restart) dependencies; paths_safe; lock; owned_entries; systemctl "$ACTION" "$UNIT";;
+        start|stop|restart)
+            dependencies; paths_safe; lock; owned_entries
+            if [[ $ACTION != stop ]]; then systemctl reset-failed "$UNIT"; fi
+            systemctl "$ACTION" "$UNIT"
+            ;;
         status) systemctl status "$UNIT" --no-pager --full;;
         logs) journalctl -u "$UNIT" -n 100 --no-pager;;
     esac

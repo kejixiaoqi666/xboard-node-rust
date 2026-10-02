@@ -135,7 +135,8 @@ def main():
             proc = subprocess.run(['bash', str(ROOT / 'install.sh'), action, '--yes', *map(str, options)],
                 capture_output=True, text=True, timeout=90, env=environment)
             if (proc.returncode == 0) != success:
-                raise AssertionError((action + ': ' + proc.stdout + proc.stderr).replace(TOKEN, '[FIXTURE_TOKEN]'))
+                details = systemctl('show', UNIT, '-p', 'Result', '-p', 'ActiveState', '-p', 'ExecMainStatus', check=False).stdout
+                raise AssertionError((action + ': ' + proc.stdout + proc.stderr + details).replace(TOKEN, '[FIXTURE_TOKEN]'))
             return proc
 
         def parent():
@@ -179,6 +180,19 @@ def main():
             cases.append('installed-systemd-parent-and-child-run-exact-rust-ELF-with-token-stripped-in-child')
             cases.append('quoted-Unicode-systemd-EnvironmentFile-credential-roundtrip')
             cases.append('installed-loopback-panel-to-native-VLESS-to-real-echo-bytes')
+            # Reproduce the real systemd start limit with direct starts, then
+            # verify that an explicit manager start recovers only this unit.
+            systemctl('stop', UNIT)
+            systemctl('reset-failed', UNIT)
+            for _ in range(5):
+                systemctl('start', UNIT)
+                wait(fetch)
+                systemctl('stop', UNIT)
+            blocked = systemctl('start', UNIT, check=False)
+            assert blocked.returncode != 0
+            assert systemctl('show', UNIT, '-p', 'Result', '--value').stdout.strip() == 'start-limit-hit'
+            run('start'); wait(fetch)
+            cases.append('real-systemd-start-limit-reproduced-and-explicit-manager-start-recovers')
             # PrivateTmp hides /tmp from the service; test TLS material lives in its managed state directory.
             cert = STATE_DIR / 'fixture-cert.pem'; key = STATE_DIR / 'fixture-key.pem'
             subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost',
