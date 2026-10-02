@@ -412,6 +412,9 @@ def main():
             config.update(tls=1, server_name='localhost', cert_config={'cert_mode': 'file', 'cert_file': str(cert), 'key_file': str(key)})
             run('restart'); wait(lambda: fetch(tls=True))
             cases.append('installed-native-VLESS-file-TLS-with-verified-certificate')
+            from test_vision import exercise as vision_exercise
+            vision_exercise(config, run, wait, cases, measurements, node_port, cert, key, USER, temp)
+            run('restart'); wait(lambda: fetch(tls=True))
             udp_roundtrip('vless')
             config['protocol'] = 'trojan'
             run('restart'); wait(lambda: fetch('trojan', True))

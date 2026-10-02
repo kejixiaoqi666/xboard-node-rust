@@ -67,6 +67,7 @@ impl SingBoxConfigBuilder {
         supported.cert_config = node.cert_config.clone();
         supported.server_name = node.server_name.clone();
         if self.native {
+            supported.flow = node.flow.clone();
             supported.routes = node.routes.clone();
             supported.custom_routes = node.custom_routes.clone();
             supported.custom_route_rules = node.custom_route_rules.clone();
@@ -159,6 +160,14 @@ impl SingBoxConfigBuilder {
                 ));
             }
         };
+        let flow = node.flow.as_deref().filter(|flow| !flow.is_empty());
+        if flow.is_some_and(|flow| flow != "xtls-rprx-vision")
+            || flow.is_some() && (!self.native || node.protocol != "vless" || node.tls != 1)
+        {
+            return Err(KernelError::Invalid(
+                "Vision requires native VLESS with file TLS".into(),
+            ));
+        }
         let mut ids = std::collections::HashSet::with_capacity(users.len());
         let vless = node.protocol == "vless";
         let mut uuid_keys =
@@ -216,6 +225,7 @@ impl SingBoxConfigBuilder {
                 users: Users {
                     users,
                     vless: node.protocol == "vless",
+                    flow,
                     native: self.native,
                 },
             }],
@@ -261,6 +271,7 @@ struct Log<'a> {
 
 struct Users<'a> {
     users: &'a [UserSpec],
+    flow: Option<&'a str>,
     vless: bool,
     native: bool,
 }
@@ -271,6 +282,7 @@ impl Serialize for Users<'_> {
         for user in self.users {
             sequence.serialize_element(&User {
                 user,
+                flow: self.flow,
                 vless: self.vless,
                 native: self.native,
             })?;
@@ -281,6 +293,7 @@ impl Serialize for Users<'_> {
 
 struct User<'a> {
     user: &'a UserSpec,
+    flow: Option<&'a str>,
     vless: bool,
     native: bool,
 }
@@ -290,6 +303,9 @@ impl Serialize for User<'_> {
         let mut map = serializer.serialize_map(None)?;
         if self.native && self.user.device_limit > 0 {
             map.serialize_entry("device_limit", &self.user.device_limit)?;
+        }
+        if let Some(flow) = self.flow {
+            map.serialize_entry("flow", flow)?;
         }
         map.serialize_entry("name", &UserName(self.user.id))?;
         if self.native && self.user.speed_limit > 0 {

@@ -135,6 +135,9 @@ pub fn decode(data: &[u8]) -> Result<Candidate, Error> {
         return Err(Error::Config);
     }
     let auth = Arc::new(Snapshot::new(protocol, inbound.users)?);
+    if auth.has_vision() && inbound.tls.is_none() {
+        return Err(Error::Unsupported);
+    }
     Ok(Candidate {
         base: Base {
             dns: config.dns,

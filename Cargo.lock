@@ -784,6 +784,7 @@ dependencies = [
  "arc-swap",
  "hickory-resolver",
  "node-core",
+ "node-vision",
  "rustls",
  "serde",
  "serde_json",
@@ -818,6 +819,18 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "node-vision"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "log",
+ "memchr",
+ "rand 0.9.5",
+ "rustls",
  "tokio",
 ]
 

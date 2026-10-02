@@ -13,6 +13,7 @@ pub enum Address {
 }
 pub struct Request {
     pub user: Arc<str>,
+    pub vision_uuid: Option<[u8; 16]>,
     pub policy: crate::limits::Policy,
     pub address: Address,
     pub port: u16,
@@ -78,9 +79,22 @@ pub async fn handshake<R: AsyncRead + Unpin>(
             let snapshot = users.load();
             let user = snapshot.vless(&key).ok_or(Error::Auth)?;
             let policy = snapshot.policy(&user).ok_or(Error::Auth)?;
+            let vision = snapshot.vision(&user);
             drop(snapshot);
-            // Nonempty addons may carry flow/extension behavior we do not implement.
-            if reader.read_u8().await? != 0 {
+            let length = reader.read_u8().await? as usize;
+            let mut addons = vec![0; length];
+            reader.read_exact(&mut addons).await?;
+            // The supported protobuf Addons has only field 1 (Flow). Unknown
+            // extensions and mismatched per-user flows fail before connecting.
+            let flow = b"xtls-rprx-vision";
+            if vision {
+                if addons.len() != flow.len() + 2
+                    || addons[..2] != [10, flow.len() as u8]
+                    || addons[2..] != *flow
+                {
+                    return Err(Error::Unsupported);
+                }
+            } else if !addons.is_empty() {
                 return Err(Error::Unsupported);
             }
             let command = match reader.read_u8().await? {
@@ -88,6 +102,9 @@ pub async fn handshake<R: AsyncRead + Unpin>(
                 2 => Command::Udp,
                 _ => return Err(Error::Unsupported),
             };
+            if vision && command != Command::Tcp {
+                return Err(Error::Unsupported);
+            }
             let port = reader.read_u16().await?;
             let kind = reader.read_u8().await?;
             let address = address(reader, kind, 2, 3).await?;
@@ -95,6 +112,7 @@ pub async fn handshake<R: AsyncRead + Unpin>(
                 return Err(Error::Protocol);
             }
             Ok(Request {
+                vision_uuid: vision.then_some(key),
                 user,
                 policy,
                 address,
@@ -124,6 +142,7 @@ pub async fn handshake<R: AsyncRead + Unpin>(
                 return Err(Error::Protocol);
             }
             Ok(Request {
+                vision_uuid: None,
                 user,
                 policy,
                 address,

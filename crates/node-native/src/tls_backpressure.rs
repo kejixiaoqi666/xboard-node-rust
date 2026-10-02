@@ -13,7 +13,7 @@ const USER: &str = "00000000-0000-4000-8000-000000000007";
 
 async fn streams() -> (
     tokio_rustls::client::TlsStream<tokio::io::DuplexStream>,
-    tokio_rustls::server::TlsStream<tokio::io::DuplexStream>,
+    tokio_rustls::server::TlsStream<crate::vision::RecordIo<tokio::io::DuplexStream>>,
 ) {
     let cert = CertificateDer::from(TEST_CERT.to_vec());
     let provider = Arc::new(rustls::crypto::ring::default_provider());
@@ -38,7 +38,7 @@ async fn streams() -> (
     let server = tokio_rustls::TlsAcceptor::from(Arc::new(server));
     let (a, b) = tokio::join!(
         client.connect(ServerName::try_from("localhost").unwrap(), a),
-        server.accept(b)
+        server.accept(crate::vision::RecordIo::new(b))
     );
     (a.unwrap(), b.unwrap())
 }
@@ -204,3 +204,177 @@ const TEST_KEY: &[u8] = &[
     219, 77, 235, 115, 107, 112, 221, 216, 93, 69, 235, 72, 146, 136, 105, 246, 59, 225, 117, 54,
     138, 222, 73, 190, 159, 73, 124,
 ];
+
+#[tokio::test]
+async fn vision_tls_backpressure_preserves_payload_and_half_close() {
+    let test = async {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let origin = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut body = Vec::new();
+            socket.read_to_end(&mut body).await.unwrap();
+            socket.write_all(&body).await.unwrap();
+            socket.shutdown().await.unwrap();
+            body
+        });
+        let users = Arc::new(ArcSwap::from_pointee(
+            auth::Snapshot::new(
+                Protocol::Vless,
+                vec![crate::config::User {
+                    name: "7".into(),
+                    uuid: Some(USER.into()),
+                    password: None,
+                    flow: Some("xtls-rprx-vision".into()),
+                    speed_limit: 0,
+                    device_limit: 0,
+                }],
+            )
+            .unwrap(),
+        ));
+        let traffic = Arc::new(traffic::Traffic::new("vision-test-epoch".into()));
+        let registry = Arc::new(limits::Registry::new(Arc::clone(&users)));
+        let (mut client, server) = streams().await;
+        let native = {
+            let users = Arc::clone(&users);
+            let traffic = Arc::clone(&traffic);
+            tokio::spawn(async move {
+                let network = crate::network::Network::direct();
+                let slots = Arc::new(tokio::sync::Semaphore::new(1));
+                crate::connection_tls(
+                    server,
+                    Protocol::Vless,
+                    crate::ConnectionContext {
+                        users: &users,
+                        traffic: &traffic,
+                        source: "127.0.0.1:12345".parse().unwrap(),
+                        limits: &registry,
+                        udp_slots: &slots,
+                        network: &network,
+                    },
+                )
+                .await
+            })
+        };
+        let mut header = vec![0];
+        header.extend(auth::uuid(USER).unwrap());
+        let flow = b"xtls-rprx-vision";
+        header.extend([18, 10, 16]);
+        header.extend(flow);
+        header.push(1);
+        header.extend(port.to_be_bytes());
+        header.extend([1, 127, 0, 0, 1]);
+        client.write_all(&header).await.unwrap();
+        client.flush().await.unwrap();
+        let (tcp, session) = client.into_inner();
+        let mut client = node_vision::VisionStream::new_client(
+            tcp,
+            rustls::Connection::Client(session),
+            auth::uuid(USER).unwrap(),
+        );
+        let payload = b"bounded-Vision-TLS-payload".repeat(4096);
+        client.write_all(&payload).await.unwrap();
+        client.shutdown().await.unwrap();
+        let mut actual = vec![0; payload.len()];
+        client.read_exact(&mut actual).await.unwrap();
+        assert_eq!(actual, payload);
+        assert_eq!(origin.await.unwrap(), payload);
+        native.await.unwrap().unwrap();
+        let counters = traffic.snapshot().unwrap().unwrap().traffic["7"];
+        assert_eq!(counters, [payload.len() as u64, payload.len() as u64]);
+    };
+    tokio::time::timeout(Duration::from_secs(15), test)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn vision_partial_tls_tail_and_close_notify_without_tcp_fin_are_forwarded() {
+    let test = async {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let origin = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut body = Vec::new();
+            stream.read_to_end(&mut body).await.unwrap();
+            stream.write_all(&body).await.unwrap();
+            stream.shutdown().await.unwrap();
+            body
+        });
+        let users = Arc::new(ArcSwap::from_pointee(
+            auth::Snapshot::new(
+                Protocol::Vless,
+                vec![crate::config::User {
+                    name: "7".into(),
+                    uuid: Some(USER.into()),
+                    password: None,
+                    flow: Some("xtls-rprx-vision".into()),
+                    speed_limit: 0,
+                    device_limit: 0,
+                }],
+            )
+            .unwrap(),
+        ));
+        let (mut client, server) = streams().await;
+        let native = tokio::spawn(async move {
+            let traffic = Arc::new(traffic::Traffic::new("d".repeat(32)));
+            let limits = Arc::new(limits::Registry::new(Arc::clone(&users)));
+            let slots = Arc::new(tokio::sync::Semaphore::new(1));
+            let network = crate::network::Network::direct();
+            crate::connection_tls(
+                server,
+                Protocol::Vless,
+                crate::ConnectionContext {
+                    users: &users,
+                    traffic: &traffic,
+                    source: "127.0.0.1:1".parse().unwrap(),
+                    limits: &limits,
+                    udp_slots: &slots,
+                    network: &network,
+                },
+            )
+            .await
+            .unwrap();
+            traffic.snapshot().unwrap().unwrap().traffic["7"]
+        });
+        let uuid = auth::uuid(USER).unwrap();
+        let mut header = vec![0];
+        header.extend(uuid);
+        header.extend([18, 10, 16]);
+        header.extend(b"xtls-rprx-vision");
+        header.push(1);
+        header.extend(port.to_be_bytes());
+        header.extend([1, 127, 0, 0, 1]);
+        client.write_all(&header).await.unwrap();
+        client.flush().await.unwrap();
+        // UUID and padding header can span different TLS records.
+        let payload = b"tail-is-payload\x16\x03\x03";
+        let mut frame = uuid.to_vec();
+        frame.push(0);
+        frame.extend((payload.len() as u16).to_be_bytes());
+        frame.extend([0, 0]);
+        frame.extend(payload);
+        for part in frame.chunks(3) {
+            client.write_all(part).await.unwrap();
+            client.flush().await.unwrap();
+        }
+        client.get_mut().1.send_close_notify();
+        client.flush().await.unwrap();
+        // Keep TCP write side open: authenticated TLS EOF must reach origin now.
+        let mut prefix = [0; 18];
+        client.read_exact(&mut prefix).await.unwrap();
+        assert_eq!(prefix[..2], [0, 0]);
+        assert_eq!(prefix[2..], uuid);
+        let mut padding = [0; 5];
+        client.read_exact(&mut padding).await.unwrap();
+        let size = u16::from_be_bytes([padding[1], padding[2]]) as usize;
+        let mut body = vec![0; size];
+        client.read_exact(&mut body).await.unwrap();
+        assert_eq!(body, payload);
+        assert_eq!(origin.await.unwrap(), payload);
+        assert_eq!(native.await.unwrap(), [payload.len() as u64; 2]);
+    };
+    tokio::time::timeout(Duration::from_secs(10), test)
+        .await
+        .unwrap();
+}

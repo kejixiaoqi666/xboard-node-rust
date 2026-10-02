@@ -13,6 +13,7 @@ pub struct Snapshot {
     vless: HashMap<[u8; 16], Arc<str>>,
     trojan: HashMap<[u8; 56], Arc<str>>,
     policies: HashMap<Arc<str>, crate::limits::Policy>,
+    vision: HashSet<Arc<str>>,
 }
 
 impl Snapshot {
@@ -21,6 +22,7 @@ impl Snapshot {
             vless: HashMap::new(),
             trojan: HashMap::new(),
             policies: HashMap::new(),
+            vision: HashSet::new(),
         };
         let mut names = HashSet::with_capacity(users.len());
         for user in users {
@@ -28,12 +30,20 @@ impl Snapshot {
                 || user.name.len() > 128
                 || user.name.chars().any(char::is_control)
                 || !names.insert(user.name.clone())
-                || user.flow.as_ref().is_some_and(|flow| !flow.is_empty())
+                || user
+                    .flow
+                    .as_deref()
+                    .is_some_and(|flow| !matches!(flow, "" | "xtls-rprx-vision"))
+                || protocol == Protocol::Trojan
+                    && user.flow.as_ref().is_some_and(|flow| !flow.is_empty())
             {
                 return Err(Error::Auth);
             }
             let policy = crate::limits::Policy::new(user.speed_limit, user.device_limit)?;
             let name: Arc<str> = user.name.into();
+            if user.flow.as_deref() == Some("xtls-rprx-vision") {
+                snapshot.vision.insert(Arc::clone(&name));
+            }
             snapshot.policies.insert(Arc::clone(&name), policy);
             match protocol {
                 Protocol::Vless => {
@@ -64,6 +74,12 @@ impl Snapshot {
             }
         }
         Ok(snapshot)
+    }
+    pub fn has_vision(&self) -> bool {
+        !self.vision.is_empty()
+    }
+    pub fn vision(&self, name: &str) -> bool {
+        self.vision.contains(name)
     }
     pub fn vless(&self, key: &[u8; 16]) -> Option<Arc<str>> {
         self.vless.get(key).cloned()

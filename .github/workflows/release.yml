@@ -48,6 +48,10 @@ jobs:
           shellcheck install.sh
       - name: Build static runtime
         run: cargo build -p node-runtime --target ${{ matrix.target }} --release --locked
+      - name: Pin official Xray test client
+        run: |
+          python3 scripts/fetch_xray_test_client.py --arch ${{ matrix.arch }} --output "$RUNNER_TEMP/xray-vision-test/xray"
+          echo "XRAY_TEST_BINARY=$RUNNER_TEMP/xray-vision-test/xray" >> "$GITHUB_ENV"
       - name: Package and verify installer lifecycle
         env:
           RELEASE_VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v0.1.0-preview.3' }}
@@ -57,7 +61,7 @@ jobs:
           PREVIOUS_DIR=$(mktemp -d "$RUNNER_TEMP/xbr-previous.XXXXXXXX")
           curl -fsSL --retry 3 "https://github.com/kejixiaoqi666/xboard-node-rust/releases/download/v0.1.0-preview.1/xboard-node-rust-linux-${{ matrix.arch }}.tar.gz" -o "$PREVIOUS_DIR/xboard-node-rust-linux-${{ matrix.arch }}.tar.gz"
           curl -fsSL --retry 3 "https://github.com/kejixiaoqi666/xboard-node-rust/releases/download/v0.1.0-preview.1/SHA256SUMS" -o "$PREVIOUS_DIR/SHA256SUMS"
-          sudo python3 scripts/test_systemd.py --binary target/${{ matrix.target }}/release/xboard-node-rust --package dist/xboard-node-rust-linux-${{ matrix.arch }}.tar.gz --checksums dist/SHA256SUMS --previous-package "$PREVIOUS_DIR/xboard-node-rust-linux-${{ matrix.arch }}.tar.gz" --previous-checksums "$PREVIOUS_DIR/SHA256SUMS" --output dist/systemd-tests-${{ matrix.arch }}.json
+          sudo --preserve-env=XRAY_TEST_BINARY python3 scripts/test_systemd.py --binary target/${{ matrix.target }}/release/xboard-node-rust --package dist/xboard-node-rust-linux-${{ matrix.arch }}.tar.gz --checksums dist/SHA256SUMS --previous-package "$PREVIOUS_DIR/xboard-node-rust-linux-${{ matrix.arch }}.tar.gz" --previous-checksums "$PREVIOUS_DIR/SHA256SUMS" --output dist/systemd-tests-${{ matrix.arch }}.json
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}

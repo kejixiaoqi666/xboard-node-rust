@@ -15,6 +15,8 @@ mod traffic;
 mod traffic_store;
 #[cfg(any(unix, test))]
 mod udp;
+#[cfg(any(unix, test))]
+mod vision;
 
 #[cfg(unix)]
 use arc_swap::ArcSwap;
@@ -242,8 +244,8 @@ async fn serve(
                     let _=stream.set_nodelay(true);
                     let context=ConnectionContext { users: &users, traffic: &traffic, source, limits: &limits, udp_slots: &udp_slots, network: &network };
                     if let Some(tls)=tls {
-                        if let Ok(Ok(stream))=tokio::time::timeout(Duration::from_secs(10),tls.accept(stream)).await {
-                            let _=connection_routed(stream,protocol,context).await;
+                        if let Ok(Ok(stream))=tokio::time::timeout(Duration::from_secs(10),tls.accept(vision::RecordIo::new(stream))).await {
+                            let _=connection_tls(stream,protocol,context).await;
                         }
                     } else { let _=connection_routed(stream,protocol,context).await; }
                 });
@@ -336,6 +338,61 @@ async fn connection_routed<S: AsyncRead + AsyncWrite + Unpin>(
     protocol: config::Protocol,
     context: ConnectionContext<'_>,
 ) -> Result<(), Error> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    let request = tokio::time::timeout_at(
+        deadline,
+        protocol::handshake(&mut inbound, protocol, context.users),
+    )
+    .await
+    .map_err(|_| Error::Protocol)??;
+    if request.vision_uuid.is_some() {
+        return Err(Error::Unsupported);
+    }
+    connection_authenticated(inbound, protocol, request, false, deadline, context).await
+}
+
+#[cfg(any(unix, test))]
+async fn connection_tls<S: AsyncRead + AsyncWrite + Unpin>(
+    mut inbound: tokio_rustls::server::TlsStream<vision::RecordIo<S>>,
+    protocol: config::Protocol,
+    context: ConnectionContext<'_>,
+) -> Result<(), Error> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    let request = tokio::time::timeout_at(
+        deadline,
+        protocol::handshake(&mut inbound, protocol, context.users),
+    )
+    .await
+    .map_err(|_| Error::Protocol)??;
+    if let Some(uuid) = request.vision_uuid {
+        if inbound.get_ref().1.protocol_version() != Some(rustls::ProtocolVersion::TLSv1_3) {
+            return Err(Error::Unsupported);
+        }
+        tokio::time::timeout_at(deadline, inbound.flush())
+            .await
+            .map_err(|_| Error::Protocol)??;
+        let (transport, session) = inbound.into_inner();
+        let stream = node_vision::VisionStream::new_server(
+            transport.into_inner()?,
+            rustls::Connection::Server(session),
+            uuid,
+            &[],
+        )?;
+        connection_authenticated(stream, protocol, request, true, deadline, context).await
+    } else {
+        connection_authenticated(inbound, protocol, request, false, deadline, context).await
+    }
+}
+
+#[cfg(any(unix, test))]
+async fn connection_authenticated<S: AsyncRead + AsyncWrite + Unpin>(
+    mut inbound: S,
+    protocol: config::Protocol,
+    request: protocol::Request,
+    vision: bool,
+    deadline: tokio::time::Instant,
+    context: ConnectionContext<'_>,
+) -> Result<(), Error> {
     let ConnectionContext {
         users,
         traffic,
@@ -344,48 +401,46 @@ async fn connection_routed<S: AsyncRead + AsyncWrite + Unpin>(
         udp_slots,
         network,
     } = context;
-    let (request, outbound, counter, lease, _udp_slot) =
-        tokio::time::timeout(Duration::from_secs(10), async {
-            let request = protocol::handshake(&mut inbound, protocol, users).await?;
-            let current_policy = users.load().policy(&request.user).unwrap_or(request.policy);
-            let lease = limits.acquire(Arc::clone(&request.user), source.ip(), current_policy)?;
-            let udp_slot = if request.command == protocol::Command::Udp {
-                Some(
-                    Arc::clone(udp_slots)
-                        .try_acquire_owned()
-                        .map_err(|_| Error::Limited)?,
-                )
-            } else {
-                None
-            };
-            let outbound = if request.command == protocol::Command::Tcp {
-                Some(
-                    network
-                        .connect(&request.address, request.port, source)
-                        .await?,
-                )
-            } else {
-                None
-            };
-            // The registry lock can be held by a durable fsync. Never take it on
-            // the single-thread async executor: cancellation, signals and other
-            // payload connections must keep making progress while storage waits.
-            let counter = if traffic.enabled() {
-                let user = Arc::clone(&request.user);
-                Some(
-                    traffic
-                        .blocking(move |t| t.user(user))
-                        .await
-                        .map_err(|_| Error::Task)??,
-                )
-            } else {
-                None
-            };
-            Ok::<_, Error>((request, outbound, counter, lease, udp_slot))
-        })
-        .await
-        .map_err(|_| Error::Protocol)??;
-    if protocol == config::Protocol::Vless {
+    let (request, outbound, counter, lease, _udp_slot) = tokio::time::timeout_at(deadline, async {
+        let current_policy = users.load().policy(&request.user).unwrap_or(request.policy);
+        let lease = limits.acquire(Arc::clone(&request.user), source.ip(), current_policy)?;
+        let udp_slot = if request.command == protocol::Command::Udp {
+            Some(
+                Arc::clone(udp_slots)
+                    .try_acquire_owned()
+                    .map_err(|_| Error::Limited)?,
+            )
+        } else {
+            None
+        };
+        let outbound = if request.command == protocol::Command::Tcp {
+            Some(
+                network
+                    .connect(&request.address, request.port, source)
+                    .await?,
+            )
+        } else {
+            None
+        };
+        // The registry lock can be held by a durable fsync. Never take it on
+        // the single-thread async executor: cancellation, signals and other
+        // payload connections must keep making progress while storage waits.
+        let counter = if traffic.enabled() {
+            let user = Arc::clone(&request.user);
+            Some(
+                traffic
+                    .blocking(move |t| t.user(user))
+                    .await
+                    .map_err(|_| Error::Task)??,
+            )
+        } else {
+            None
+        };
+        Ok::<_, Error>((request, outbound, counter, lease, udp_slot))
+    })
+    .await
+    .map_err(|_| Error::Protocol)??;
+    if protocol == config::Protocol::Vless && !vision {
         inbound.write_all(&[0, 0]).await?;
         inbound.flush().await?;
     }

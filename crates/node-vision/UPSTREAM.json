@@ -1,0 +1,45 @@
+{
+  "repository": "https://github.com/cfal/shoes",
+  "commit": "60ed3838b346268615c81e4eace4e15e717da23e",
+  "license": "MIT",
+  "files": [
+    {
+      "upstream_path": "src/vless/tls_deframer.rs",
+      "sha256": "b4a14c1d618cf052f0079dfd531ceb0d45d3063facb60457f7accbed69a1e4cc"
+    },
+    {
+      "upstream_path": "src/vless/tls_fuzzy_deframer.rs",
+      "sha256": "5dd2c55df0589f6c0a94132115db35a5a714574dd452c25bded594b66d029ee9"
+    },
+    {
+      "upstream_path": "src/vless/tls_handshake_util.rs",
+      "sha256": "7fd092debcd7856dad57563e0a0b8a8556c3cd00e72ee0792c6bca44bf344cdf"
+    },
+    {
+      "upstream_path": "src/vless/vision_filter.rs",
+      "sha256": "f458175182b2a078041b14c8e1a1d329d4ffe01a7b9dc03555bce1b091f0abc1"
+    },
+    {
+      "upstream_path": "src/vless/vision_pad.rs",
+      "sha256": "9ed00c942ebecfa5c0e6009f609d71fc8cfe8445d3c709e6a061fbf3d0fc3f29"
+    },
+    {
+      "upstream_path": "src/vless/vision_unpad.rs",
+      "sha256": "7c5704aaa405b779ac078db2137e6f6d22f7700e87dcdc5a543f1d70df79522c"
+    },
+    {
+      "upstream_path": "src/vless/vision_stream.rs",
+      "sha256": "ef4999c607c3c40af264ae8aa4495a25f2b15fb5f37c55292257fac484865247"
+    }
+  ],
+  "adaptations": [
+    "Rustls-only crypto adapter; no REALITY or upstream full proxy runtime",
+    "No AsyncPing abstraction; Tokio AsyncRead/AsyncWrite only",
+    "Use std::task::ready and rand 0.9",
+    "Strict fragmented UUID validation and bounded stream state fixes are local",
+    "Separate forwarding from TLS classification, preserving incomplete TLS-like tails",
+    "Track authenticated TLS close_notify without waiting for TCP FIN",
+    "Retain HelloRetryRequest detection and restrict accepted TLS13 ciphers",
+    "Drain bounded writes on flush and shutdown"
+  ]
+}

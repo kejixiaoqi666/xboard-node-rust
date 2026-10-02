@@ -64,6 +64,8 @@ def dependency_notices(target):
             files['system/' + path.parent.name + '/COPYRIGHT'] = path.read_bytes()
     if target.endswith('musl') and not any(name.startswith('system/musl') for name in files):
         raise RuntimeError('Static musl license notice missing from /usr/share/doc')
+    files['vendored/node-vision/LICENSE'] = (ROOT / 'crates/node-vision/LICENSE').read_bytes()
+    files['vendored/node-vision/UPSTREAM.json'] = (ROOT / 'crates/node-vision/UPSTREAM.json').read_bytes()
     files['NOTICE_MANIFEST.json'] = (json.dumps({'target': target, 'dependencies': entries,
         'files': [{'path': name, 'sha256': sha(body)} for name, body in sorted(files.items())]}, indent=2) + '\n').encode()
     output = io.BytesIO()

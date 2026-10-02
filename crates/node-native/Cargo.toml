@@ -5,6 +5,7 @@ edition = "2024"
 license = "MPL-2.0"
 
 [dependencies]
+node-vision = { path = "../node-vision" }
 node-core = { path = "../node-core" }
 arc-swap = "1.9.2"
 serde = { version = "1", features = ["derive"] }
