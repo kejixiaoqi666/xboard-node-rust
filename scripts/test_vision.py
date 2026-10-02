@@ -61,6 +61,39 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
             server.tls.load_cert_chain(str(cert), str(key))
         servers.append(server)
         threading.Thread(target=server.serve_forever, daemon=True).start()
+    # Force a TLS1.3 retry: the Python client offers X25519 first and the
+    # origin only accepts P-384. A loopback relay records the actual HRR random.
+    hrr_origin = Server(('127.0.0.1', 0), Echo)
+    hrr_origin.tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    hrr_origin.tls.minimum_version = hrr_origin.tls.maximum_version = ssl.TLSVersion.TLSv1_3
+    hrr_origin.tls.load_cert_chain(str(cert), str(key))
+    hrr_origin.tls.set_ecdh_curve('secp384r1')
+    hrr_observed = [False]
+    class Relay(socketserver.BaseRequestHandler):
+        def handle(self):
+            self.request.settimeout(20)
+            upstream = socket.create_connection(hrr_origin.server_address, timeout=20)
+            def copy(source, target, record=False):
+                observed = bytearray()
+                try:
+                    while True:
+                        body = source.recv(65536)
+                        if not body: break
+                        if record and len(observed) < 65536:
+                            observed.extend(body[:65536-len(observed)])
+                            random = bytes.fromhex('cf21ad74e59a6111be1d8c021e65b891c2a211167abb8c5e079e09e2c8a8339c')
+                            if random in observed: hrr_observed[0] = True
+                        target.sendall(body)
+                except OSError: pass
+                finally:
+                    try: target.shutdown(socket.SHUT_WR)
+                    except OSError: pass
+            thread = threading.Thread(target=copy, args=(self.request, upstream), daemon=True)
+            thread.start(); copy(upstream, self.request, True); thread.join(timeout=22); upstream.close()
+    retry = Server(('127.0.0.1', 0), Relay)
+    retry.tls = hrr_origin.tls
+    servers.append(retry)
+    for server in [hrr_origin, retry]: threading.Thread(target=server.serve_forever, daemon=True).start()
     @contextlib.contextmanager
     def client(label, flow='xtls-rprx-vision', identity=user):
         port = free_port()
@@ -101,7 +134,7 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
     config['flow'] = 'xtls-rprx-vision'
     try:
         run('restart')
-        for label, server in zip(['plain', 'tls13', 'tls12'], servers):
+        for label, server in zip(['plain', 'tls13', 'tls12', 'tls13-hrr'], servers):
             with client(label) as port:
                 def roundtrip():
                     with connect(port, server.server_address[1]) as stream:
@@ -109,6 +142,11 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
                             context = ssl.create_default_context(cafile=str(cert))
                             context.minimum_version = context.maximum_version = server.tls.minimum_version
                             stream = context.wrap_socket(stream, server_hostname='localhost')
+                        # Xray only emits DIRECT when its input contains complete TLS records.
+                        # Start with a small complete application record, then exercise large fragmented records.
+                        warmup = b"complete-record-before-large-transfer"
+                        stream.sendall(warmup)
+                        assert receive(stream, len(warmup)) == warmup
                         # Tail resembling a partial TLS header must also be delivered.
                         for index in range(32):
                             body = bytes([index])*8192 + b'\x16\x03\x03'
@@ -116,13 +154,14 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
                             assert receive(stream, len(body)) == body
                         return True
                 wait(roundtrip)
-            if label == 'tls13':
+            if label in ['tls13', 'tls13-hrr']:
                 assert re.search(r'XtlsPadding \d+ \d+ 2', logs[label]), logs[label]
                 assert re.search(r'Xtls Unpadding new block, content \d+ padding \d+ command 2', logs[label]), logs[label]
             if label == 'tls12':
                 assert 'command 2' not in logs[label]
                 assert not re.search(r'XtlsPadding \d+ \d+ 2', logs[label])
-            cases.append('installed-native-Vision-official-Xray-' + label + '-exact-bytes' + ('-bidirectional-DIRECT' if label=='tls13' else ''))
+            cases.append('installed-native-Vision-official-Xray-' + label + '-exact-bytes' + ('-bidirectional-DIRECT' if label in ['tls13','tls13-hrr'] else ''))
+        assert hrr_observed[0], 'Fixture did not exercise a real HelloRetryRequest'
         for label, flow, identity in [('missing-flow', '', user), ('wrong-uuid', 'xtls-rprx-vision', '00000000-0000-4000-8000-000000000999')]:
             with lock: baseline = accepted[0]
             with client(label, flow, identity) as port:
@@ -136,13 +175,14 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
             with lock: assert accepted[0] == baseline, 'Denied credentials reached origin'
             cases.append('installed-native-Vision-' + label + '-denied-before-origin-connect')
         measurements['vision'] = {'client_version': version, 'client_binary_sha256': binary_sha,
-            'client_only': True, 'loopback_only': True, 'payload_bytes_per_case': 32*8195,
+            'client_only': True, 'loopback_only': True, 'payload_bytes_per_case': 32*8195 + len(b"complete-record-before-large-transfer"),
             'client_logs_sha256': {label: hashlib.sha256(body.encode()).hexdigest() for label,body in logs.items()},
             'tls13_client_sent_and_received_direct_command': True,
+            'tls13_retry_observed_in_actual_origin_wire': hrr_observed[0],
             'server_runtime_external_kernel_required': False}
     except BaseException:
         for label, body in logs.items(): print('Xray fixture ' + label + ':\n' + body[-16000:])
         raise
     finally:
         config.pop('flow', None)
-        for server in servers: server.shutdown(); server.server_close()
+        for server in [*servers,hrr_origin]: server.shutdown(); server.server_close()

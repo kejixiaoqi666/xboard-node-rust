@@ -198,3 +198,38 @@ fn invalid_streamed_config_never_writes_and_output_errors_propagate() {
         Err(KernelError::Prepare(_))
     ));
 }
+
+#[test]
+fn vision_flow_is_retained_and_unsupported_security_modes_never_write_candidates() {
+    let mut node = NodeSpec::new("vless", 443);
+    node.tls = 1;
+    node.flow = Some("xtls-rprx-vision".into());
+    node.cert_config = Some(
+        serde_json::json!({"cert_mode":"file","cert_file":std::env::temp_dir().join("vision-cert.pem"),"key_file":std::env::temp_dir().join("vision-key.pem")}),
+    );
+    let users = [user(7, "00000000-0000-4000-8000-000000000007")];
+    let config = SingBoxConfigBuilder::native().build(&node, &users).unwrap();
+    assert_eq!(
+        config["inbounds"][0]["users"][0]["flow"],
+        "xtls-rprx-vision"
+    );
+    assert!(SingBoxConfigBuilder::new().build(&node, &users).is_err());
+    for (protocol, tls, flow) in [
+        ("vless", 0, "xtls-rprx-vision"),
+        ("vless", 2, "xtls-rprx-vision"),
+        ("trojan", 1, "xtls-rprx-vision"),
+        ("vless", 1, "unsupported-flow"),
+    ] {
+        let mut invalid = node.clone();
+        invalid.protocol = protocol.into();
+        invalid.tls = tls;
+        invalid.flow = Some(flow.into());
+        let mut output = Vec::new();
+        assert!(
+            SingBoxConfigBuilder::native()
+                .write_json(&mut output, &invalid, &users)
+                .is_err()
+        );
+        assert!(output.is_empty());
+    }
+}

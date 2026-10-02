@@ -99,3 +99,25 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for RecordIo<S> {
         Pin::new(&mut self.get_mut().inner).poll_shutdown(cx)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    #[tokio::test]
+    async fn tls_record_boundary_leaves_following_raw_bytes_in_transport() {
+        let (mut writer, reader) = tokio::io::duplex(128);
+        writer
+            .write_all(&[23, 3, 3, 0, 3, 1, 2, 3, 9, 8, 7])
+            .await
+            .unwrap();
+        let mut reader = RecordIo::new(reader);
+        let mut record = [0; 8];
+        reader.read_exact(&mut record).await.unwrap();
+        assert_eq!(record, [23, 3, 3, 0, 3, 1, 2, 3]);
+        let mut reader = reader.into_inner().unwrap();
+        let mut raw = [0; 3];
+        reader.read_exact(&mut raw).await.unwrap();
+        assert_eq!(raw, [9, 8, 7]);
+    }
+}

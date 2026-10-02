@@ -365,3 +365,53 @@ async fn tcp_half_close_retains_reverse_payload() {
         }
     }
 }
+
+#[tokio::test]
+async fn vision_addons_match_authenticated_user_and_tcp_only_policy() {
+    let users = Arc::new(ArcSwap::from_pointee(
+        auth::Snapshot::new(
+            config::Protocol::Vless,
+            vec![config::User {
+                name: "100".into(),
+                uuid: Some(UUID_A.into()),
+                password: None,
+                flow: Some("xtls-rprx-vision".into()),
+                speed_limit: 0,
+                device_limit: 0,
+            }],
+        )
+        .unwrap(),
+    ));
+    for (addons, command, accept) in [
+        (
+            [vec![10, 16], b"xtls-rprx-vision".to_vec()].concat(),
+            1,
+            true,
+        ),
+        (vec![], 1, false),
+        (
+            [vec![10, 16], b"xtls-rprx-vision".to_vec()].concat(),
+            2,
+            false,
+        ),
+        (
+            [vec![10, 16], b"xtls-rprx-vision".to_vec(), vec![16, 1]].concat(),
+            1,
+            false,
+        ),
+        (vec![10, 255], 1, false),
+    ] {
+        let mut frame = vec![0];
+        frame.extend(auth::uuid(UUID_A).unwrap());
+        frame.push(addons.len() as u8);
+        frame.extend(addons);
+        frame.push(command);
+        frame.extend([0, 80, 1, 127, 0, 0, 1]);
+        let result =
+            protocol::handshake(&mut frame.as_slice(), config::Protocol::Vless, &users).await;
+        assert_eq!(result.is_ok(), accept);
+        if let Ok(request) = result {
+            assert_eq!(request.vision_uuid, auth::uuid(UUID_A));
+        }
+    }
+}
