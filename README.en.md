@@ -71,7 +71,7 @@ Replace example addresses, then run `xboard-rust check` and `xboard-rust restart
 
 The shared custom cache respects TTL, capped at 300 seconds for positive and 30 seconds for negative answers. `cache_size` counts responses; 0 disables caching. OS caching remains OS-managed. Bounds: 8 servers, 4,096 hosts, 32 returned IPs, 256 simultaneous network lookups per data process; overload fails. Timeout range: 100–10,000 ms, with a separate overall TCP handshake/connect deadline.
 
-OS DNS uses two dedicated workers and 64 waiting slots, separate from accounting storage workers. A timeout ends client waiting; a running OS lookup retains its slot until it actually returns, preventing repeated cancellations from building an unbounded queue.
+OS DNS uses two dedicated workers and 64 waiting slots, separate from accounting storage workers. A timeout ends client waiting; a running OS lookup retains its slot until it actually returns, preventing repeated cancellations from building an unbounded queue. The custom resolver handles RFC special names such as `localhost` locally; configure explicit IP route blocks when loopback/private destinations must be denied.
 
 These fields belong to the **panel node response**, not `runtime.json`. Your panel must provide an interface that emits them; this project does not add a panel UI:
 

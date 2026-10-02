@@ -7,6 +7,7 @@ import struct
 import threading
 import time
 import uuid
+from pathlib import Path
 
 
 def receive(stream, size):
@@ -23,6 +24,7 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
              cases, measurements, echo_port, udp_origin, user):
     counts, lock = collections.Counter(), threading.Lock()
     targets = []
+    system_only_name = 'xboard-rust-dns-os-only.test'
 
     def dns_answer(query, transport):
         cursor, labels = 12, []
@@ -37,7 +39,7 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
             counts[transport + ':' + name] += 1
         if name == 'truncated.test' and transport == 'udp':
             return query[:2] + struct.pack('!HHHHH', 0x8380, 1, 0, 0, 0) + question
-        if name in ['missing.test', 'localhost']:
+        if name in ['missing.test', system_only_name]:
             return query[:2] + struct.pack('!HHHHH', 0x8183, 1, 0, 0, 0) + question
         if qtype != 1 or qclass != 1:
             return query[:2] + struct.pack('!HHHHH', 0x8180, 1, 0, 0, 0) + question
@@ -156,7 +158,14 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
             return True
         return False
 
+    hosts_path = Path('/etc/hosts')
+    hosts_before = hosts_path.read_bytes()
+    assert len(hosts_before) < 1024 * 1024 and system_only_name.encode() not in hosts_before
+    hosts_during = hosts_before + ('\n127.0.0.1 ' + system_only_name + '\n').encode()
     try:
+        hosts_path.write_bytes(hosts_during)
+        # Prove the installed musl ELF (not just Python/glibc) can use OS hosts.
+        roundtrip(system_only_name)
         save_dns()
         roundtrip('cached.test'); roundtrip('cached.test')
         assert counts['udp:cached.test'] == 1
@@ -166,7 +175,7 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
         time.sleep(1.1); roundtrip('ttl.test')
         assert counts['udp:ttl.test'] > before
         assert denied('missing.test')
-        assert denied('localhost'), 'An OS-resolvable name must not bypass custom NXDOMAIN'
+        assert denied(system_only_name), 'An OS-resolvable ordinary name must not bypass custom NXDOMAIN'
         fetch()
         roundtrip('udp.test', port=udp_origin[1], udp=True)
         cases.append('installed-shared-DNS-cache-TTL-expiry-static-hosts-NXDOMAIN-and-TCP-UDP-origin-payload')
@@ -227,12 +236,19 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
         roundtrip('good.test')
         cases.append('actual-client-source-port-is-blocked-while-other-client-ports-still-work')
         measurements['routing_dns'] = {'dns_requests': dict(counts), 'socks_pinned_destinations': targets,
+            'system_only_name': system_only_name, 'installed_ELF_system_hosts_positive': True,
+            'custom_NXDOMAIN_did_not_fall_back_to_system': True,
             'controller_retained_during_panel_route_updates': True, 'invalid_route_retained_native_child': True}
     finally:
-        for key in ['custom_outbounds', 'custom_routes']:
-            config.pop(key, None)
-        runtime_path.write_bytes(runtime_before)
-        runtime_path.chmod(0o600)
-        run('restart'); wait(fetch)
-        for server in servers:
-            server.shutdown(); server.server_close()
+        try:
+            for key in ['custom_outbounds', 'custom_routes']:
+                config.pop(key, None)
+            runtime_path.write_bytes(runtime_before)
+            runtime_path.chmod(0o600)
+            run('restart'); wait(fetch)
+        finally:
+            assert hosts_path.read_bytes() == hosts_during, 'Do not overwrite unexpected concurrent hosts changes'
+            hosts_path.write_bytes(hosts_before)
+            assert hosts_path.read_bytes() == hosts_before
+            for server in servers:
+                server.shutdown(); server.server_close()
