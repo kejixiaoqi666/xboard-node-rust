@@ -4,7 +4,7 @@
 
 **用 Rust 重构的 Xboard 节点后端。** 安装在 Linux VPS 上，向 Xboard 面板获取节点配置和用户列表，并提供当前已迁移的代理协议、用户同步和流量统计能力。
 
-本项目从 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3) 的迁移工作继续开发，目标是保留原版的使用流程，改进运行架构、配置更新和资源管理。**`v0.1.0-preview.3`** 在 TCP/UDP、共享限速和来源 IP 限制的基础上，增加域名/IP/端口路由、自定义 DNS 和 SOCKS5 TCP 上游。Rust 服务端可独立运行，一键安装和管理入口已提供，完整原版功能仍在迁移。
+本项目从 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3) 的迁移工作继续开发，目标是保留原版的使用流程，改进运行架构、配置更新和资源管理。**`v0.1.0-preview.4`** 增加文件 TLS 下的 VLESS Vision TCP：支持填充、去填充和内层 TLS 1.3 的双向直通切换。保留 TCP/UDP、共享限速、来源 IP 限制、路由、自定义 DNS 和 SOCKS5 TCP 上游。Rust 服务端可独立运行，一键安装和管理入口已提供，完整原版功能仍在迁移。
 
 ## 先了解它做什么
 
@@ -64,6 +64,7 @@ xboard-rust
 | --- | --- |
 | VLESS TCP | 已实现；UUID 认证和 TCP 转发 |
 | VLESS TCP + TLS | 已实现；使用本机已有证书与私钥文件 |
+| VLESS Vision TCP | 外层文件 TLS 1.3，`xtls-rprx-vision`；普通 TCP、内层 TLS 1.2/1.3，TLS 1.3 可双向直通；不含 REALITY、Vision UDP、mux/XUDP |
 | Trojan TCP + TLS | 已实现；认证、文件 TLS 和转发 |
 | VLESS / Trojan UDP | 已实现；通过协议连接转发 UDP，支持 IPv4、IPv6、域名解析和文件 TLS |
 | 路由 | 域名、域名后缀、IPv4/IPv6 CIDR、目标端口/范围、TCP/UDP、来源 IP/端口；按顺序匹配 |
@@ -91,11 +92,38 @@ VLESS UDP 每个连接使用固定目标；Trojan UDP 一个连接可访问多�
 
 ### 还没有迁完的部分
 
-REALITY、Vision、mux/XUDP、VMess、Shadowsocks、AnyTLS、TUIC、Hysteria2、其他传输方式、GeoIP/GeoSite、正则/规则集、其他代理出站、加密 DNS、单进程多节点/多面板、在线 IP 向面板上报和自动 ACME 证书管理仍未完成。**当前不能视作原版的完整替换。**
+REALITY、Vision UDP、mux/XUDP、VMess、Shadowsocks、AnyTLS、TUIC、Hysteria2、其他传输方式、GeoIP/GeoSite、正则/规则集、其他代理出站、加密 DNS、单进程多节点/多面板、在线 IP 向面板上报和自动 ACME 证书管理仍未完成。**当前不能视作原版的完整替换。**
 
 未支持的协议和配置会明确拒绝。原生 Rust 模式会执行上述非零用户限制；可选的旧外部内核适配器仍拒绝非零限制，避免没有执行却声称支持。当前 JSON 运行配置与原版 Go `config.yml` 不直接互换。面板已绑定的旧节点不会被安装器自动迁移或停掉。
 
 文件 TLS 需要先在 VPS 上准备证书，并在面板对应配置中指定 `cert_mode=file`、`cert_file`、`key_file`。证书申请和续期由你现有的证书工具负责；此版不声称内置自动申请。
+
+## Vision 怎么用
+
+Vision 是 VLESS 的一种数据流方式。连接开始时使用填充；目标连接符合支持的 TLS 1.3 特征后，可切换为直接传送已经加密的内层 TLS 数据，减少一层重复加密。普通 TCP 和内层 TLS 1.2 仍通过外层 TLS 传送。它不代替证书，也不保证任何网络环境下的速度、可达性或隐蔽性。
+
+面板下发的**节点配置**需要包含以下字段；这不是完整的本地 `runtime.json`：
+
+```json
+{
+  "protocol": "vless",
+  "network": "tcp",
+  "tls": 1,
+  "flow": "xtls-rprx-vision",
+  "server_name": "node.example.com",
+  "cert_config": {
+    "cert_mode": "file",
+    "cert_file": "/etc/letsencrypt/live/node.example.com/fullchain.pem",
+    "key_file": "/etc/letsencrypt/live/node.example.com/privkey.pem"
+  }
+}
+```
+
+替换为 VPS 上实际的证书路径和域名。面板需能下发这些字段；客户端也要设置 VLESS、TCP、TLS、相同 UUID、正确证书域名和 `xtls-rprx-vision`。外层协商 TLS 1.3；缺少/不匹配的 flow、未知 addons、Vision UDP 或明文 Vision 会被拒绝，不会退成普通 VLESS。
+
+Vision 继续使用已有的路由、共享限速、来源 IP 名额和持久计数。有效载荷指传给目标服务的数据：访问 HTTPS 时包含内层 TLS 记录，排除 VLESS/Vision 填充和外层 TLS 开销，并不等于网页或文件的明文大小。当前实现使用有界 Tokio 复制，**没有宣称实现内核 splice/零拷贝或提高了最大吞吐**。
+
+回退到 preview.3 或更早版本前，先在面板去掉 Vision flow，并同步修改客户端；程序回退保留当前流量状态。客户端需要重连，已有连接不能跨版本保持。
 
 ## 路由与 DNS 怎么用
 
@@ -204,6 +232,8 @@ SOCKS5 服务器目前必须填写 IP；`settings` 可同时添加 `username` �
 
 此发行版构建流程分别编译 AMD64/ARM64，验证包校验、文件权限、配置保留、程序切换/回退、异常拒绝和卸载。全新 systemd 安装使用回环模拟面板和真实 TCP/TLS/UDP 回显，覆盖不同目标端口、域名、IPv6、空包和 65,507 字节数据包，并计时验证两条连接的双向共享限速、IP 名额和不重启的用户策略更新。另使用已公开的 preview.1 实际二进制验证升级及双向回退，核对配置和原生计数身份保留。具体结果与测量随 Release 附带 `installer-tests-*.json` 与 `systemd-tests-*.json`。
 
+Vision 验收使用固定版本的官方 Xray **客户端**连接实际安装的 AMD64/ARM64 Rust 服务端：普通 TCP、内层 TLS 1.2/1.3、真实 HelloRetryRequest 后的 TLS 1.3、双向 DIRECT 指令与内容一致性、缺 flow/错 UUID 拒绝。还覆盖 512 字节传输缓冲、分片 UUID、类 TLS 尾部和只有 TLS close_notify 的半关闭。官方客户端不随服务端包交付，也不是服务端依赖。
+
 重要边界：未落盘的强杀尾部仍可能丢失；周期存档不是断电零丢失保证。上报结果不明时保留队列并暂停该批次，需要与面板记录核对；接口接收确认不等于实际计费数据库已对账。当前测试不证明公网最大吞吐、TCP 极限、长期生产稳定性或与真实面板的完整兼容。
 
 技术细节： [迁移清单](docs/RUST_MIGRATION_ZH.md) · [Rust 数据层](docs/RUST_NATIVE_KERNEL_ZH.md) · [流量语义](docs/RUST_TRAFFIC_ZH.md) · [持久化与停止协议](docs/RUST_NATIVE_DURABILITY_ZH.md) · [历史内存优化](docs/RUST_MEMORY_OPTIMIZATION_ZH.md)。
@@ -233,6 +263,6 @@ Windows 可以进行模块构建和测试；默认原生数据层需要 Unix 控
 
 ## 开源与来源
 
-本项目遵循 **[MPL-2.0](LICENSE)**，保留原版来源及许可证，没有额外添加用途或商业使用限制。运行包包含第三方依赖与 Rust/musl 工具链的许可说明。
+本项目遵循 **[MPL-2.0](LICENSE)**，保留原版来源及许可证，没有额外添加用途或商业使用限制。Vision 子模块采用其原始 **MIT** 许可，保留 [cfal/shoes](https://github.com/cfal/shoes) 的版权和来源；其余项目遵循 MPL-2.0。运行包包含该子模块、第三方依赖与 Rust/musl 工具链的许可说明。
 
 感谢 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3)、[xboard-node](https://github.com/cedar2025/xboard-node)、Xboard 及 Rust 生态的相关项目。详细来源见 [NOTICE.md](NOTICE.md)。

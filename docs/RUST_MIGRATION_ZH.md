@@ -22,6 +22,7 @@
 | node-core | 配置/用户模型、校验、用户哈希和状态转换 |
 | node-panel | REST、配置 wire 转换、ETag、WS 消息解析及重连 |
 | node-kernel | 配置生成、预检查、进程启动/停止/恢复；可选有界用户更新控制 |
+| node-vision | 从 MIT 许可 shoes 窄提取并修订的 Vision 数据流；保留 upstream hash/许可，不包含完整 shoes 或 REALITY |
 | node-native | 当前默认 Rust 协议数据层：VLESS/Trojan TCP、Rustls、稳定认证快照、双向转发、有界控制 |
 | kernels/native-users | 历史外部 Go 过渡方案，保留源码/许可证；不作为默认运行依赖 |
 | node-runtime | 配置入口、串行同步、快照提交、取消/关闭协调 |
@@ -53,7 +54,7 @@ WS 与 REST 没有共同的面板版本号，因此运行时不把本地到达�
 | 标准 wire 配置 | 单独处理 node_id/base_config；归一空串、nil 集合、空 map、整数串；保留未知字段拒绝 |
 | 配置与用户 ETag | 候选应用成功才确认；失败保留旧缓存；取消后用快照 generation 防止错误重用旧 ETag |
 | WS | WSS、目标节点过滤、有限队列、重连；发现地址绑定面板 HTTPS origin，无效地址回退 REST |
-| VLESS TCP/UDP | version 0，UUID/地址/端口解析；UDP 使用固定目标及长度分包；mux/Vision/非空 addons 未实现 |
+| VLESS TCP/UDP | version 0，UUID/地址/端口解析；UDP 使用固定目标及长度分包；Vision TCP 在文件 TLS1.3 下实现，限定 flow addons；mux/XUDP/Vision UDP 未实现 |
 | Trojan UDP | CRLF 分包边界、每包目标地址和长度；同关联支持多个 IPv4/IPv6/域名目标，只接受已请求端点的回复 |
 | VLESS/Trojan + 文件 TLS | Rustls 文件证书/私钥；Trojan SHA-224 认证与协议解析；本轮原生真实客户端验收见 Rust 数据层报告 |
 | 流式候选配置 | 借用用户表、64 KiB 缓冲、编码后 16 MiB 限制；新旧配置完整输出/错误对照与超限保留旧监听器已测 |
@@ -67,7 +68,9 @@ WS 与 REST 没有共同的面板版本号，因此运行时不把本地到达�
 | 资源状态/在线上报 | 传输模型保留，未接入实际来源；流量报告不伪造这些值 |
 | 限速/来源 IP 限制 | 原生模式执行用户双向共享 Mbps 预算、不同活跃来源 IP 名额和热更新；同 IP 多连接共用名额；可选外部 adapter 仍拒绝非零限制 |
 | REALITY、AnyTLS、TUIC、Hysteria2、VMess、SS | 模型可表达部分配置；当前运行 adapter 尚不支持 |
-| 自定义路由、出站、DNS、非 TCP transport | 当前 adapter 显式拒绝未实现设置，防止悄悄丢配置 |
+| 自定义路由、出站、DNS | preview.3 增加受限有序规则、UDP/TCP/系统 DNS、hosts/TTL 缓存和 SOCKS5 TCP；明确边界见首页 |
+| 非 TCP transport | 尚未实现；未知设置明确拒绝 |
+| Vision TCP | preview.4 在文件 TLS1.3 下支持填充、去填充、TLS1.3 双向 DIRECT；官方客户端双架构回环验收，非生产吞吐声明 |
 | xray、多节点/多面板、ACME、持久恢复 | 未接入；当前程序不宣称完整 Go 功能等价 |
 
 默认 Rust 模式的仅用户更新保持已认证连接；删除用户禁止新的认证，不强制断开已有会话。其他配置变更仍是可恢复的 stop/start。TCP ready 只证明监听存在；完整协议验收需要真实客户端，不能由进程存活代替。当前默认路径详见 [Rust 原生协议数据层](RUST_NATIVE_KERNEL_ZH.md)，此前 Go 过渡方案测量见 [历史用户热更新报告](RUST_NATIVE_USERS_ZH.md)。
