@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = ["crates/node-core", "crates/node-panel", "crates/node-kernel", "crates/node-native", "crates/node-runtime"]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "unwind"
+
+[profile.diagnostic]
+inherits = "release"
+strip = "none"
+debug = "line-tables-only"

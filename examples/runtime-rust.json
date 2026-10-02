@@ -1,0 +1,12 @@
+{
+  "panel_url": "https://panel.example.com",
+  "token_env": "XBORD_PANEL_TOKEN",
+  "node_id": 7,
+  "machine_id": 1,
+  "state_dir": "/var/lib/xb-rust",
+  "poll_seconds": 30,
+  "report_seconds": 60,
+  "traffic_checkpoint_ms": 1000,
+  "traffic_reporting": true,
+  "websocket": true
+}

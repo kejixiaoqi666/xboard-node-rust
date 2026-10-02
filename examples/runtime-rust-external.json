@@ -1,0 +1,11 @@
+{
+  "panel_url": "https://panel.example.com",
+  "token_env": "XBORD_PANEL_TOKEN",
+  "node_id": 7,
+  "machine_id": 1,
+  "singbox_executable": "/usr/local/bin/sing-box",
+  "state_dir": "/var/lib/xb-compat",
+  "poll_seconds": 30,
+  "websocket": true,
+  "native_user_updates": false
+}

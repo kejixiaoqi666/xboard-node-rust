@@ -1,0 +1,18 @@
+[package]
+name = "node-panel"
+version = "0.1.0"
+edition = "2024"
+license = "MPL-2.0"
+
+[dependencies]
+node-core = { path = "../node-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+thiserror = "2"
+tokio = { version = "1", features = ["sync", "time", "rt", "macros"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util", "sync", "time"] }

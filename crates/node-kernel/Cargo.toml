@@ -1,0 +1,19 @@
+[package]
+name = "node-kernel"
+version = "0.1.0"
+edition = "2024"
+license = "MPL-2.0"
+
+[dependencies]
+node-core = { path = "../node-core" }
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[target.'cfg(unix)'.dependencies]
+socket2 = "0.6"
+
+[[bench]]
+name = "config_memory"
+harness = false

@@ -1,0 +1,11 @@
+/target/
+/dist/
+__pycache__/
+*.pyc
+.Codex/
+.hermes/
+*.env
+*.pem
+*.key
+runtime.local.json
+*.log

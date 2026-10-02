@@ -1,0 +1,1064 @@
+{
+  "result": "PASS_SCOPED_RUST_TRAFFIC",
+  "observed_at": "2026-10-02T11:47:10.448627+00:00",
+  "architecture": "One Rust server executable; separate Rust control and protocol processes for fault isolation",
+  "server_requires_go": false,
+  "native_backend": "embedded_rust",
+  "compiled_input_files": 59,
+  "compiled_source_manifest_sha256": "809b81bd8719693ebda5dfd9127ac01ae7667f06053cb164503af888acfa1cca",
+  "compiled_source_candidate_sha256": "18b85f6be2e4538de2383aba58f70967c7a6b533670756a4c5b59e7afa02cb16",
+  "binary": {
+    "bytes": 4331448,
+    "sha256": "5ed983bdf570f6e28392c5fde6d49fe47d8c60bfde1927c4d01ba8b6642474db",
+    "needed_libraries": [
+      "libgcc_s.so.1",
+      "libc.so.6"
+    ],
+    "minimum_glibc_symbol_version": "2.39"
+  },
+  "checks": {
+    "windows_workspace_tests": 99,
+    "windows_workspace_ignored": 1,
+    "windows_fmt": "PASS",
+    "windows_clippy": "PASS",
+    "linux_workspace_tests": 106,
+    "linux_workspace_ignored": 1,
+    "linux_fmt": "PASS",
+    "linux_clippy": "PASS",
+    "legacy_external_real_vless": 1,
+    "real_payload_accounting_cases": 7,
+    "embedded_rust_protocol_lifecycle": "PASS",
+    "fd_exhaustion_with_control": "PASS",
+    "independent_static_review": "PASS"
+  },
+  "traffic_cases": {
+    "vless": {
+      "result": "PASS",
+      "expected": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reported": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reports": 2,
+      "live_connection_counted": true,
+      "removed_user_old_connection_accounted": true,
+      "child_preserved": true
+    },
+    "vless-tls": {
+      "result": "PASS",
+      "expected": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reported": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reports": 2,
+      "live_connection_counted": true,
+      "removed_user_old_connection_accounted": true,
+      "child_preserved": true
+    },
+    "trojan-tls": {
+      "result": "PASS",
+      "expected": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reported": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reports": 2,
+      "live_connection_counted": true,
+      "removed_user_old_connection_accounted": true,
+      "child_preserved": true
+    },
+    "lost": {
+      "result": "PASS",
+      "failure": "lost",
+      "expected": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reported": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reports": 2,
+      "uncertain_batch_id": 1,
+      "automatic_retries_while_uncertain": 0,
+      "shutdown_ms": 24.816,
+      "durably_collected_only": true,
+      "operator_reconciliation_verified": true
+    },
+    "cancel": {
+      "result": "PASS",
+      "failure": "cancel",
+      "expected": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reported": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reports": 2,
+      "uncertain_batch_id": 1,
+      "automatic_retries_while_uncertain": 0,
+      "shutdown_ms": 33.651,
+      "durably_collected_only": true,
+      "operator_reconciliation_verified": true
+    },
+    "crash": {
+      "result": "PASS",
+      "failure": "crash",
+      "expected": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reported": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reports": 2,
+      "uncertain_batch_id": 1,
+      "automatic_retries_while_uncertain": 0,
+      "shutdown_ms": 1.562,
+      "durably_collected_only": true,
+      "operator_reconciliation_verified": true
+    },
+    "not-sent": {
+      "result": "PASS",
+      "expected": {
+        "1": [
+          123457,
+          123457
+        ]
+      },
+      "reported": {
+        "1": [
+          123457,
+          123457
+        ]
+      },
+      "reports": 1,
+      "retained_prepared_batch_id": 1,
+      "confirmed_not_sent_retry": true
+    }
+  },
+  "protocol_resource_cases": [
+    {
+      "name": "default",
+      "native": false,
+      "tls": false,
+      "protocol": "vless",
+      "steady": {
+        "seconds": 30.145814031362534,
+        "tick_hz": 100,
+        "runtime": {
+          "rss_median_kib": 7188.0,
+          "rss_min_kib": 7188,
+          "rss_max_kib": 7188,
+          "threads": [
+            2
+          ],
+          "cpu_ticks": 3,
+          "cpu_seconds": 0.03,
+          "one_core_cpu_percent": 0.09951630421652959
+        },
+        "kernel": {
+          "rss_median_kib": 57264.0,
+          "rss_min_kib": 57264,
+          "rss_max_kib": 57264,
+          "threads": [
+            7
+          ],
+          "cpu_ticks": 0,
+          "cpu_seconds": 0.0,
+          "one_core_cpu_percent": 0.0
+        }
+      },
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 270,
+        "exited_process_samples_skipped": 6,
+        "controller_sampled_rss_peak_kib": 13560,
+        "controller_hwm_kib": 13560,
+        "controller_max_fds": 11,
+        "group_sampled_rss_peak_kib": 158072,
+        "group_max_processes": 3
+      },
+      "cycles": [
+        {
+          "users": 20000,
+          "elapsed_seconds": 1.4227981241419911,
+          "pid_before": 1527515,
+          "pid_after": 1528585,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832820.111373136
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 1.5155254658311605,
+          "pid_before": 1528585,
+          "pid_after": 1528629,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832821.769994046
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 1.2587388483807445,
+          "pid_before": 1528629,
+          "pid_after": 1528666,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832823.165440554
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 1.4469295796006918,
+          "pid_before": 1528666,
+          "pid_after": 1528801,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832824.737458351
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 1.3166626626625657,
+          "pid_before": 1528801,
+          "pid_after": 1528835,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832826.191344677
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 1.4068744760006666,
+          "pid_before": 1528835,
+          "pid_after": 1528873,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832827.727057305
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 0,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4832818.541431874,
+        "body_valid": false,
+        "finished": 4832819.634686792
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c"
+    },
+    {
+      "name": "native",
+      "native": true,
+      "tls": false,
+      "protocol": "vless",
+      "steady": {
+        "seconds": 30.17569718323648,
+        "tick_hz": 100,
+        "runtime": {
+          "rss_median_kib": 7172.0,
+          "rss_min_kib": 7172,
+          "rss_max_kib": 7172,
+          "threads": [
+            2
+          ],
+          "cpu_ticks": 5,
+          "cpu_seconds": 0.05,
+          "one_core_cpu_percent": 0.16569625449375378
+        },
+        "kernel": {
+          "rss_median_kib": 4676.0,
+          "rss_min_kib": 4676,
+          "rss_max_kib": 4676,
+          "threads": [
+            1
+          ],
+          "cpu_ticks": 0,
+          "cpu_seconds": 0.0,
+          "one_core_cpu_percent": 0.0
+        }
+      },
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 161,
+        "exited_process_samples_skipped": 1,
+        "controller_sampled_rss_peak_kib": 14440,
+        "controller_hwm_kib": 14440,
+        "controller_max_fds": 11,
+        "group_sampled_rss_peak_kib": 32424,
+        "group_max_processes": 3
+      },
+      "cycles": [
+        {
+          "users": 20000,
+          "elapsed_seconds": 0.7018345557153225,
+          "pid_before": 1528980,
+          "pid_after": 1528980,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832863.113760952
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.78995272051543,
+          "pid_before": 1528980,
+          "pid_after": 1528980,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832864.046923243
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 0.8601623820140958,
+          "pid_before": 1528980,
+          "pid_after": 1528980,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832865.049608711
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.8599266214296222,
+          "pid_before": 1528980,
+          "pid_after": 1528980,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832866.041862063
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 0.9230970162898302,
+          "pid_before": 1528980,
+          "pid_after": 1528980,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832867.111551941
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.8188578709959984,
+          "pid_before": 1528980,
+          "pid_after": 1528980,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832868.064688669
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 64,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4832862.267217702,
+        "body_valid": true,
+        "finished": 4832866.181432619
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c",
+      "reorder_no_restart": true,
+      "default_hostname_resolution": true,
+      "private_state_and_candidate_cleanup": true
+    },
+    {
+      "name": "vless-tls",
+      "native": true,
+      "tls": true,
+      "protocol": "vless",
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 22,
+        "exited_process_samples_skipped": 0,
+        "controller_sampled_rss_peak_kib": 8464,
+        "controller_hwm_kib": 9488,
+        "controller_max_fds": 11,
+        "group_sampled_rss_peak_kib": 18528,
+        "group_max_processes": 2
+      },
+      "cycles": [
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.613807275891304,
+          "pid_before": 1530629,
+          "pid_after": 1530629,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832876.267392624
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 64,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4832875.456400056,
+        "body_valid": true,
+        "finished": 4832879.363460511
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c",
+      "reorder_no_restart": true,
+      "default_hostname_resolution": true,
+      "wrong_tls_hostname_denied": true,
+      "private_state_and_candidate_cleanup": true
+    },
+    {
+      "name": "trojan-tls",
+      "native": true,
+      "tls": true,
+      "protocol": "trojan",
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 25,
+        "exited_process_samples_skipped": 1,
+        "controller_sampled_rss_peak_kib": 9096,
+        "controller_hwm_kib": 9096,
+        "controller_max_fds": 11,
+        "group_sampled_rss_peak_kib": 20452,
+        "group_max_processes": 2
+      },
+      "cycles": [
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.6594236921519041,
+          "pid_before": 1530948,
+          "pid_after": 1530948,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4832886.940484899
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 64,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4832886.07470616,
+        "body_valid": true,
+        "finished": 4832889.988785996
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c",
+      "reorder_no_restart": true,
+      "default_hostname_resolution": true,
+      "wrong_tls_hostname_denied": true,
+      "private_state_and_candidate_cleanup": true
+    }
+  ],
+  "control_faults": [
+    {
+      "mode": "lost",
+      "pid_before": 1531270,
+      "pid_after": 1531270,
+      "proxy_counts": {
+        "replace": 1,
+        "status": 1,
+        "dropped": 1,
+        "real_applied": 1
+      },
+      "result": "PASS"
+    },
+    {
+      "mode": "reject",
+      "pid_before": 1531384,
+      "pid_after": 1531384,
+      "proxy_counts": {
+        "replace": 3,
+        "status": 0,
+        "dropped": 0,
+        "real_applied": 0
+      },
+      "result": "PASS"
+    },
+    {
+      "mode": "unknown",
+      "pid_before": 1531511,
+      "pid_after": 1531614,
+      "proxy_counts": {
+        "replace": 1,
+        "status": 1,
+        "dropped": 0,
+        "real_applied": 1
+      },
+      "result": "PASS"
+    },
+    {
+      "mode": "stall",
+      "pid_before": 1531648,
+      "pid_after": null,
+      "proxy_counts": {
+        "replace": 1,
+        "status": 1,
+        "dropped": 0,
+        "real_applied": 0
+      },
+      "result": "PASS"
+    }
+  ],
+  "lifecycle": {
+    "result": "PASS",
+    "tcp": {
+      "held_connections": 256,
+      "hold_seconds": 10,
+      "verified_held_responses": 256,
+      "before": {
+        "controller": {
+          "rss_kib": 5392,
+          "threads": 2,
+          "cpu_ticks": 2,
+          "fds": 10,
+          "hwm_kib": 5392
+        },
+        "kernel": {
+          "rss_kib": 3472,
+          "threads": 1,
+          "cpu_ticks": 0,
+          "fds": 11,
+          "hwm_kib": 3472
+        }
+      },
+      "held_samples": [
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5392,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5392
+          },
+          "kernel": {
+            "rss_kib": 8848,
+            "threads": 1,
+            "cpu_ticks": 4,
+            "fds": 523,
+            "hwm_kib": 8848
+          }
+        }
+      ],
+      "after": {
+        "controller": {
+          "rss_kib": 5392,
+          "threads": 2,
+          "cpu_ticks": 2,
+          "fds": 10,
+          "hwm_kib": 5392
+        },
+        "kernel": {
+          "rss_kib": 7464,
+          "threads": 1,
+          "cpu_ticks": 95,
+          "fds": 11,
+          "hwm_kib": 8848
+        }
+      },
+      "transfers": {
+        "requests": 1024,
+        "payload_bytes": 262144,
+        "concurrency": 8,
+        "seconds": 2.4065955840051174,
+        "mib_per_second": 106.37433297951885,
+        "all_contents_verified": true
+      }
+    },
+    "crash_pid_before": 1531738,
+    "crash_pid_after": 1533302,
+    "listener_restart_pid": 1533330,
+    "stalled_http_shutdown_seconds": 0.0034374529495835304,
+    "recovered_candidate_cleanup_seconds": 0.10117022041231394,
+    "candidate_socket_cleanup": true,
+    "token_not_in_kernel_environment": true
+  },
+  "fd_exhaustion": {
+    "result": "PASS",
+    "started_at": "2026-10-02T11:42:32.789205+00:00",
+    "binary_sha256": "5ed983bdf570f6e28392c5fde6d49fe47d8c60bfde1927c4d01ba8b6642474db",
+    "script_sha256": "94f7d16b70cbc47fd96e500f7b2087731d8f4e6e07e2bfca172636bcac144746",
+    "child_rlimit_nofile": 64,
+    "host_wide_limits_changed": false,
+    "kernel_pid": 1533424,
+    "baseline_fds": 11,
+    "exhaustion_fds": 64,
+    "existing_transfers_verified": 2,
+    "new_authenticated_transfer_verified": true,
+    "queued_control_during_exhaustion": true,
+    "control_after_recovery": true,
+    "fd_return_to_baseline": true,
+    "second_exhaustion_fds": 64,
+    "shutdown_seconds": 0.0034800935536623,
+    "control_queued_during_shutdown": true,
+    "control_socket_cleanup": true,
+    "finished_at": "2026-10-02T11:42:33.694413+00:00"
+  },
+  "provenance": {
+    "traffic6": {
+      "measurement_sha256": "0fbab919fdd969b4b3ac7901cea2775f51c764fad47e1e924e93b163a6e1e0e1",
+      "executed_script": {
+        "path": "/opt/xbord-rust-lab/20261002-build-01/rust-accounting-20261002-01/traffic_lab7.py",
+        "sha256": "88e1359309b0e30e1d6da0fc48669a4de90e337e8182f387948f571ad9a26c4e"
+      }
+    },
+    "m4": {
+      "measurement_sha256": "c7a431df5876496ab9e6d1c4b85d3828ef3f599810b7081e09fae9d1afdd2263",
+      "executed_script": {
+        "path": "/opt/xbord-rust-lab/20261002-build-01/rust-accounting-20261002-01/native_users_lab.py",
+        "sha256": "2108d21555a5d1f055c9d8eb3f32e932ff948e4ac447d634a6d5bc9cacc18057"
+      }
+    },
+    "fd4": {
+      "measurement_sha256": "c57933841650b1fbaa7667ceeb467f9dcd00e80b24ee3f1ad4e94eccd911fe66",
+      "executed_script": {
+        "path": "/opt/xbord-rust-lab/20261002-build-01/rust-accounting-20261002-01/rust_fd_lab.py",
+        "sha256": "94f7d16b70cbc47fd96e500f7b2087731d8f4e6e07e2bfca172636bcac144746"
+      }
+    }
+  },
+  "independent_review": {
+    "result": "STATIC_REVIEW_PASS",
+    "source_manifest_sha256": "809b81bd8719693ebda5dfd9127ac01ae7667f06053cb164503af888acfa1cca",
+    "report_sha256": "dc8892b575ce7bd909e75cb600ca4e80dd69266a49f7bd688e3f0be8c4ee7f0b",
+    "scope": "Static final-source and traffic-script review only"
+  },
+  "corrected_fixture_failures": [
+    {
+      "fixture": "traffic1",
+      "result": "FAIL",
+      "cause": "test fixture passed a user list where a count was required"
+    },
+    {
+      "fixture": "traffic4",
+      "result": "FAIL",
+      "cause": "test state path made Trojan-TLS Unix socket 108 bytes long"
+    },
+    {
+      "fixture": "traffic5",
+      "result": "FAIL",
+      "cause": "pooled HTTP tunnel bypassed CONNECT failure injection; six other cases passed"
+    }
+  ],
+  "final_execution_acceptance_uses": "acct4 build4, traffic6, m4 and fd4 only",
+  "upstream_report_contract": {
+    "method": "POST",
+    "path": "/api/v2/server/report",
+    "success": "Complete HTTP 200 JSON exactly {\"data\":true}; interface receipt only",
+    "source": "https://github.com/cedar2025/Xboard/blob/4f48e61a2cbc6db5338872b6bdb45ef954ec1256/app/Http/Controllers/V2/Server/ServerController.php"
+  },
+  "measurement_semantics": {
+    "resource_sampling": "scan /proc then wait 10ms, not fixed-frequency or instantaneous peaks",
+    "group_rss": "sum of sampled process RSS, includes shared pages and temporary candidate check process",
+    "comparison": "full official sing-box vs limited native Rust subset with accounting disabled during protocol/resource comparisons",
+    "throughput": "local content-checked loopback transfers; no WAN or maximum capacity claim",
+    "traffic": "successful upload/download payload writes, excludes handshake/TLS headers; exact per-user fixture bytes"
+  },
+  "host_readback": {
+    "services_preserved": 7,
+    "remaining_owned_processes": [],
+    "hosts_sha256": "bf32084cdab9f32943da097e13af6ea87f12a52139c154e77af21583a9e4c7f3"
+  },
+  "dependency_notice_reuse": {
+    "result": "PASS",
+    "normal_registry_dependencies": 115,
+    "unchanged_registry_lock": true,
+    "same_rust_toolchain": "1.98.1",
+    "archive_sha256": "2193b9b0a9743bdf439fd0915cfd96fea9899ea6b3c6ca5dd3d3634bc76f6a17",
+    "previous_notice_manifest_sha256": "92334727837d92fe0d21a5524b9829b472c8067ff5cb9ef80b2b4011991edb65",
+    "current_tree_output_sha256": "6dbba80c486766a67743469b1f2137acb884e43c999409c113e733c72737f323"
+  },
+  "license": "Project Rust code MPL-2.0; dependencies retain their own licenses; no Go server bundled or linked",
+  "limits": [
+    "Only VLESS TCP, VLESS file TLS and Trojan file TLS with direct/system-resolver outbound",
+    "Only durably collected bytes are retained across controller restart; unsampled native tail may be lost on kill/restart",
+    "Shutdown bounded drain is not quiescent or lossless: max128 batches, 1s before next batch, per-RPC2s plus filesystem synchronization",
+    "Unknown delivery halts automatic report replay; operator must reconcile exact batch; no end-to-end exactly-once billing",
+    "Strict upstream ACK confirms interface acceptance, not asynchronous billing database reconciliation",
+    "Removed users deny new authentication, existing authenticated connections may continue",
+    "Enforcement/other protocols/routing/multi-node/durable native counters/full original parity remain incomplete",
+    "Full native runtime tested Linux ARM64 GNU/glibc2.39+/libgcc_s; Windows tests do not prove native runtime support",
+    "No production panel write, production replacement, long-duration stability, maximum capacity or broad language-performance claim"
+  ],
+  "git_pushed": false,
+  "production_replaced": false,
+  "production_panel_used": false,
+  "full_migration": "UNVERIFIED"
+}

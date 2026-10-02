@@ -1,0 +1,1261 @@
+{
+  "result": "PASS_SCOPED_RUST_NATIVE_DURABILITY",
+  "observed_at": "2026-10-02T13:05:41.934569+00:00",
+  "architecture": "One Rust server executable; separate Rust control and protocol processes for fault isolation",
+  "server_requires_go": false,
+  "native_backend": "embedded_rust",
+  "compiled_input_files": 60,
+  "compiled_source_manifest_sha256": "9d9a55cf57b9187e9b92fae71e22282f84552a134af766cbf3b0b4217a980aa2",
+  "compiled_source_candidate_sha256": "71f6a6ca34a6ef9f2d43326b8d84b8ea0827d9b1af8d141179d34ad04f8caa4f",
+  "binary": {
+    "bytes": 4462520,
+    "sha256": "c72d2f8cbe9c8eff500ae2268144958502c83f43e3bf968f6349a23da9417a51",
+    "needed_libraries": [
+      "libgcc_s.so.1",
+      "libc.so.6"
+    ],
+    "minimum_glibc_symbol_version": "2.39"
+  },
+  "binary_growth_from_acct4_bytes": 131072,
+  "checks": {
+    "windows_workspace_tests": 104,
+    "windows_workspace_ignored": 1,
+    "windows_fmt": "PASS",
+    "windows_clippy": "PASS",
+    "linux_workspace_tests": 113,
+    "linux_workspace_ignored": 1,
+    "linux_fmt": "PASS",
+    "linux_clippy": "PASS",
+    "windows_test_threads": 1,
+    "legacy_external_real_vless": 1,
+    "native_durable_cases": 5,
+    "real_payload_accounting_cases": 7,
+    "embedded_rust_protocol_lifecycle": "PASS",
+    "fd_exhaustion_without_durable_store": "PASS",
+    "independent_static_source_review": "NO_CONFIRMED_BLOCKER_P1_OR_P2"
+  },
+  "native_durable_cases": {
+    "native-crash": {
+      "result": "PASS",
+      "failure": "native-crash",
+      "expected": {
+        "1": [
+          131089,
+          131089
+        ]
+      },
+      "reported": {
+        "1": [
+          131089,
+          131089
+        ]
+      },
+      "reports": 1,
+      "native_epoch_preserved": true,
+      "native_checkpoint_preceded_controller_collection": true,
+      "frozen_receipt_recovered": false,
+      "repeated_collection_did_not_duplicate": true,
+      "unsaved_tail_lossless": false
+    },
+    "controller-native-crash": {
+      "result": "PASS",
+      "failure": "controller-native-crash",
+      "expected": {
+        "1": [
+          131089,
+          131089
+        ]
+      },
+      "reported": {
+        "1": [
+          131089,
+          131089
+        ]
+      },
+      "reports": 1,
+      "native_epoch_preserved": true,
+      "native_checkpoint_preceded_controller_collection": true,
+      "frozen_receipt_recovered": false,
+      "repeated_collection_did_not_duplicate": true,
+      "unsaved_tail_lossless": false
+    },
+    "frozen-controller-native-crash": {
+      "result": "PASS",
+      "failure": "frozen-controller-native-crash",
+      "expected": {
+        "1": [
+          131089,
+          131089
+        ]
+      },
+      "reported": {
+        "1": [
+          131089,
+          131089
+        ]
+      },
+      "reports": 1,
+      "native_epoch_preserved": true,
+      "native_checkpoint_preceded_controller_collection": true,
+      "frozen_receipt_recovered": true,
+      "repeated_collection_did_not_duplicate": true,
+      "unsaved_tail_lossless": false
+    },
+    "quiescence": {
+      "result": "PASS",
+      "expected": {
+        "1": [
+          65539,
+          65539
+        ]
+      },
+      "reported": {
+        "1": [
+          65539,
+          65539
+        ]
+      },
+      "quiesced_confirmed": true,
+      "listener_closed": true,
+      "held_writer_ended": true,
+      "new_authentication_denied": true,
+      "frozen_retry_stable": true,
+      "final_drain_survived_restart": true
+    },
+    "listener-replacement": {
+      "result": "PASS",
+      "expected": {
+        "1": [
+          32771,
+          32771
+        ],
+        "2": [
+          8197,
+          8197
+        ]
+      },
+      "reported": {
+        "1": [
+          32771,
+          32771
+        ],
+        "2": [
+          8197,
+          8197
+        ]
+      },
+      "native_epoch_preserved": true,
+      "old_listener_ended": true,
+      "new_listener_authenticated": true,
+      "single_writer_restart_verified": true,
+      "both_generations_durably_collected": true
+    }
+  },
+  "traffic_cases": {
+    "vless": {
+      "result": "PASS",
+      "expected": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reported": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reports": 2,
+      "live_connection_counted": true,
+      "removed_user_old_connection_accounted": true,
+      "child_preserved": true
+    },
+    "vless-tls": {
+      "result": "PASS",
+      "expected": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reported": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reports": 2,
+      "live_connection_counted": true,
+      "removed_user_old_connection_accounted": true,
+      "child_preserved": true
+    },
+    "trojan-tls": {
+      "result": "PASS",
+      "expected": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reported": {
+        "1": [
+          204000,
+          204000
+        ],
+        "2": [
+          73781,
+          73781
+        ]
+      },
+      "reports": 2,
+      "live_connection_counted": true,
+      "removed_user_old_connection_accounted": true,
+      "child_preserved": true
+    },
+    "lost": {
+      "result": "PASS",
+      "failure": "lost",
+      "expected": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reported": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reports": 2,
+      "uncertain_batch_id": 1,
+      "automatic_retries_while_uncertain": 0,
+      "shutdown_ms": 32.306,
+      "durably_collected_only": true,
+      "operator_reconciliation_verified": true
+    },
+    "cancel": {
+      "result": "PASS",
+      "failure": "cancel",
+      "expected": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reported": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reports": 2,
+      "uncertain_batch_id": 1,
+      "automatic_retries_while_uncertain": 0,
+      "shutdown_ms": 33.62,
+      "durably_collected_only": true,
+      "operator_reconciliation_verified": true
+    },
+    "crash": {
+      "result": "PASS",
+      "failure": "crash",
+      "expected": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reported": {
+        "1": [
+          99696,
+          99696
+        ]
+      },
+      "reports": 2,
+      "uncertain_batch_id": 1,
+      "automatic_retries_while_uncertain": 0,
+      "shutdown_ms": 1.809,
+      "durably_collected_only": true,
+      "operator_reconciliation_verified": true
+    },
+    "not-sent": {
+      "result": "PASS",
+      "expected": {
+        "1": [
+          123457,
+          123457
+        ]
+      },
+      "reported": {
+        "1": [
+          123457,
+          123457
+        ]
+      },
+      "reports": 1,
+      "retained_prepared_batch_id": 1,
+      "confirmed_not_sent_retry": true
+    }
+  },
+  "protocol_resource_cases": [
+    {
+      "name": "default",
+      "native": false,
+      "tls": false,
+      "protocol": "vless",
+      "steady": {
+        "seconds": 30.163738027215004,
+        "tick_hz": 100,
+        "runtime": {
+          "rss_median_kib": 7192.0,
+          "rss_min_kib": 7192,
+          "rss_max_kib": 7192,
+          "threads": [
+            2
+          ],
+          "cpu_ticks": 4,
+          "cpu_seconds": 0.04,
+          "one_core_cpu_percent": 0.13260955908021183
+        },
+        "kernel": {
+          "rss_median_kib": 59216.0,
+          "rss_min_kib": 59216,
+          "rss_max_kib": 59216,
+          "threads": [
+            8
+          ],
+          "cpu_ticks": 0,
+          "cpu_seconds": 0.0,
+          "one_core_cpu_percent": 0.0
+        }
+      },
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 266,
+        "exited_process_samples_skipped": 3,
+        "controller_sampled_rss_peak_kib": 13900,
+        "controller_hwm_kib": 13900,
+        "controller_max_fds": 11,
+        "group_sampled_rss_peak_kib": 165876,
+        "group_max_processes": 3
+      },
+      "cycles": [
+        {
+          "users": 20000,
+          "elapsed_seconds": 1.4271949650719762,
+          "pid_before": 1638619,
+          "pid_after": 1639936,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837431.095086352
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 1.4634410180151463,
+          "pid_before": 1639936,
+          "pid_after": 1640104,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837432.694038624
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 1.23725360725075,
+          "pid_before": 1640104,
+          "pid_after": 1640243,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837434.075594168
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 1.4918186338618398,
+          "pid_before": 1640243,
+          "pid_after": 1640349,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837435.702378933
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 1.2999696685001254,
+          "pid_before": 1640349,
+          "pid_after": 1640402,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837437.146569977
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 1.56781651917845,
+          "pid_before": 1640402,
+          "pid_after": 1640466,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837438.848429702
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 0,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4837429.526361344,
+        "body_valid": false,
+        "finished": 4837430.620959665
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c"
+    },
+    {
+      "name": "native",
+      "native": true,
+      "tls": false,
+      "protocol": "vless",
+      "steady": {
+        "seconds": 30.150091422721744,
+        "tick_hz": 100,
+        "runtime": {
+          "rss_median_kib": 7316.0,
+          "rss_min_kib": 7316,
+          "rss_max_kib": 7316,
+          "threads": [
+            2
+          ],
+          "cpu_ticks": 4,
+          "cpu_seconds": 0.04,
+          "one_core_cpu_percent": 0.1326695811272239
+        },
+        "kernel": {
+          "rss_median_kib": 4792.0,
+          "rss_min_kib": 4792,
+          "rss_max_kib": 4792,
+          "threads": [
+            1
+          ],
+          "cpu_ticks": 0,
+          "cpu_seconds": 0.0,
+          "one_core_cpu_percent": 0.0
+        }
+      },
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 161,
+        "exited_process_samples_skipped": 0,
+        "controller_sampled_rss_peak_kib": 14588,
+        "controller_hwm_kib": 14588,
+        "controller_max_fds": 13,
+        "group_sampled_rss_peak_kib": 36208,
+        "group_max_processes": 3
+      },
+      "cycles": [
+        {
+          "users": 20000,
+          "elapsed_seconds": 0.6778836213052273,
+          "pid_before": 1640509,
+          "pid_after": 1640509,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837474.555306981
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.8037831066176295,
+          "pid_before": 1640509,
+          "pid_after": 1640509,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837475.492793731
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 0.8830056870356202,
+          "pid_before": 1640509,
+          "pid_after": 1640509,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837476.566519135
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.762375146150589,
+          "pid_before": 1640509,
+          "pid_after": 1640509,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837477.467520589
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 0.9591688923537731,
+          "pid_before": 1640509,
+          "pid_after": 1640509,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837478.566673075
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.7780075026676059,
+          "pid_before": 1640509,
+          "pid_after": 1640509,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837479.493625813
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 64,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4837473.740408061,
+        "body_valid": true,
+        "finished": 4837477.70480101
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c",
+      "reorder_no_restart": true,
+      "default_hostname_resolution": true,
+      "private_state_and_candidate_cleanup": true
+    },
+    {
+      "name": "vless-tls",
+      "native": true,
+      "tls": true,
+      "protocol": "vless",
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 21,
+        "exited_process_samples_skipped": 0,
+        "controller_sampled_rss_peak_kib": 10000,
+        "controller_hwm_kib": 10000,
+        "controller_max_fds": 11,
+        "group_sampled_rss_peak_kib": 20028,
+        "group_max_processes": 2
+      },
+      "cycles": [
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.5820118384435773,
+          "pid_before": 1641742,
+          "pid_after": 1641742,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837487.247885616
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 64,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4837486.449105296,
+        "body_valid": true,
+        "finished": 4837490.336580341
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c",
+      "reorder_no_restart": true,
+      "default_hostname_resolution": true,
+      "wrong_tls_hostname_denied": true,
+      "private_state_and_candidate_cleanup": true
+    },
+    {
+      "name": "trojan-tls",
+      "native": true,
+      "tls": true,
+      "protocol": "trojan",
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 18,
+        "exited_process_samples_skipped": 0,
+        "controller_sampled_rss_peak_kib": 9244,
+        "controller_hwm_kib": 9528,
+        "controller_max_fds": 11,
+        "group_sampled_rss_peak_kib": 20132,
+        "group_max_processes": 2
+      },
+      "cycles": [
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.4479123121127486,
+          "pid_before": 1642054,
+          "pid_after": 1642054,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4837498.313932671
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 64,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4837497.605376668,
+        "body_valid": true,
+        "finished": 4837501.53432058
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c",
+      "reorder_no_restart": true,
+      "default_hostname_resolution": true,
+      "wrong_tls_hostname_denied": true,
+      "private_state_and_candidate_cleanup": true
+    }
+  ],
+  "control_faults": [
+    {
+      "mode": "lost",
+      "pid_before": 1642344,
+      "pid_after": 1642344,
+      "proxy_counts": {
+        "replace": 1,
+        "status": 1,
+        "dropped": 1,
+        "real_applied": 1
+      },
+      "result": "PASS"
+    },
+    {
+      "mode": "reject",
+      "pid_before": 1642386,
+      "pid_after": 1642386,
+      "proxy_counts": {
+        "replace": 3,
+        "status": 0,
+        "dropped": 0,
+        "real_applied": 0
+      },
+      "result": "PASS"
+    },
+    {
+      "mode": "unknown",
+      "pid_before": 1642557,
+      "pid_after": 1642605,
+      "proxy_counts": {
+        "replace": 1,
+        "status": 1,
+        "dropped": 0,
+        "real_applied": 1
+      },
+      "result": "PASS"
+    },
+    {
+      "mode": "stall",
+      "pid_before": 1642617,
+      "pid_after": null,
+      "proxy_counts": {
+        "replace": 1,
+        "status": 1,
+        "dropped": 0,
+        "real_applied": 0
+      },
+      "result": "PASS"
+    }
+  ],
+  "lifecycle": {
+    "result": "PASS",
+    "tcp": {
+      "held_connections": 256,
+      "hold_seconds": 10,
+      "verified_held_responses": 256,
+      "before": {
+        "controller": {
+          "rss_kib": 5520,
+          "threads": 2,
+          "cpu_ticks": 1,
+          "fds": 10,
+          "hwm_kib": 5520
+        },
+        "kernel": {
+          "rss_kib": 3600,
+          "threads": 1,
+          "cpu_ticks": 0,
+          "fds": 11,
+          "hwm_kib": 3600
+        }
+      },
+      "held_samples": [
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 1,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 1,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 1,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 1,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 1,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 1,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5520,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5520
+          },
+          "kernel": {
+            "rss_kib": 8976,
+            "threads": 1,
+            "cpu_ticks": 8,
+            "fds": 523,
+            "hwm_kib": 8976
+          }
+        }
+      ],
+      "after": {
+        "controller": {
+          "rss_kib": 5520,
+          "threads": 2,
+          "cpu_ticks": 3,
+          "fds": 10,
+          "hwm_kib": 5520
+        },
+        "kernel": {
+          "rss_kib": 8460,
+          "threads": 1,
+          "cpu_ticks": 98,
+          "fds": 11,
+          "hwm_kib": 8976
+        }
+      },
+      "transfers": {
+        "requests": 1024,
+        "payload_bytes": 262144,
+        "concurrency": 8,
+        "seconds": 2.3285779198631644,
+        "mib_per_second": 109.93834383478286,
+        "all_contents_verified": true
+      }
+    },
+    "crash_pid_before": 1642762,
+    "crash_pid_after": 1644311,
+    "listener_restart_pid": 1644324,
+    "stalled_http_shutdown_seconds": 0.0038099773228168488,
+    "recovered_candidate_cleanup_seconds": 0.10141060594469309,
+    "candidate_socket_cleanup": true,
+    "token_not_in_kernel_environment": true
+  },
+  "fd_exhaustion": {
+    "result": "PASS",
+    "started_at": "2026-10-02T12:59:25.259979+00:00",
+    "binary_sha256": "c72d2f8cbe9c8eff500ae2268144958502c83f43e3bf968f6349a23da9417a51",
+    "script_sha256": "94f7d16b70cbc47fd96e500f7b2087731d8f4e6e07e2bfca172636bcac144746",
+    "child_rlimit_nofile": 64,
+    "host_wide_limits_changed": false,
+    "kernel_pid": 1644339,
+    "baseline_fds": 11,
+    "exhaustion_fds": 64,
+    "existing_transfers_verified": 2,
+    "new_authenticated_transfer_verified": true,
+    "queued_control_during_exhaustion": true,
+    "control_after_recovery": true,
+    "fd_return_to_baseline": true,
+    "second_exhaustion_fds": 64,
+    "shutdown_seconds": 0.007752116769552231,
+    "control_queued_during_shutdown": true,
+    "control_socket_cleanup": true,
+    "finished_at": "2026-10-02T12:59:26.129954+00:00"
+  },
+  "provenance": {
+    "d1": {
+      "measurement_sha256": "ea118d1b926851052bd929afe45ce847a591db4a76c6693bce46b59b53b320bf",
+      "executed_script": {
+        "path": "/opt/xbord-rust-lab/20261002-build-01/nd-20261002-01/native_durable_lab2.py",
+        "sha256": "0e55041efcfee9ffee82945d65dce91451a66fadfbd242bc9391f327e549f3d8"
+      }
+    },
+    "t1": {
+      "measurement_sha256": "1140228ff320abaeb204fc86f9e6ed6f41cd89adffc5599c2677d1c4cfcdc6ae",
+      "executed_script": {
+        "path": "/opt/xbord-rust-lab/20261002-build-01/nd-20261002-01/traffic_lab1.py",
+        "sha256": "084df611de3ec5ae92504e16946a9e0debc71672d31121fb43ad8d36afd9f282"
+      }
+    },
+    "m1": {
+      "measurement_sha256": "d62ea7f236b6b8fdc435fff3a96443bdd1b8e1702b1b2c0c839dfca517cdd0ed",
+      "executed_script": {
+        "path": "/opt/xbord-rust-lab/20261002-build-01/nd-20261002-01/native_users_lab.py",
+        "sha256": "2108d21555a5d1f055c9d8eb3f32e932ff948e4ac447d634a6d5bc9cacc18057"
+      }
+    },
+    "f1": {
+      "measurement_sha256": "51f88fd12814c340ae02ca76d2295627ca10174e27d780026b726e46a587948d",
+      "executed_script": {
+        "path": "/opt/xbord-rust-lab/20261002-build-01/nd-20261002-01/rust_fd_lab.py",
+        "sha256": "94f7d16b70cbc47fd96e500f7b2087731d8f4e6e07e2bfca172636bcac144746"
+      }
+    }
+  },
+  "imported_script_sha256": {
+    "traffic_lab.py": "084df611de3ec5ae92504e16946a9e0debc71672d31121fb43ad8d36afd9f282",
+    "native_users_lab.py": "2108d21555a5d1f055c9d8eb3f32e932ff948e4ac447d634a6d5bc9cacc18057",
+    "runtime_lab.py": "64cb9853596212284ddf3c6f6c3187d2281aa85764e407c69057aef5ff57cbcd"
+  },
+  "independent_review": {
+    "conclusion": "STATIC_REVIEW_NO_CONFIRMED_BLOCKER_P1_OR_P2",
+    "source_manifest_sha256": "9d9a55cf57b9187e9b92fae71e22282f84552a134af766cbf3b0b4217a980aa2",
+    "report_sha256": "07123c2d866ad8ca685816d3ba876021e51f9197d90e52670e36875571faa12f",
+    "business_acceptance": "NOT_SIGNED_BY_THIS_REVIEW",
+    "scope_notes": [
+      {
+        "id": "VISIBLE_CHECKPOINT_FILE_IS_NOT_DIRECTORY_FSYNC_COMPLETION_ACK",
+        "blocking_product_release": false,
+        "references": [
+          "benchmarks/native_durable_lab.py:30",
+          "benchmarks/native_durable_lab.py:72",
+          "crates/node-native/src/traffic_store.rs:159",
+          "crates/node-native/src/traffic_store.rs:161",
+          "crates/node-native/src/traffic_store.rs:163"
+        ],
+        "note": "The first two crash cases observe the renamed file contents. The source fsyncs its data before rename, but the name can be visible before the following directory fsync returns. These process-kill cases therefore do not independently acknowledge completion of the full checkpoint transaction or test power-loss durability. Successful frozen-snapshot and quiescence RPCs do await the complete commit. This is an execution-evidence boundary, not a defect in the source publication order.",
+        "suggestion": "Describe the first two cases as observed fsynced file data surviving process SIGKILL. If a future claim requires independently confirmed completed periodic checkpoints or power-loss resilience, add an explicit completion barrier or storage-fault experiment and bind that new version."
+      },
+      {
+        "id": "FD_ACCEPT_CASE_NOT_PERSISTENT_STORE_PRESSURE_TEST",
+        "blocking_product_release": false,
+        "references": [
+          "benchmarks/rust_fd_lab.py:82"
+        ],
+        "note": "The FD case has no --traffic-state/--traffic-destination arguments. It does not show successful fsync/checkpoint recovery while the persistent store itself is starved of descriptors. A real store I/O failure intentionally produces a visible unhealthy/recovery path."
+      },
+      {
+        "id": "HELD_QUIESCENCE_CASE_IS_NOT_CONTINUOUS_WRITE_STRESS",
+        "blocking_product_release": false,
+        "references": [
+          "benchmarks/native_durable_lab.py:117",
+          "benchmarks/native_durable_lab.py:118",
+          "benchmarks/native_durable_lab.py:127"
+        ],
+        "note": "The held connection has completed its exact echo before the quiesce call. The assertions test closure of that connection and a stable book over the observation period; they are not a stress test of continuously written or backpressured sockets during the barrier. The abort-and-join ordering is supported separately by static source review."
+      },
+      {
+        "id": "LISTENER_SINGLE_WRITER_ASSERTION_IS_INDIRECT",
+        "blocking_product_release": false,
+        "references": [
+          "benchmarks/native_durable_lab.py:167",
+          "benchmarks/native_durable_lab.py:182",
+          "crates/node-kernel/src/process.rs:559",
+          "crates/node-native/src/traffic_store.rs:109"
+        ],
+        "note": "The listener case observes new readiness, old listener termination, preserved epoch and exact accumulated totals. Its single_writer_restart_verified field relies on that evidence plus the reviewed stop/reap ordering and OS lock; the script does not directly trace overlapping disk-writer lifetimes."
+      },
+      {
+        "id": "SCRIPT_IMPORTS_REQUIRE_BINDING",
+        "blocking_product_release": false,
+        "note": "native_durable_lab.py imports traffic_lab.py and runtime_lab.py; traffic_lab.py also uses native_users_lab.py. The durable output's own script hash alone is insufficient to reproduce the fixture. All five current script hashes are bound in this review; actual aggregate execution evidence must retain the imported-file hashes too."
+      }
+    ]
+  },
+  "retained_failures": [
+    {
+      "evidence": "nd1-windows-tests.log",
+      "sha256": "b66454618e7f4cf037cd35410995990c893a792e56f695250decbc1dd494feb0",
+      "whole_result": "FAIL",
+      "reason": "Fixture reopened a runtime outbox using a different destination; fixed test readback, not accepted as whole PASS"
+    },
+    {
+      "evidence": "nd3-windows-tests.log",
+      "sha256": "791f0194c2c140d142bc009246aabf3be4c6bb882f4f51e37e4d484e45d0a4be",
+      "whole_result": "FAIL",
+      "reason": "Pre-freeze cancellation test used unwrap_err requiring Counter Debug; corrected assertion before final nd3 freeze"
+    },
+    {
+      "evidence": "nd3-windows-tests-final.log",
+      "sha256": "697eff422b3ad60537da21c1813d7222350e553c5b2a0abd8f012a3722ac920a",
+      "whole_result": "FAIL",
+      "reason": "Existing hanging candidate check exceeded four-second assertion during concurrent local work; unchanged final source and threshold passed the complete serial workspace run"
+    },
+    {
+      "evidence": "nd-preliminary-windows-clippy.log",
+      "sha256": "6884e99d8ddbfeff8c2d1630044929afb087c8e65885f1deb0a58c2103b17c3d",
+      "whole_result": "FAIL",
+      "reason": "Prototype store tests preceded later implementation items; moved test module to the end before final freeze"
+    }
+  ],
+  "final_execution_acceptance_uses": "nd3 build3 / d1 / t1 / m1 / f1 and Windows serial only",
+  "checkpoint": {
+    "default_interval_ms": 1000,
+    "allowed_interval_ms": [
+      50,
+      60000
+    ],
+    "completed_commit": "owned temp create/write/file fsync/rename/directory fsync before successful RPC or commit return",
+    "first_two_crash_trigger": "observed renamed file with previously fsynced data; not a directory fsync completion acknowledgement",
+    "unsaved_tail_lossless": false,
+    "host_power_loss_tested": false,
+    "detached_work_maximum": 2
+  },
+  "measurement_semantics": {
+    "resource_sampling": "scan /proc then wait 10ms; not fixed-frequency or absolute peaks",
+    "comparison": "full external sing-box vs limited native Rust subset with accounting disabled",
+    "fd_test": "owned64FD kernel without persistent-store flags; no host-wide changes",
+    "quiescence_test": "completed exact echo, then held idle connection; no continuously written/backpressured barrier stress",
+    "traffic": "successful plaintext upload/download payload writes excluding protocol/TLS headers"
+  },
+  "host_readback": {
+    "services_preserved": 7,
+    "remaining_owned_processes": [],
+    "hosts_sha256": "bf32084cdab9f32943da097e13af6ea87f12a52139c154e77af21583a9e4c7f3"
+  },
+  "dependency_notice_reuse": {
+    "result": "PASS",
+    "normal_registry_dependencies": 115,
+    "unchanged_registry_lock": true,
+    "same_rust_toolchain": "1.98.1",
+    "archive_sha256": "2193b9b0a9743bdf439fd0915cfd96fea9899ea6b3c6ca5dd3d3634bc76f6a17",
+    "previous_notice_manifest_sha256": "92334727837d92fe0d21a5524b9829b472c8067ff5cb9ef80b2b4011991edb65",
+    "current_tree_output_sha256": "5a9ac0c7860f7e0510eda4fba0113b9aed417c54c4c092853d915eee430e1727"
+  },
+  "license": "Project Rust code MPL-2.0; dependencies retain their licenses; no Go server bundled or linked",
+  "limits": [
+    "Only VLESS TCP, VLESS/Trojan file TLS and direct/system-resolver outbound",
+    "Unsaved native atomic tail can be lost on forced termination; socket delivery and storage are not one transaction",
+    "Checkpoint interval adds scheduling/queue/filesystem time; no hard one-second loss bound or power-failure acceptance",
+    "Quiescence confirms joined payload tasks plus completed forced checkpoint; outer failure does not claim success",
+    "Final drain max128 batches; one-second budget checked before each RPC; per-RPC2s plus storage time; remainder stays in native store",
+    "Unknown upstream delivery requires exact-batch operator reconciliation; no end-to-end exactly-once billing",
+    "Removed users deny new authentication; already authenticated connections continue",
+    "Enforcement/other protocols/routing/multi-node/config persistence/full original parity remain incomplete",
+    "Linux ARM64 GNU/glibc2.39+/libgcc_s only; Windows module tests do not prove native runtime support",
+    "No production panel write/replacement, long-duration stability, WAN/maximum capacity or accounting-on resource improvement claim"
+  ],
+  "git_pushed": false,
+  "production_replaced": false,
+  "production_panel_used": false,
+  "full_migration": "UNVERIFIED"
+}

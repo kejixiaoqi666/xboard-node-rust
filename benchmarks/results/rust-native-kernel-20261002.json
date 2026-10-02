@@ -1,0 +1,872 @@
+{
+  "result": "PASS_SCOPED_RUST_NATIVE_KERNEL",
+  "observed_at": "2026-10-02T09:35:27.705650+00:00",
+  "architecture": "Rust control and protocol data plane in one executable, two Rust processes for fault isolation",
+  "server_requires_go": false,
+  "native_backend": "embedded_rust",
+  "compiled_input_files": 54,
+  "compiled_source_manifest_sha256": "b016fea6175279bf66303ae3ccabadd5f416ea6953e463370acb22e71094a1c1",
+  "compiled_source_candidate_sha256": "5ec7d21de8b2d22d9471b0ae71cac131d674b86c602790989f89c369667d9d95",
+  "binary": {
+    "bytes": 4069304,
+    "sha256": "e89a4fdbe80575551b8d4900f8affa283a63c0f8f3d78db5b4a7af2f9ec66665",
+    "needed_libraries": [
+      "libgcc_s.so.1",
+      "libc.so.6"
+    ],
+    "minimum_glibc_symbol_version": "2.39"
+  },
+  "binaries": {
+    "controller": {
+      "bytes": 4069304,
+      "sha256": "e89a4fdbe80575551b8d4900f8affa283a63c0f8f3d78db5b4a7af2f9ec66665"
+    },
+    "native": {
+      "bytes": 4069304,
+      "sha256": "e89a4fdbe80575551b8d4900f8affa283a63c0f8f3d78db5b4a7af2f9ec66665"
+    },
+    "singbox": {
+      "bytes": 75759845,
+      "sha256": "4393306b90bb05502fce3b8f1754280f531c0f3ff47df9b1997b7831e3e543d0"
+    }
+  },
+  "checks": {
+    "windows_workspace_tests": 87,
+    "windows_fmt": "PASS",
+    "windows_clippy": "PASS",
+    "linux_workspace_tests": 93,
+    "linux_fmt": "PASS",
+    "linux_clippy": "PASS",
+    "legacy_external_real_vless": 1,
+    "embedded_rust_protocol_lifecycle": "PASS",
+    "fd_exhaustion_with_control": "PASS",
+    "independent_static_review": "PASS"
+  },
+  "protocol_resource_cases": [
+    {
+      "name": "default",
+      "native": false,
+      "tls": false,
+      "protocol": "vless",
+      "steady": {
+        "seconds": 30.140874885953963,
+        "tick_hz": 100,
+        "runtime": {
+          "rss_median_kib": 7048.0,
+          "rss_min_kib": 7048,
+          "rss_max_kib": 7048,
+          "threads": [
+            2
+          ],
+          "cpu_ticks": 3,
+          "cpu_seconds": 0.03,
+          "one_core_cpu_percent": 0.09953261182202905
+        },
+        "kernel": {
+          "rss_median_kib": 57180.0,
+          "rss_min_kib": 57180,
+          "rss_max_kib": 57180,
+          "threads": [
+            8
+          ],
+          "cpu_ticks": 0,
+          "cpu_seconds": 0.0,
+          "one_core_cpu_percent": 0.0
+        }
+      },
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 290,
+        "exited_process_samples_skipped": 4,
+        "controller_sampled_rss_peak_kib": 14740,
+        "controller_hwm_kib": 14740,
+        "controller_max_fds": 11,
+        "group_sampled_rss_peak_kib": 166604,
+        "group_max_processes": 3
+      },
+      "cycles": [
+        {
+          "users": 20000,
+          "elapsed_seconds": 1.4832993522286415,
+          "pid_before": 1320193,
+          "pid_after": 1320866,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824409.759017672
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 1.4403523299843073,
+          "pid_before": 1320866,
+          "pid_after": 1320898,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824411.331692147
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 1.2001838805153966,
+          "pid_before": 1320898,
+          "pid_after": 1320943,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824412.686597006
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 1.5400213161483407,
+          "pid_before": 1320943,
+          "pid_after": 1321001,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824414.359372828
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 1.1246512336656451,
+          "pid_before": 1321001,
+          "pid_after": 1321028,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824415.614785634
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 1.5594277922064066,
+          "pid_before": 1321028,
+          "pid_after": 1321066,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824417.304767236
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 0,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4824408.081903674,
+        "body_valid": false,
+        "finished": 4824409.324990583
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c"
+    },
+    {
+      "name": "native",
+      "native": true,
+      "tls": false,
+      "protocol": "vless",
+      "steady": {
+        "seconds": 30.12338412925601,
+        "tick_hz": 100,
+        "runtime": {
+          "rss_median_kib": 7052.0,
+          "rss_min_kib": 7052,
+          "rss_max_kib": 7052,
+          "threads": [
+            2
+          ],
+          "cpu_ticks": 3,
+          "cpu_seconds": 0.03,
+          "one_core_cpu_percent": 0.09959040415669573
+        },
+        "kernel": {
+          "rss_median_kib": 4548.0,
+          "rss_min_kib": 4548,
+          "rss_max_kib": 4548,
+          "threads": [
+            1
+          ],
+          "cpu_ticks": 0,
+          "cpu_seconds": 0.0,
+          "one_core_cpu_percent": 0.0
+        }
+      },
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 171,
+        "exited_process_samples_skipped": 1,
+        "controller_sampled_rss_peak_kib": 13312,
+        "controller_hwm_kib": 13568,
+        "controller_max_fds": 11,
+        "group_sampled_rss_peak_kib": 32480,
+        "group_max_processes": 3
+      },
+      "cycles": [
+        {
+          "users": 20000,
+          "elapsed_seconds": 0.7729819361120462,
+          "pid_before": 1321140,
+          "pid_after": 1321140,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824453.055119467
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.765652765519917,
+          "pid_before": 1321140,
+          "pid_after": 1321140,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824453.950797582
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 0.9796580737456679,
+          "pid_before": 1321140,
+          "pid_after": 1321140,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824455.072148684
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.7746630599722266,
+          "pid_before": 1321140,
+          "pid_after": 1321140,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824455.982744414
+        },
+        {
+          "users": 20000,
+          "elapsed_seconds": 0.9449272360652685,
+          "pid_before": 1321140,
+          "pid_after": 1321140,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824457.065590171
+        },
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.8018685160204768,
+          "pid_before": 1321140,
+          "pid_after": 1321140,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824458.006159215
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 64,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4824452.143918645,
+        "body_valid": true,
+        "finished": 4824456.074149265
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c",
+      "reorder_no_restart": true,
+      "default_hostname_resolution": true,
+      "private_state_and_candidate_cleanup": true
+    },
+    {
+      "name": "vless-tls",
+      "native": true,
+      "tls": true,
+      "protocol": "vless",
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 25,
+        "exited_process_samples_skipped": 0,
+        "controller_sampled_rss_peak_kib": 9144,
+        "controller_hwm_kib": 9144,
+        "controller_max_fds": 13,
+        "group_sampled_rss_peak_kib": 17980,
+        "group_max_processes": 2
+      },
+      "cycles": [
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.6339890593662858,
+          "pid_before": 1321929,
+          "pid_after": 1321929,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824465.644386059
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 64,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4824464.81665959,
+        "body_valid": true,
+        "finished": 4824468.720335115
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c",
+      "reorder_no_restart": true,
+      "default_hostname_resolution": true,
+      "wrong_tls_hostname_denied": true,
+      "private_state_and_candidate_cleanup": true
+    },
+    {
+      "name": "trojan-tls",
+      "native": true,
+      "tls": true,
+      "protocol": "trojan",
+      "update_resources": {
+        "poll_delay_seconds": 0.01,
+        "sampling_model": "scan /proc, then wait; not a fixed sampling interval",
+        "samples": 24,
+        "exited_process_samples_skipped": 0,
+        "controller_sampled_rss_peak_kib": 9732,
+        "controller_hwm_kib": 9732,
+        "controller_max_fds": 11,
+        "group_sampled_rss_peak_kib": 20564,
+        "group_max_processes": 2
+      },
+      "cycles": [
+        {
+          "users": 10000,
+          "elapsed_seconds": 0.6241649342700839,
+          "pid_before": 1322215,
+          "pid_after": 1322215,
+          "new_works": true,
+          "removed_denied": true,
+          "retained_works": true,
+          "committed": 4824476.253927528
+        }
+      ],
+      "held_connections": 64,
+      "held_survived": 64,
+      "held_retained_user": 32,
+      "held_removed_user": 32,
+      "stream": {
+        "started": 4824475.397137854,
+        "body_valid": true,
+        "finished": 4824479.306963451
+      },
+      "stream_bytes": 2097152,
+      "stream_sha256": "f8afd3793827bc3596a8107070fe902db6eca2373ca28f1a8d9af4b8214f521c",
+      "reorder_no_restart": true,
+      "default_hostname_resolution": true,
+      "wrong_tls_hostname_denied": true,
+      "private_state_and_candidate_cleanup": true
+    }
+  ],
+  "faults": [
+    {
+      "mode": "lost",
+      "pid_before": 1322480,
+      "pid_after": 1322480,
+      "proxy_counts": {
+        "replace": 1,
+        "status": 1,
+        "dropped": 1,
+        "real_applied": 1
+      },
+      "result": "PASS"
+    },
+    {
+      "mode": "reject",
+      "pid_before": 1322592,
+      "pid_after": 1322592,
+      "proxy_counts": {
+        "replace": 3,
+        "status": 0,
+        "dropped": 0,
+        "real_applied": 0
+      },
+      "result": "PASS"
+    },
+    {
+      "mode": "unknown",
+      "pid_before": 1322694,
+      "pid_after": 1322786,
+      "proxy_counts": {
+        "replace": 1,
+        "status": 1,
+        "dropped": 0,
+        "real_applied": 1
+      },
+      "result": "PASS"
+    },
+    {
+      "mode": "stall",
+      "pid_before": 1322871,
+      "pid_after": null,
+      "proxy_counts": {
+        "replace": 1,
+        "status": 1,
+        "dropped": 0,
+        "real_applied": 0
+      },
+      "result": "PASS"
+    }
+  ],
+  "lifecycle": {
+    "result": "PASS",
+    "tcp": {
+      "held_connections": 256,
+      "hold_seconds": 10,
+      "verified_held_responses": 256,
+      "before": {
+        "controller": {
+          "rss_kib": 5008,
+          "threads": 2,
+          "cpu_ticks": 2,
+          "fds": 10,
+          "hwm_kib": 5008
+        },
+        "kernel": {
+          "rss_kib": 3160,
+          "threads": 1,
+          "cpu_ticks": 0,
+          "fds": 11,
+          "hwm_kib": 3160
+        }
+      },
+      "held_samples": [
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 2,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        },
+        {
+          "controller": {
+            "rss_kib": 5008,
+            "threads": 2,
+            "cpu_ticks": 3,
+            "fds": 10,
+            "hwm_kib": 5008
+          },
+          "kernel": {
+            "rss_kib": 8408,
+            "threads": 1,
+            "cpu_ticks": 5,
+            "fds": 523,
+            "hwm_kib": 8408
+          }
+        }
+      ],
+      "after": {
+        "controller": {
+          "rss_kib": 5008,
+          "threads": 2,
+          "cpu_ticks": 3,
+          "fds": 10,
+          "hwm_kib": 5008
+        },
+        "kernel": {
+          "rss_kib": 8408,
+          "threads": 1,
+          "cpu_ticks": 84,
+          "fds": 11,
+          "hwm_kib": 8408
+        }
+      },
+      "transfers": {
+        "requests": 1024,
+        "payload_bytes": 262144,
+        "concurrency": 8,
+        "seconds": 1.8396899234503508,
+        "mib_per_second": 139.15388497637161,
+        "all_contents_verified": true
+      }
+    },
+    "crash_pid_before": 1323011,
+    "crash_pid_after": 1324518,
+    "listener_restart_pid": 1324530,
+    "stalled_http_shutdown_seconds": 0.007623208686709404,
+    "recovered_candidate_cleanup_seconds": 0.10098361596465111,
+    "candidate_socket_cleanup": true,
+    "token_not_in_kernel_environment": true
+  },
+  "fd_exhaustion": {
+    "result": "PASS",
+    "started_at": "2026-10-02T09:19:54.006554+00:00",
+    "binary_sha256": "e89a4fdbe80575551b8d4900f8affa283a63c0f8f3d78db5b4a7af2f9ec66665",
+    "script_sha256": "94f7d16b70cbc47fd96e500f7b2087731d8f4e6e07e2bfca172636bcac144746",
+    "child_rlimit_nofile": 64,
+    "host_wide_limits_changed": false,
+    "kernel_pid": 1320170,
+    "baseline_fds": 11,
+    "exhaustion_fds": 64,
+    "existing_transfers_verified": 2,
+    "new_authenticated_transfer_verified": true,
+    "queued_control_during_exhaustion": true,
+    "control_after_recovery": true,
+    "fd_return_to_baseline": true,
+    "second_exhaustion_fds": 64,
+    "shutdown_seconds": 0.0040258681401610374,
+    "control_queued_during_shutdown": true,
+    "control_socket_cleanup": true,
+    "finished_at": "2026-10-02T09:19:54.872872+00:00"
+  },
+  "comparison_scope": "Full official sing-box 1.14.0 versus limited Rust protocol subset; not full feature parity or a general Go/Rust language comparison",
+  "measurement_semantics": {
+    "sampling": "scan /proc then wait 10ms, not a fixed sampling interval",
+    "group_peak": "sampled RSS sum with shared pages and temporary check process; not exclusive physical memory or all instantaneous peaks",
+    "committed": "client business readiness timestamp, not the internal Rust commit timestamp",
+    "stream": "full 2MiB equality spanning first observed publication, not all six updates",
+    "throughput": "local loopback 8-concurrency transfer content test, not WAN speed or maximum capacity"
+  },
+  "provenance": {
+    "m2": {
+      "measurement_sha256": "dd60eecf5f71578b34982ae37218e02cb91720900fc39e437d59d96517cc1334",
+      "executed_script": {
+        "path": "/opt/xbord-rust-lab/20261002-build-01/rust-native-20261002-01/native_users_lab3.py",
+        "sha256": "e5dbb08afd77e0798e72ae2c9cb88305daaf2b3c17564f943e8172b3d6b3aa5f"
+      }
+    },
+    "fd3": {
+      "measurement_sha256": "3384cca3bc79cb10633a36022cad4ed3c5917793872e182958fb69414013998b",
+      "executed_script": {
+        "path": "/opt/xbord-rust-lab/20261002-build-01/rust-native-20261002-01/rust_fd_lab3.py",
+        "sha256": "94f7d16b70cbc47fd96e500f7b2087731d8f4e6e07e2bfca172636bcac144746"
+      }
+    }
+  },
+  "independent_review": {
+    "source_manifest_sha256": "b016fea6175279bf66303ae3ccabadd5f416ea6953e463370acb22e71094a1c1",
+    "report_sha256": "395e2538ff6ca0a7762e4665962b0b71dc07d389038e7786ed2f72159eebaf2c",
+    "scope": "static source/script review only"
+  },
+  "prior_execution": {
+    "rn1_m1_result": "PASS",
+    "final_acceptance_uses": "rn3 m2 and fd3 only",
+    "rn1_review_findings": [
+      "join metadata capacity bound",
+      "recoverable accept errors abort service"
+    ],
+    "rn3_resolution": "bound total JoinSet entries; recoverable TCP and control accept backoff; rerun exact final binary"
+  },
+  "host_readback": {
+    "services_preserved": 7,
+    "remaining_owned_processes": [],
+    "hosts_sha256": "bf32084cdab9f32943da097e13af6ea87f12a52139c154e77af21583a9e4c7f3"
+  },
+  "license": "MPL-2.0 for project Rust code; Cargo dependencies retain their own licenses; no Go companion bundled or linked",
+  "limits": [
+    "Current VLESS/Trojan TCP/direct/file TLS subset only",
+    "Accounting/limits/devices/IP enforcement and full parity incomplete",
+    "Removed users deny new authentication, existing authenticated sessions may continue",
+    "Listener/TLS/protocol change and uncertain state recovery interrupt sessions",
+    "Native control requires Unix, tested Linux ARM64 GNU/glibc 2.39+/libgcc_s",
+    "No production real-panel acceptance or maximum-capacity/long-duration/WAN performance claim"
+  ],
+  "git_pushed": false,
+  "production_replaced": false
+}

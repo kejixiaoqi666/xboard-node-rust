@@ -1,0 +1,1303 @@
+{
+  "result": "PASS",
+  "scope": "loopback HTTPS panel and real VLESS; shared host, GOMAXPROCS=2 for both kernels; TCP is sing-box data plane",
+  "binary": {
+    "baseline": {
+      "bytes": 6623160,
+      "sha256": "c15e942ad2c001050f2d3111d1ca76c762a0fd45f297b8a2a07663187174b8f6"
+    },
+    "optimized": {
+      "bytes": 3676088,
+      "sha256": "d6a48eddc1fd5a99b42c0b17f30b3f0fd9aee1f84c313f8a38c8c8a77c3fb430"
+    },
+    "singbox": {
+      "bytes": 75759845,
+      "sha256": "4393306b90bb05502fce3b8f1754280f531c0f3ff47df9b1997b7831e3e543d0"
+    }
+  },
+  "source_candidate_sha256": "ebf37fa3c13ba88c9653c886281276c8ae2067c56a24845e481bf92e05d9a5be",
+  "rust_manifest_files": 44,
+  "rust_source_drift": [],
+  "measurement_script_sha256": "64cb9853596212284ddf3c6f6c3187d2281aa85764e407c69057aef5ff57cbcd",
+  "target": "aarch64-unknown-linux-gnu",
+  "minimum_glibc_symbol_version": "2.39",
+  "workspace_tests": {
+    "passed": 71,
+    "failed": 0,
+    "ignored": 1
+  },
+  "explicit_real_vless_integration": "PASS",
+  "format": "PASS",
+  "clippy": "PASS",
+  "cached_poll_raw": [
+    {
+      "allocated_bytes": 8962258,
+      "allocations": 18904,
+      "allocations_per_poll": 189.04,
+      "bytes_per_poll": 89622.58,
+      "elapsed_ms": 66.51041500000001,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 665.1041500000001,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 1,
+      "version": "baseline",
+      "trial": 1
+    },
+    {
+      "allocated_bytes": 8962290,
+      "allocations": 18906,
+      "allocations_per_poll": 189.06,
+      "bytes_per_poll": 89622.9,
+      "elapsed_ms": 101.25664900000001,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 1012.56649,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 1,
+      "version": "baseline",
+      "trial": 2
+    },
+    {
+      "allocated_bytes": 8962100,
+      "allocations": 18900,
+      "allocations_per_poll": 189.0,
+      "bytes_per_poll": 89621.0,
+      "elapsed_ms": 83.518971,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 835.1897099999999,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 1,
+      "version": "baseline",
+      "trial": 3
+    },
+    {
+      "allocated_bytes": 414589290,
+      "allocations": 3018906,
+      "allocations_per_poll": 30189.06,
+      "bytes_per_poll": 4145892.9,
+      "elapsed_ms": 473.037338,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 4730.37338,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 10000,
+      "version": "baseline",
+      "trial": 1
+    },
+    {
+      "allocated_bytes": 414559500,
+      "allocations": 3018700,
+      "allocations_per_poll": 30187.0,
+      "bytes_per_poll": 4145595.0,
+      "elapsed_ms": 447.799226,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 4477.99226,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 10000,
+      "version": "baseline",
+      "trial": 2
+    },
+    {
+      "allocated_bytes": 414589290,
+      "allocations": 3018906,
+      "allocations_per_poll": 30189.06,
+      "bytes_per_poll": 4145892.9,
+      "elapsed_ms": 429.576345,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 4295.76345,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 10000,
+      "version": "baseline",
+      "trial": 3
+    },
+    {
+      "allocated_bytes": 8930500,
+      "allocations": 17800,
+      "allocations_per_poll": 178.0,
+      "bytes_per_poll": 89305.0,
+      "elapsed_ms": 112.32422,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 1123.2422,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 1,
+      "version": "optimized",
+      "trial": 1
+    },
+    {
+      "allocated_bytes": 8930500,
+      "allocations": 17800,
+      "allocations_per_poll": 178.0,
+      "bytes_per_poll": 89305.0,
+      "elapsed_ms": 80.7888,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 807.8879999999999,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 1,
+      "version": "optimized",
+      "trial": 2
+    },
+    {
+      "allocated_bytes": 8930500,
+      "allocations": 17800,
+      "allocations_per_poll": 178.0,
+      "bytes_per_poll": 89305.0,
+      "elapsed_ms": 70.856515,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 708.56515,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 1,
+      "version": "optimized",
+      "trial": 3
+    },
+    {
+      "allocated_bytes": 99840700,
+      "allocations": 18000,
+      "allocations_per_poll": 180.0,
+      "bytes_per_poll": 998407.0,
+      "elapsed_ms": 142.89379599999998,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 1428.93796,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 10000,
+      "version": "optimized",
+      "trial": 1
+    },
+    {
+      "allocated_bytes": 99811100,
+      "allocations": 17800,
+      "allocations_per_poll": 178.0,
+      "bytes_per_poll": 998111.0,
+      "elapsed_ms": 107.168757,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 1071.68757,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 10000,
+      "version": "optimized",
+      "trial": 2
+    },
+    {
+      "allocated_bytes": 99811100,
+      "allocations": 17800,
+      "allocations_per_poll": 178.0,
+      "bytes_per_poll": 998111.0,
+      "elapsed_ms": 104.368504,
+      "metrics": {
+        "applied": 1,
+        "failed": 0,
+        "push_resyncs": 0,
+        "recovered": 0,
+        "sync_attempts": 107,
+        "unchanged": 106
+      },
+      "microseconds_per_poll": 1043.68504,
+      "polls": 100,
+      "scope": "control sync + loopback HTTP fixture; no TLS or protocol kernel",
+      "users": 10000,
+      "version": "optimized",
+      "trial": 3
+    }
+  ],
+  "cached_poll_summary": [
+    {
+      "version": "baseline",
+      "users": 1,
+      "allocations_per_poll": {
+        "median": 189.04,
+        "min": 189.0,
+        "max": 189.06
+      },
+      "bytes_per_poll": {
+        "median": 89622.58,
+        "min": 89621.0,
+        "max": 89622.9
+      },
+      "microseconds_per_poll": {
+        "median": 835.1897099999999,
+        "min": 665.1041500000001,
+        "max": 1012.56649
+      }
+    },
+    {
+      "version": "baseline",
+      "users": 10000,
+      "allocations_per_poll": {
+        "median": 30189.06,
+        "min": 30187.0,
+        "max": 30189.06
+      },
+      "bytes_per_poll": {
+        "median": 4145892.9,
+        "min": 4145595.0,
+        "max": 4145892.9
+      },
+      "microseconds_per_poll": {
+        "median": 4477.99226,
+        "min": 4295.76345,
+        "max": 4730.37338
+      }
+    },
+    {
+      "version": "optimized",
+      "users": 1,
+      "allocations_per_poll": {
+        "median": 178.0,
+        "min": 178.0,
+        "max": 178.0
+      },
+      "bytes_per_poll": {
+        "median": 89305.0,
+        "min": 89305.0,
+        "max": 89305.0
+      },
+      "microseconds_per_poll": {
+        "median": 807.8879999999999,
+        "min": 708.56515,
+        "max": 1123.2422
+      }
+    },
+    {
+      "version": "optimized",
+      "users": 10000,
+      "allocations_per_poll": {
+        "median": 178.0,
+        "min": 178.0,
+        "max": 180.0
+      },
+      "bytes_per_poll": {
+        "median": 998111.0,
+        "min": 998111.0,
+        "max": 998407.0
+      },
+      "microseconds_per_poll": {
+        "median": 1071.68757,
+        "min": 1043.68504,
+        "max": 1428.93796
+      }
+    }
+  ],
+  "resources": [
+    {
+      "users": 1,
+      "version": "baseline",
+      "trials": 3,
+      "runtime": {
+        "rss_median_kib": 5368.0,
+        "rss_min_kib": 5364,
+        "rss_max_kib": 5368,
+        "threads": [
+          8
+        ],
+        "sample_seconds": 36.19157017208636,
+        "cpu_seconds": 0.03,
+        "aggregate_one_core_cpu_percent": 0.08289223113933376
+      },
+      "kernel": {
+        "rss_median_kib": 53016.0,
+        "rss_min_kib": 52908,
+        "rss_max_kib": 53468,
+        "threads": [
+          7,
+          8
+        ],
+        "sample_seconds": 36.19157017208636,
+        "cpu_seconds": 0.0,
+        "aggregate_one_core_cpu_percent": 0.0
+      }
+    },
+    {
+      "users": 1,
+      "version": "optimized",
+      "trials": 3,
+      "runtime": {
+        "rss_median_kib": 4696.0,
+        "rss_min_kib": 4696,
+        "rss_max_kib": 4824,
+        "threads": [
+          2
+        ],
+        "sample_seconds": 36.15129884425551,
+        "cpu_seconds": 0.04,
+        "aggregate_one_core_cpu_percent": 0.11064609371941295
+      },
+      "kernel": {
+        "rss_median_kib": 53400.0,
+        "rss_min_kib": 53332,
+        "rss_max_kib": 53432,
+        "threads": [
+          8
+        ],
+        "sample_seconds": 36.15129884425551,
+        "cpu_seconds": 0.0,
+        "aggregate_one_core_cpu_percent": 0.0
+      }
+    },
+    {
+      "users": 10000,
+      "version": "baseline",
+      "trials": 3,
+      "runtime": {
+        "rss_median_kib": 33424.0,
+        "rss_min_kib": 33348,
+        "rss_max_kib": 33436,
+        "threads": [
+          8
+        ],
+        "sample_seconds": 36.199477788992226,
+        "cpu_seconds": 0.2,
+        "aggregate_one_core_cpu_percent": 0.5524941579704703
+      },
+      "kernel": {
+        "rss_median_kib": 57196.0,
+        "rss_min_kib": 57084,
+        "rss_max_kib": 57204,
+        "threads": [
+          7
+        ],
+        "sample_seconds": 36.199477788992226,
+        "cpu_seconds": 0.0,
+        "aggregate_one_core_cpu_percent": 0.0
+      }
+    },
+    {
+      "users": 10000,
+      "version": "optimized",
+      "trials": 3,
+      "runtime": {
+        "rss_median_kib": 29908.0,
+        "rss_min_kib": 29800,
+        "rss_max_kib": 30552,
+        "threads": [
+          2
+        ],
+        "sample_seconds": 36.20090922527015,
+        "cpu_seconds": 0.05,
+        "aggregate_one_core_cpu_percent": 0.13811807788821326
+      },
+      "kernel": {
+        "rss_median_kib": 56992.0,
+        "rss_min_kib": 56716,
+        "rss_max_kib": 57776,
+        "threads": [
+          7,
+          8
+        ],
+        "sample_seconds": 36.20090922527015,
+        "cpu_seconds": 0.0,
+        "aggregate_one_core_cpu_percent": 0.0
+      }
+    }
+  ],
+  "tcp_and_wss": {
+    "scope": "loopback HTTPS panel and real VLESS; shared host, GOMAXPROCS=2 for both kernels; TCP is sing-box data plane",
+    "started_at": "2026-10-01T20:18:49Z",
+    "cases": [
+      {
+        "version": "baseline",
+        "users": 1,
+        "trial": 1,
+        "steady": {
+          "seconds": 12.065173859708011,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 5368.0,
+            "rss_min_kib": 5368,
+            "rss_max_kib": 5368,
+            "threads": [
+              8
+            ],
+            "cpu_ticks": 1,
+            "cpu_seconds": 0.01,
+            "one_core_cpu_percent": 0.08288318192740912
+          },
+          "kernel": {
+            "rss_median_kib": 53468.0,
+            "rss_min_kib": 53468,
+            "rss_max_kib": 53468,
+            "threads": [
+              7
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "tcp": {
+          "held_connections": 256,
+          "all_responses_verified": 256,
+          "hold_seconds": 3,
+          "accept_seconds": 0.31766002625226974,
+          "kernel_held_samples": [
+            {
+              "rss_kib": 59404,
+              "threads": 7,
+              "cpu_ticks": 26,
+              "fds": 1034
+            },
+            {
+              "rss_kib": 59404,
+              "threads": 7,
+              "cpu_ticks": 26,
+              "fds": 1034
+            },
+            {
+              "rss_kib": 59404,
+              "threads": 7,
+              "cpu_ticks": 26,
+              "fds": 1034
+            }
+          ],
+          "transfers": [
+            {
+              "mib_per_second": 79.2603360994171,
+              "seconds": 0.10093320813030005,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 21.29292069002986,
+              "p95_ms": 28.380081057548523
+            },
+            {
+              "mib_per_second": 93.88899623843278,
+              "seconds": 0.08520700316876173,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 16.1051657050848,
+              "p95_ms": 26.05067379772663
+            },
+            {
+              "mib_per_second": 124.63415414181817,
+              "seconds": 0.0641878629103303,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 12.958996463567019,
+              "p95_ms": 20.819379948079586
+            }
+          ]
+        },
+        "sigterm_seconds": 0.01613596547394991,
+        "metrics": {
+          "sync_attempts": 19,
+          "applied": 1,
+          "unchanged": 18,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 0
+        }
+      },
+      {
+        "version": "optimized",
+        "users": 1,
+        "trial": 1,
+        "steady": {
+          "seconds": 12.057942439801991,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 4696.0,
+            "rss_min_kib": 4696,
+            "rss_max_kib": 4696,
+            "threads": [
+              2
+            ],
+            "cpu_ticks": 2,
+            "cpu_seconds": 0.02,
+            "one_core_cpu_percent": 0.1658657776801299
+          },
+          "kernel": {
+            "rss_median_kib": 53332.0,
+            "rss_min_kib": 53332,
+            "rss_max_kib": 53332,
+            "threads": [
+              8
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "tcp": {
+          "held_connections": 256,
+          "all_responses_verified": 256,
+          "hold_seconds": 3,
+          "accept_seconds": 0.35662894882261753,
+          "kernel_held_samples": [
+            {
+              "rss_kib": 59604,
+              "threads": 8,
+              "cpu_ticks": 25,
+              "fds": 1034
+            },
+            {
+              "rss_kib": 59604,
+              "threads": 8,
+              "cpu_ticks": 25,
+              "fds": 1034
+            },
+            {
+              "rss_kib": 59604,
+              "threads": 8,
+              "cpu_ticks": 25,
+              "fds": 1034
+            }
+          ],
+          "transfers": [
+            {
+              "mib_per_second": 100.44301661744727,
+              "seconds": 0.07964714989066124,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 17.118629068136215,
+              "p95_ms": 36.29366401582956
+            },
+            {
+              "mib_per_second": 121.34561976271002,
+              "seconds": 0.06592739000916481,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 13.098298572003841,
+              "p95_ms": 20.603058859705925
+            },
+            {
+              "mib_per_second": 132.5116385827527,
+              "seconds": 0.060372055508196354,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 12.360816355794668,
+              "p95_ms": 18.15633289515972
+            }
+          ]
+        },
+        "mid_rest_304_kernel_crash_recovered": true,
+        "sigterm_during_stalled_https": true,
+        "sigterm_seconds": 0.016017806716263294,
+        "metrics": {
+          "sync_attempts": 21,
+          "applied": 1,
+          "unchanged": 19,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 1
+        }
+      },
+      {
+        "version": "optimized",
+        "users": 1,
+        "trial": 2,
+        "steady": {
+          "seconds": 12.040057563222945,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 4824.0,
+            "rss_min_kib": 4824,
+            "rss_max_kib": 4824,
+            "threads": [
+              2
+            ],
+            "cpu_ticks": 1,
+            "cpu_seconds": 0.01,
+            "one_core_cpu_percent": 0.0830560813143085
+          },
+          "kernel": {
+            "rss_median_kib": 53432.0,
+            "rss_min_kib": 53432,
+            "rss_max_kib": 53432,
+            "threads": [
+              8
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "sigterm_seconds": 0.01651860773563385,
+        "metrics": {
+          "sync_attempts": 16,
+          "applied": 1,
+          "unchanged": 15,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 0
+        }
+      },
+      {
+        "version": "baseline",
+        "users": 1,
+        "trial": 2,
+        "steady": {
+          "seconds": 12.062636286020279,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 5368.0,
+            "rss_min_kib": 5368,
+            "rss_max_kib": 5368,
+            "threads": [
+              8
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          },
+          "kernel": {
+            "rss_median_kib": 52908.0,
+            "rss_min_kib": 52908,
+            "rss_max_kib": 52908,
+            "threads": [
+              8
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "sigterm_seconds": 0.016210087575018406,
+        "metrics": {
+          "sync_attempts": 16,
+          "applied": 1,
+          "unchanged": 15,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 0
+        }
+      },
+      {
+        "version": "baseline",
+        "users": 1,
+        "trial": 3,
+        "steady": {
+          "seconds": 12.063760026358068,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 5364.0,
+            "rss_min_kib": 5364,
+            "rss_max_kib": 5364,
+            "threads": [
+              8
+            ],
+            "cpu_ticks": 2,
+            "cpu_seconds": 0.02,
+            "one_core_cpu_percent": 0.16578579113230094
+          },
+          "kernel": {
+            "rss_median_kib": 53016.0,
+            "rss_min_kib": 53016,
+            "rss_max_kib": 53016,
+            "threads": [
+              7
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "sigterm_seconds": 0.01618068665266037,
+        "metrics": {
+          "sync_attempts": 16,
+          "applied": 1,
+          "unchanged": 15,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 0
+        }
+      },
+      {
+        "version": "optimized",
+        "users": 1,
+        "trial": 3,
+        "steady": {
+          "seconds": 12.053298841230571,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 4696.0,
+            "rss_min_kib": 4696,
+            "rss_max_kib": 4696,
+            "threads": [
+              2
+            ],
+            "cpu_ticks": 1,
+            "cpu_seconds": 0.01,
+            "one_core_cpu_percent": 0.08296483918405079
+          },
+          "kernel": {
+            "rss_median_kib": 53400.0,
+            "rss_min_kib": 53400,
+            "rss_max_kib": 53400,
+            "threads": [
+              8
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "sigterm_seconds": 0.009344387799501419,
+        "metrics": {
+          "sync_attempts": 16,
+          "applied": 1,
+          "unchanged": 15,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 0
+        }
+      },
+      {
+        "version": "baseline",
+        "users": 10000,
+        "trial": 1,
+        "steady": {
+          "seconds": 12.06198669783771,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 33348.0,
+            "rss_min_kib": 33348,
+            "rss_max_kib": 33348,
+            "threads": [
+              8
+            ],
+            "cpu_ticks": 6,
+            "cpu_seconds": 0.06,
+            "one_core_cpu_percent": 0.4974304938568361
+          },
+          "kernel": {
+            "rss_median_kib": 57196.0,
+            "rss_min_kib": 57196,
+            "rss_max_kib": 57196,
+            "threads": [
+              7
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "tcp": {
+          "held_connections": 256,
+          "all_responses_verified": 256,
+          "hold_seconds": 3,
+          "accept_seconds": 0.34922825172543526,
+          "kernel_held_samples": [
+            {
+              "rss_kib": 66724,
+              "threads": 8,
+              "cpu_ticks": 43,
+              "fds": 1034
+            },
+            {
+              "rss_kib": 66724,
+              "threads": 8,
+              "cpu_ticks": 43,
+              "fds": 1034
+            },
+            {
+              "rss_kib": 66724,
+              "threads": 8,
+              "cpu_ticks": 43,
+              "fds": 1034
+            }
+          ],
+          "transfers": [
+            {
+              "mib_per_second": 88.23275826844308,
+              "seconds": 0.09066927246749401,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 19.23917792737484,
+              "p95_ms": 40.37928115576506
+            },
+            {
+              "mib_per_second": 119.91356318858428,
+              "seconds": 0.06671472173184156,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 13.378079980611801,
+              "p95_ms": 18.64061690866947
+            },
+            {
+              "mib_per_second": 106.95446633548298,
+              "seconds": 0.07479818537831306,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 16.107688192278147,
+              "p95_ms": 20.368381403386593
+            }
+          ]
+        },
+        "sigterm_seconds": 0.019824259914457798,
+        "metrics": {
+          "sync_attempts": 19,
+          "applied": 1,
+          "unchanged": 18,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 0
+        }
+      },
+      {
+        "version": "optimized",
+        "users": 10000,
+        "trial": 1,
+        "steady": {
+          "seconds": 12.088806226849556,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 30360.0,
+            "rss_min_kib": 30168,
+            "rss_max_kib": 30552,
+            "threads": [
+              2
+            ],
+            "cpu_ticks": 2,
+            "cpu_seconds": 0.02,
+            "one_core_cpu_percent": 0.16544230774068885
+          },
+          "kernel": {
+            "rss_median_kib": 57776.0,
+            "rss_min_kib": 57776,
+            "rss_max_kib": 57776,
+            "threads": [
+              8
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "tcp": {
+          "held_connections": 256,
+          "all_responses_verified": 256,
+          "hold_seconds": 3,
+          "accept_seconds": 0.3379660667851567,
+          "kernel_held_samples": [
+            {
+              "rss_kib": 65712,
+              "threads": 8,
+              "cpu_ticks": 45,
+              "fds": 1034
+            },
+            {
+              "rss_kib": 65712,
+              "threads": 8,
+              "cpu_ticks": 45,
+              "fds": 1034
+            },
+            {
+              "rss_kib": 65712,
+              "threads": 8,
+              "cpu_ticks": 45,
+              "fds": 1034
+            }
+          ],
+          "transfers": [
+            {
+              "mib_per_second": 86.07970355808304,
+              "seconds": 0.09293712303042412,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 19.38895881175995,
+              "p95_ms": 25.457117706537247
+            },
+            {
+              "mib_per_second": 112.31112977253699,
+              "seconds": 0.07123069651424885,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 14.156102668493986,
+              "p95_ms": 21.23638428747654
+            },
+            {
+              "mib_per_second": 98.76683768368731,
+              "seconds": 0.0809988472610712,
+              "requests": 32,
+              "payload_bytes": 262144,
+              "concurrency": 8,
+              "p50_ms": 13.577241450548172,
+              "p95_ms": 19.580899737775326
+            }
+          ]
+        },
+        "sigterm_seconds": 0.03696059249341488,
+        "metrics": {
+          "sync_attempts": 19,
+          "applied": 1,
+          "unchanged": 18,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 0
+        }
+      },
+      {
+        "version": "optimized",
+        "users": 10000,
+        "trial": 2,
+        "steady": {
+          "seconds": 12.051557628437877,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 29800.0,
+            "rss_min_kib": 29800,
+            "rss_max_kib": 29800,
+            "threads": [
+              2
+            ],
+            "cpu_ticks": 1,
+            "cpu_seconds": 0.01,
+            "one_core_cpu_percent": 0.08297682596980786
+          },
+          "kernel": {
+            "rss_median_kib": 56992.0,
+            "rss_min_kib": 56992,
+            "rss_max_kib": 56992,
+            "threads": [
+              7
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "sigterm_seconds": 0.06432243715971708,
+        "metrics": {
+          "sync_attempts": 16,
+          "applied": 1,
+          "unchanged": 15,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 0
+        }
+      },
+      {
+        "version": "baseline",
+        "users": 10000,
+        "trial": 2,
+        "steady": {
+          "seconds": 12.06146754231304,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 33436.0,
+            "rss_min_kib": 33436,
+            "rss_max_kib": 33436,
+            "threads": [
+              8
+            ],
+            "cpu_ticks": 7,
+            "cpu_seconds": 0.07,
+            "one_core_cpu_percent": 0.5803605552511071
+          },
+          "kernel": {
+            "rss_median_kib": 57204.0,
+            "rss_min_kib": 57204,
+            "rss_max_kib": 57204,
+            "threads": [
+              7
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "sigterm_seconds": 0.032670700922608376,
+        "metrics": {
+          "sync_attempts": 16,
+          "applied": 1,
+          "unchanged": 15,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 0
+        }
+      },
+      {
+        "version": "baseline",
+        "users": 10000,
+        "trial": 3,
+        "steady": {
+          "seconds": 12.076023548841476,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 33424.0,
+            "rss_min_kib": 33424,
+            "rss_max_kib": 33424,
+            "threads": [
+              8
+            ],
+            "cpu_ticks": 7,
+            "cpu_seconds": 0.07,
+            "one_core_cpu_percent": 0.5796610094116247
+          },
+          "kernel": {
+            "rss_median_kib": 57084.0,
+            "rss_min_kib": 57084,
+            "rss_max_kib": 57084,
+            "threads": [
+              7
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "sigterm_seconds": 0.03183769900351763,
+        "metrics": {
+          "sync_attempts": 16,
+          "applied": 1,
+          "unchanged": 15,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 0
+        }
+      },
+      {
+        "version": "optimized",
+        "users": 10000,
+        "trial": 3,
+        "steady": {
+          "seconds": 12.06054536998272,
+          "tick_hz": 100,
+          "runtime": {
+            "rss_median_kib": 29908.0,
+            "rss_min_kib": 29908,
+            "rss_max_kib": 29908,
+            "threads": [
+              2
+            ],
+            "cpu_ticks": 2,
+            "cpu_seconds": 0.02,
+            "one_core_cpu_percent": 0.1658299802078408
+          },
+          "kernel": {
+            "rss_median_kib": 56716.0,
+            "rss_min_kib": 56716,
+            "rss_max_kib": 56716,
+            "threads": [
+              7
+            ],
+            "cpu_ticks": 0,
+            "cpu_seconds": 0.0,
+            "one_core_cpu_percent": 0.0
+          }
+        },
+        "sigterm_seconds": 0.03189242072403431,
+        "metrics": {
+          "sync_attempts": 16,
+          "applied": 1,
+          "unchanged": 15,
+          "failed": 0,
+          "push_resyncs": 0,
+          "recovered": 0
+        }
+      }
+    ],
+    "binary": {
+      "baseline": {
+        "bytes": 6623160,
+        "sha256": "c15e942ad2c001050f2d3111d1ca76c762a0fd45f297b8a2a07663187174b8f6"
+      },
+      "optimized": {
+        "bytes": 3676088,
+        "sha256": "d6a48eddc1fd5a99b42c0b17f30b3f0fd9aee1f84c313f8a38c8c8a77c3fb430"
+      },
+      "singbox": {
+        "bytes": 75759845,
+        "sha256": "4393306b90bb05502fce3b8f1754280f531c0f3ff47df9b1997b7831e3e543d0"
+      }
+    },
+    "wss": {
+      "foreign_node_ignored": true,
+      "burst_messages": 32,
+      "users_per_message": 10000,
+      "rest_authoritative_rotation_verified": true,
+      "connections_after_forced_close": 2,
+      "sigterm_seconds": 0.017044372856616974,
+      "metrics": {
+        "sync_attempts": 4,
+        "applied": 2,
+        "unchanged": 2,
+        "failed": 0,
+        "push_resyncs": 4,
+        "recovered": 0
+      }
+    },
+    "global_hosts_unchanged": true,
+    "result": "PASS",
+    "finished_at": "2026-10-01T20:22:20Z"
+  },
+  "cli_acceptance": {
+    "scope": "US ARM64 executable against isolated HTTPS fixture; no real panel",
+    "checks": [
+      {
+        "name": "executable-help",
+        "result": "PASS"
+      },
+      {
+        "name": "check-without-network-or-kernel",
+        "result": "PASS"
+      },
+      {
+        "name": "cli-https-authenticated-sync-and-kernel-start",
+        "result": "PASS",
+        "kernel_pid": 272536,
+        "token_absent_from_kernel_environment": true,
+        "directory_mode": "0700",
+        "config_mode": "0600"
+      },
+      {
+        "name": "real-vless-client-http-origin",
+        "result": "PASS"
+      },
+      {
+        "name": "304-keeps-existing-kernel",
+        "result": "PASS",
+        "unchanged_pid": 272536
+      },
+      {
+        "name": "same-port-user-rotation-old-denied-new-works",
+        "result": "PASS"
+      },
+      {
+        "name": "unsupported-limit-keeps-active-good-config",
+        "result": "PASS"
+      },
+      {
+        "name": "actual-kernel-crash-recovery",
+        "result": "PASS",
+        "previous_pid": 272839,
+        "recovered_pid": 272989
+      },
+      {
+        "name": "sigterm-reaps-kernel-cleans-config-releases-port",
+        "result": "PASS",
+        "elapsed_seconds": 0.017,
+        "metrics": {
+          "sync_attempts": 9,
+          "applied": 2,
+          "unchanged": 5,
+          "failed": 2,
+          "push_resyncs": 0,
+          "recovered": 1
+        }
+      }
+    ],
+    "started_at": "2026-10-01T20:23:12Z",
+    "observed_runtime_status": [
+      "VmRSS:\t    4636 kB",
+      "Threads:\t2"
+    ],
+    "result": "PASS",
+    "finished_at": "2026-10-01T20:23:21Z",
+    "fixture_requests": {
+      "requests": 18,
+      "not_modified": 12,
+      "auth_rejected": 0
+    }
+  },
+  "fixture_orphan_cleanup": {
+    "result": "PASS",
+    "scope": "owned process session; killed leader leaves child, finally reaps live group",
+    "leader_pid": 272457,
+    "initial_owned_members": [
+      272457,
+      272458
+    ],
+    "remaining_live_members": []
+  },
+  "failed_fixture_runs_preserved": [
+    "tcp-run-01/result.json",
+    "logs/tcp-driver.log",
+    "logs/measure-v2-launch.log"
+  ],
+  "production_panel_acceptance": "UNVERIFIED",
+  "go_rust_comparison": "UNVERIFIED"
+}

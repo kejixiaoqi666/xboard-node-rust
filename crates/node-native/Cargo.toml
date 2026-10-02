@@ -1,0 +1,16 @@
+[package]
+name = "node-native"
+version = "0.1.0"
+edition = "2024"
+license = "MPL-2.0"
+
+[dependencies]
+node-core = { path = "../node-core" }
+arc-swap = "1.9.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "2"
+tokio = { version = "1", features = ["rt", "macros", "net", "io-util", "sync", "time", "signal"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = ["std", "ring", "tls12"] }

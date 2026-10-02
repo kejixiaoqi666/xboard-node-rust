@@ -1,0 +1,81 @@
+name: Build Linux release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release tag (for example v0.1.0-preview.1)'
+        required: true
+        default: v0.1.0-preview.1
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version || github.ref }}
+      - name: Install build tools and pinned Rust
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools python3 binutils shellcheck
+          rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy --component rust-docs
+          rustup target add ${{ matrix.target }} --toolchain 1.98.1
+      - name: Rust and installer checks
+        run: |
+          cargo fmt --all -- --check
+          cargo test --workspace --locked -- --test-threads=1
+          cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+          bash -n install.sh
+          shellcheck install.sh
+      - name: Build static runtime
+        run: cargo build -p node-runtime --target ${{ matrix.target }} --release --locked
+      - name: Package and verify installer lifecycle
+        env:
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          python3 scripts/package_release.py --target ${{ matrix.target }} --version "$RELEASE_VERSION" --binary target/${{ matrix.target }}/release/xboard-node-rust
+          sudo python3 scripts/test_installer.py --binary target/${{ matrix.target }}/release/xboard-node-rust --package dist/xboard-node-rust-linux-${{ matrix.arch }}.tar.gz --checksums dist/SHA256SUMS --output dist/installer-tests-${{ matrix.arch }}.json
+          sudo python3 scripts/test_systemd.py --binary target/${{ matrix.target }}/release/xboard-node-rust --package dist/xboard-node-rust-linux-${{ matrix.arch }}.tar.gz --checksums dist/SHA256SUMS --output dist/systemd-tests-${{ matrix.arch }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  draft:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version || github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Combine checksums and prepare draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          python3 scripts/prepare_release_assets.py artifacts dist
+          gh release create "$RELEASE_VERSION" --draft --prerelease --verify-tag --title "Xboard Node Rust $RELEASE_VERSION" --notes-file RELEASE_NOTES.md
+          gh release upload "$RELEASE_VERSION" dist/*
