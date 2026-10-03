@@ -49,7 +49,27 @@ def dependency_notices(target):
                 files[name] = body
                 notices.append({'path': name, 'sha256': sha(body)})
         if not notices:
-            raise RuntimeError('Missing dependency license: ' + str(identity))
+            # Some crates publish only Cargo's SPDX declaration (notably
+            # proc-macro implementation crates) and omit a license file from
+            # the .crate archive.  The release archive still needs the full
+            # license text, so source the canonical copies installed with the
+            # pinned Rust docs instead of silently dropping the dependency.
+            declared = package.get('license') or ''
+            tokens = set(re.findall(r'MIT|Apache-2\.0', declared))
+            sysroot = Path(command('rustc', '--print', 'sysroot')) / 'share/doc/rust'
+            license_sources = {
+                'MIT': sysroot / 'licenses/MIT.txt',
+                'Apache-2.0': sysroot / 'licenses/Apache-2.0.txt',
+            }
+            if not tokens or any(not license_sources[token].is_file() for token in tokens):
+                raise RuntimeError('Missing dependency license: ' + str(identity))
+            for token in sorted(tokens):
+                source = license_sources[token]
+                name = identity[0] + '-' + identity[1] + '/' + token + '.txt'
+                body = source.read_bytes()
+                files[name] = body
+                notices.append({'path': name, 'sha256': sha(body),
+                                'source': 'Rust toolchain canonical SPDX text'})
         entries.append({'name': identity[0], 'version': identity[1], 'license': package.get('license'), 'notice_files': notices})
     sysroot = Path(command('rustc', '--print', 'sysroot')) / 'share/doc/rust'
     toolchain_files = [sysroot / 'COPYRIGHT.html', sysroot / 'COPYRIGHT-library.html']
