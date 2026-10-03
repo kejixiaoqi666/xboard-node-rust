@@ -208,7 +208,18 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
             {'ip_cidr': ['127.0.0.2/32'], 'outbound': 'block'},
             {'domain': ['proxy.test'], 'outbound': 'upstream'},
         ]
-        wait(lambda: child_ids() != old_children and roundtrip('proxy.test'))
+        def proxy_ready():
+            if child_ids() == old_children:
+                return False
+            with lock:
+                before = len(targets)
+            if not roundtrip('proxy.test'):
+                return False
+            # A transient check/earlier candidate child and a direct echo do
+            # not establish this policy. Require this attempt's SOCKS connect.
+            with lock:
+                return len(targets) > before and targets[-1] == ['127.0.0.1', echo_port]
+        wait(proxy_ready)
         assert parent() == original_pid and targets[-1] == ['127.0.0.1', echo_port]
         assert denied('sub.blocked.test') and denied('private.test')
         assert counts['private-origin-bytes'] == private_bytes_before_block
