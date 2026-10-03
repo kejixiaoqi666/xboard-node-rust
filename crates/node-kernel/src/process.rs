@@ -36,6 +36,11 @@ struct ProcessState {
     child: Option<KernelChild>,
     active: Option<ProcessCandidate>,
     control: Option<UserControl>,
+    // A successful structured traffic barrier is part of this child
+    // lifecycle.  Do not issue the same bounded quiesce request again from
+    // the generic stop path; on a slow embedded worker that would consume
+    // the service manager's whole stop budget before the worker is reaped.
+    quiesced: bool,
 }
 
 const MAX_CANDIDATE_BYTES: usize = 16 * 1024 * 1024;
@@ -206,6 +211,7 @@ impl ProcessKernel {
         }
         state.child = None;
         state.control = None;
+        state.quiesced = false;
         state.active = None;
         Ok(())
     }
@@ -243,29 +249,39 @@ impl ProcessKernel {
         crate::traffic_control::ack(&control.path, snapshot)
     }
     pub fn traffic_quiesce(&self) -> Result<bool, KernelError> {
-        let state = self
+        let mut state = self
             .inner
             .lock()
             .map_err(|_| KernelError::Activate("lock poisoned".into()))?;
+        if state.quiesced {
+            return Ok(true);
+        }
         let control = state
             .control
             .as_ref()
             .ok_or_else(|| KernelError::Activate("traffic control unavailable".into()))?;
         crate::traffic_control::quiesce(&control.path)?;
+        state.quiesced = true;
         Ok(true)
     }
     fn quiesce_before_restart(&self, state: &mut ProcessState) {
+        if state.quiesced {
+            return;
+        }
         if self.config.args.iter().any(|arg| arg == "--traffic-state")
             && state
                 .child
                 .as_mut()
                 .is_some_and(|child| matches!(child.try_wait(), Ok(None)))
             && let Some(control) = &state.control
-            && crate::traffic_control::quiesce(&control.path).is_err()
         {
-            eprintln!(
-                "native final checkpoint unconfirmed; recovery is limited to the last durable checkpoint"
-            );
+            if crate::traffic_control::quiesce(&control.path).is_ok() {
+                state.quiesced = true;
+            } else {
+                eprintln!(
+                    "native final checkpoint unconfirmed; recovery is limited to the last durable checkpoint"
+                );
+            }
         }
     }
     pub fn without_environment(mut self, keys: impl IntoIterator<Item = String>) -> Self {
@@ -593,6 +609,7 @@ impl KernelAdapter for ProcessKernel {
             match control.replace(&previous_digest, &next_digest, &candidate.config_path) {
                 Replacement::Applied => {
                     state.active = Some(candidate);
+                    state.quiesced = false;
                     return Ok(());
                 }
                 Replacement::RestartRequired => {}
@@ -610,6 +627,7 @@ impl KernelAdapter for ProcessKernel {
                     }
                     state.child = None;
                     state.control = None;
+                    state.quiesced = false;
                     return Err(KernelError::Activate(
                         "native update state unavailable; kernel stopped for recovery".into(),
                     ));
@@ -633,6 +651,7 @@ impl KernelAdapter for ProcessKernel {
             }
             state.child = None;
             state.control = None;
+            state.quiesced = false;
         }
         let (child, control) = match self.launch(&candidate) {
             Ok(child) => child,
@@ -667,6 +686,7 @@ impl KernelAdapter for ProcessKernel {
         }
         state.child = Some(child);
         state.control = control;
+        state.quiesced = false;
         state.active = Some(candidate);
         Ok(())
     }
