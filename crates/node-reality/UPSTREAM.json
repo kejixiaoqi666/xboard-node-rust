@@ -27,8 +27,7 @@
     "Tokio AsyncRead/Write without shoes routing/ping trait",
     "Strict Finished content type and length, outer record header/size checks",
     "Bound ciphertext/plaintext buffers; unsupported post-handshake messages fail closed",
-    "Bounded peer TLS1.3 KeyUpdate and requested response; independent secrets/sequence reset, output ordering, async response flush/backpressure"
+    "Bounded peer TLS1.3 KeyUpdate and requested response; independent secrets/sequence reset, output ordering, async response flush/backpressure",
+    "preview.9: configurable bounded write-record budget; server-initiated TLS 1.3 KeyUpdate (not requested), batch-boundary splitting, close-notify budget, shared peer-response rotation, independent receive keys, all-suite/partial-output/backpressure regressions. No timers or new runtime dependencies."
   ]
 }
-
-Local preview.9 adaptation: configurable bounded write-record budget and server-initiated TLS 1.3 KeyUpdate (not requested), batch-boundary splitting, close-notify budget, shared peer-response rotation, independent receive keys, and all-suite/partial-output/backpressure regressions. No timers or new server dependencies.
