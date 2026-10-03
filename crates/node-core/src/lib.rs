@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 mod traffic;
-pub use traffic::{MAX_TRAFFIC_ROWS, TrafficSnapshot};
+pub use traffic::{MAX_TRAFFIC_ROWS, TRAFFIC_QUIESCE_TIMEOUT_SECS, TrafficSnapshot};
 mod activity;
 pub use activity::ActivitySnapshot;
 pub mod reality;

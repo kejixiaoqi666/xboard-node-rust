@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub const MAX_TRAFFIC_ROWS: usize = 512;
+/// Structured shutdown may join handshakes, a SIP003 process group, QUIC and
+/// payload writers before a durable checkpoint. Other control calls stay short.
+pub const TRAFFIC_QUIESCE_TIMEOUT_SECS: u64 = 30;
 
 /// Unacknowledged payload bytes, frozen until the controller durably collects them.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]

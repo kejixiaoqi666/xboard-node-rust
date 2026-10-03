@@ -410,6 +410,52 @@ async fn real_tcp_and_udp_payload_are_counted_once_and_rogue_packets_are_not_bil
 }
 
 #[tokio::test]
+async fn real_udp_receive_accepts_fitting_protocol_buffers_without_truncation_or_false_counting() {
+    let origin = UdpEcho::start(false).await;
+    let env = Environment::new(0, 1, true, None);
+    let channel = env
+        .host
+        .datagram(&env.user(), peer("127.0.0.1"))
+        .await
+        .unwrap();
+    let mut received = [0x9b; 64];
+    channel
+        .send(b"fitting-payload", &origin.target)
+        .await
+        .unwrap();
+    let (len, from) = timeout(Duration::from_secs(2), channel.receive(&mut received))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(&received[..len], b"fitting-payload");
+    assert_eq!(from, origin.target);
+    let before = received;
+    channel.send(&[0x4d; 65], &origin.target).await.unwrap();
+    let error = timeout(Duration::from_secs(2), channel.receive(&mut received))
+        .await
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+    assert_eq!(received, before, "oversized packet was partially copied");
+    channel
+        .send(b"after-rejection", &origin.target)
+        .await
+        .unwrap();
+    let (len, _) = timeout(Duration::from_secs(2), channel.receive(&mut received))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(&received[..len], b"after-rejection");
+    drop(channel);
+    env.assert_traffic(
+        b"fitting-payload".len() + 65 + b"after-rejection".len(),
+        b"fitting-payload".len() + b"after-rejection".len(),
+    );
+    env.assert_empty();
+    origin.finish().await;
+}
+
+#[tokio::test]
 async fn real_vless_udp_transport_header_and_auth_do_not_double_count_host_payload() {
     let origin = UdpEcho::start(true).await;
     let users = Arc::new(ArcSwap::from_pointee(

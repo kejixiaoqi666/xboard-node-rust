@@ -471,12 +471,6 @@ impl UdpSession {
     }
     async fn receive_current(&self, buffer: &mut [u8]) -> io::Result<(usize, Destination)> {
         use futures::StreamExt;
-        if buffer.len() < 65507 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "UDP receive buffer must fit a whole datagram",
-            ));
-        }
         let _read = self.read_lock.lock().await;
         loop {
             let changed = self.changed.notified();
@@ -500,6 +494,15 @@ impl UdpSession {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "oversized remote UDP payload",
+                ));
+            }
+            // Graph returns a complete owned packet. Accept fitting protocol
+            // buffers and reject an actual oversized packet before copying or
+            // counting; never truncate it to the caller's receive capacity.
+            if packet.payload.len() > buffer.len() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "UDP packet exceeds receive buffer",
                 ));
             }
             self.lease()?

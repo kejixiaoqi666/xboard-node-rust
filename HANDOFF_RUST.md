@@ -1,19 +1,40 @@
-# 开发接续入口
+# 开发与交接入口
 
-这是 `xboard-node-rust` 的独立公开源码仓库。先读 [README](README.md)、[安装指南](docs/INSTALL_ZH.md) 和 [迁移清单](docs/RUST_MIGRATION_ZH.md)，再核对当前提交与工作区差异。
+先读 [中文首页](README.md)、[安装指南](docs/INSTALL_ZH.md) 和 [验证入口](docs/VALIDATION_ZH.md)，再核对当前提交、工作区差异和对应版本的 Release 报告。历史 benchmark 只证明它们绑定的历史源码与二进制。
 
-默认服务端路径全部为 Rust，当前支持范围和未完成功能由首页列出。`docs/RUST_*.md` 与 `benchmarks/results/` 保留迁移过程中的历史测量；它们绑定各自的历史源码/二进制，不自动成为新发行版的验收。完整 Go 基线和历史外部内核仍在来源仓库，本仓库不分发该 Go 服务端。
+## 当前结构
 
-检查入口：
+默认服务端由一个 Rust 进程运行控制层与协议数据层。简单配置启动一个节点，fleet 可运行多个面板的固定节点，机器配置可发现、增加与移除节点。每个节点使用独立状态目录与流量队列，整个进程最多 64 个活动节点。
+
+| 模块 | 职责 |
+| --- | --- |
+| node-core / node-panel | 配置与用户、面板 wire、REST/ETag/WS、严格业务 ACK 与观测上报 |
+| node-kernel | 实际候选配置、预检查、内置任务或显式外部程序、热更新与失败恢复 |
+| node-native / node-session | 协议入口、共享限制/计数/预算/取消、控制 socket 与持久快照 |
+| node-vision / node-reality | Vision 与 REALITY 的 TLS/认证实现 |
+| node-extended / node-quic | VMess/AnyTLS、传输与复用；Hysteria2/TUIC |
+| node-outbound | 路由、规则数据、DNS、TCP/UDP 上游与代理链 |
+| node-admin | 原 Go YAML 导入、私密引用、证书、日志与健康设置 |
+| node-runtime | 单节点/fleet/机器入口、证书挂接、生命周期、持久上报与健康汇总 |
+
+来源、许可和修改记录留在各模块内。默认路径不需要 Go、Xray 或外部 sing-box 服务端。外部 SIP003 插件是管理员明确配置的额外程序；官方客户端只用于测试，不随发行包附带。
+
+## 验证和发行
 
 ```bash
-cargo fmt --all -- --check
-cargo test --workspace --locked -- --test-threads=1
-cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo fmt -- --check
+cargo test --workspace --locked -j 2 -- --test-threads=1
+cargo clippy --workspace --all-targets --all-features --locked -j 2 -- -D warnings
 ```
 
-发行入口为 `.github/workflows/release.yml`：按标签 checkout，编译两个 Linux musl 架构，执行安装文件流程及全新 systemd/真实 TCP/TLS 测试，打包许可文件，再创建草稿 Release。人工回读附件、测试与标签 commit 后公开 Release。仓库源码、CI 结果、安装结果、真实面板兼容是不同证据范围。
+发行工作流固定准确源码，在 Linux AMD64/ARM64 分别运行普通回归、严格检查、固定 SHA 官方客户端、静态 musl 构建、35 节点生产入口的 TCP/UDP 与计数检查，以及安装器和 systemd 生命周期。手动 QA 默认不创建 Release，标签流程在所有门通过后创建草稿。
 
-接下来仍需实现和验证限速/设备/IP、真实计费对账、其他协议与路由、多节点和主控制配置持久恢复。不要把 installer 的配置 `--check` 或 systemd active 当作这些业务验收；升级测试里的 fixture 版本只改发行标签、复用同一程序，不能证明任意未来数据迁移。
+发布前核对两架构包内 BUILDINFO 的 commit、源文件与实际 ELF SHA，再核对报告和公开下载。代码测试、模拟面板、真实 Flash 业务和公开文件校验分别记录。不要把 --check、systemd active 或 HTTP 200 当作计费验收。
 
-公开仓库不携带本机 `.Codex` 账本、真实凭据或生产配置。后续执行者应在自己的项目目录记录工作状态，并依据用户当次授权确定部署对象。
+## 保留的边界
+
+当前接口与协议范围见首页，不宣称全部上游字段兼容、公网最大承载量或长期生产稳定性。Cloudflare DNS-01 使用本地 mock，HTTP-01 使用本地 Pebble；它们不能替代生产 DNS/公共 CA 验收。
+
+成功配置快照保存在内存中，进程重启需要重新拉取面板；计数、采集回执和上报队列独立持久保存。没有通用批次去重时，未知上报必须对账；周期存档仍有未保存的强杀/断电尾部窗口。回退程序保留当前计费状态，不回滚已上报流量。
+
+公开仓库不携带本机账本、真实凭据、生产配置或测试客户端。接手者在自己的项目目录记录状态，并沿用当次授权确定远端对象。

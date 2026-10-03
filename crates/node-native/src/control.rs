@@ -106,11 +106,24 @@ pub async fn serve(
                 return Err(Error::Io(error));
             }
         };
+        // Read every packet under the short admission deadline. Only an already
+        // decoded quiesce request gets the structured shutdown allowance.
+        let Ok(Ok(request)) =
+            tokio::time::timeout(Duration::from_secs(2), read_request(&mut socket)).await
+        else {
+            continue;
+        };
+        let seconds = if request.operation == "traffic_quiesce" {
+            node_core::TRAFFIC_QUIESCE_TIMEOUT_SECS
+        } else {
+            2
+        };
         // One serialized operation at a time; digest/status cannot race publication.
         let _ = tokio::time::timeout(
-            Duration::from_secs(2),
+            Duration::from_secs(seconds),
             handle(
                 &mut socket,
+                request,
                 &mut state,
                 &users,
                 &directory,
@@ -122,21 +135,25 @@ pub async fn serve(
     }
 }
 
-async fn handle(
-    socket: &mut UnixStream,
-    state: &mut Candidate,
-    users: &Users,
-    directory: &Path,
-    traffic: &Arc<crate::traffic::Traffic>,
-    quiesce: &Quiesce,
-) -> Result<(), Error> {
+async fn read_request(socket: &mut UnixStream) -> Result<Request, Error> {
     let length = socket.read_u32().await? as usize;
     if length == 0 || length > 64 * 1024 {
         return Err(Error::Protocol);
     }
     let mut payload = vec![0; length];
     socket.read_exact(&mut payload).await?;
-    let request: Request = serde_json::from_slice(&payload).map_err(|_| Error::Protocol)?;
+    serde_json::from_slice(&payload).map_err(|_| Error::Protocol)
+}
+
+async fn handle(
+    socket: &mut UnixStream,
+    request: Request,
+    state: &mut Candidate,
+    users: &Users,
+    directory: &Path,
+    traffic: &Arc<crate::traffic::Traffic>,
+    quiesce: &Quiesce,
+) -> Result<(), Error> {
     if request.operation == "activity" {
         let activity = quiesce.limits.activity();
         let payload = serde_json::to_vec(&serde_json::json!({"capability":"xbord-native-traffic-v1","code":"ok","snapshot":null,"activity":activity})).map_err(|_|Error::Protocol)?;
@@ -370,8 +387,10 @@ mod tests {
             let task = tokio::spawn(async move {
                 let (request, _) = tokio::sync::watch::channel(false);
                 let (_, done) = tokio::sync::watch::channel(0_u8);
+                let request_payload = read_request(&mut server).await?;
                 handle(
                     &mut server,
+                    request_payload,
                     &mut state,
                     &users,
                     &directory.0,

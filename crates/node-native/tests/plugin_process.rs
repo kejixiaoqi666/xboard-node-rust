@@ -55,6 +55,11 @@ fn sip003_fixture_child() {
     let local: SocketAddr = format!("{local_host}:{local_port}").parse().unwrap();
     let path = Path::new(options.get("fixture-report").unwrap());
     let mode = options.get("fixture-mode").unwrap();
+    if mode == "relay-ignore-term" {
+        unsafe {
+            libc::signal(libc::SIGTERM, libc::SIG_IGN);
+        }
+    }
     let mut state = json!({"pid":std::process::id(),"group":unsafe {getpgrp()},"remote_host":remote_host,"remote_port":remote_port,"local_host":local_host,"local_port":local_port,"options":std::env::var("SS_PLUGIN_OPTIONS").unwrap(),"ready":false});
     report(path, &state);
     if mode == "exit-before-ready" {
@@ -180,11 +185,32 @@ async fn assert_cleanup(run: &NativeRun, pid: u32, public_port: u16, private: So
 
 #[tokio::test]
 async fn sip003_environment_private_endpoint_real_payload_readiness_and_stop_cleanup() {
+    relay_case(false).await;
+}
+
+#[tokio::test]
+async fn sip003_quiesce_waits_sigterm_resistant_child_before_final_checkpoint() {
+    relay_case(true).await;
+}
+
+async fn relay_case(ignore_term: bool) {
     let directory = Directory::new("sip003");
     let port = free_port();
-    let (value, path, text) = plugin_config(&directory, port, "relay");
+    let (value, path, text) = plugin_config(
+        &directory,
+        port,
+        if ignore_term {
+            "relay-ignore-term"
+        } else {
+            "relay"
+        },
+    );
     let start = Instant::now();
-    let mut run = NativeRun::start(&value, &directory);
+    let mut run = if ignore_term {
+        NativeRun::start_persistent(&value, &directory)
+    } else {
+        NativeRun::start(&value, &directory)
+    };
     run.ready().await;
     assert!(
         start.elapsed() >= Duration::from_millis(125),
@@ -224,6 +250,27 @@ async fn sip003_environment_private_endpoint_real_payload_readiness_and_stop_cle
         .unwrap();
     assert_eq!(returned, payload);
     assert_traffic(&run, 66000, 66000).await;
+    if ignore_term {
+        let started = Instant::now();
+        let reply = tokio::time::timeout(
+            Duration::from_secs(8),
+            query(&run.control, "traffic_quiesce"),
+        )
+        .await
+        .expect("quiesce did not finish within its bounded cleanup allowance")
+        .unwrap();
+        assert!(
+            started.elapsed() >= Duration::from_secs(2),
+            "fixture did not require the SIGKILL fallback"
+        );
+        assert_eq!(reply["code"], "ok");
+        assert_eq!(reply["quiesced"], true);
+        assert!(
+            !alive(pid),
+            "quiesce acknowledged before reaping the resistant plugin"
+        );
+        assert_persisted_traffic(&directory, 66000, 66000);
+    }
     // Hold the client open: stop must cancel native workers and the external
     // process rather than depending on the client to voluntarily close.
     run.stopped(true).await.unwrap();
