@@ -207,6 +207,11 @@ def matrix(cert, key, reality):
             node.update(tls=1, server_name='localhost', cert_config={
                 'cert_mode': 'file', 'cert_file': str(cert), 'key_file': str(key)})
             outbound['tls'] = {'enabled': True, 'server_name': 'localhost', 'certificate_path': str(cert)}
+            if protocol in ['hysteria2', 'tuic']:
+                # The native QUIC listener advertises h3.  Sing-box otherwise
+                # may omit ALPN on this loopback outbound and reject the peer
+                # before the protocol handshake reaches the Rust server.
+                outbound['tls']['alpn'] = ['h3']
         if extra:
             node.update(extra)
         if client:
