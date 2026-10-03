@@ -27,6 +27,7 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, real
     class Server6(Server):
         address_family = socket.AF_INET6
     servers = [Server(('127.0.0.1', 0), Echo), Server(('127.0.0.1', 0), Echo), Server6(('::1', 0), Echo)]
+    previous_routes = config.get('routes')
     for server in servers: threading.Thread(target=server.serve_forever, daemon=True).start()
 
     @contextlib.contextmanager
@@ -97,6 +98,15 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, real
             else: raise AssertionError('Unauthorized UDP received a response')
         with lock: assert len(observed) == baseline, 'Unauthorized UDP reached origin'
         cases.append('installed-REALITY-UDP-wrong-UUID-denied-before-origin')
+        config['routes'] = [{'match': ['127.0.0.1'], 'action': 'block'}]; run('restart')
+        with client('blocked-route') as (datagram, relay):
+            datagram.sendto(packet(0, 37)[0], relay)
+            try: datagram.recvfrom(65536)
+            except socket.timeout: pass
+            else: raise AssertionError('Blocked REALITY UDP received a response')
+        with lock: assert len(observed) == baseline, 'Blocked REALITY UDP reached origin'
+        cases.append('installed-REALITY-UDP-blocked-route-denied-before-origin-and-not-counted')
+        config['routes'] = previous_routes
         config['flow'] = 'xtls-rprx-vision'; run('restart')
         with client('missing-flow') as (datagram, relay):
             datagram.sendto(packet(0, 37)[0], relay)
@@ -123,12 +133,15 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, real
             'zero_datagram_unverified': 'Pinned Xray SOCKS drops empty datagrams',
             'maximum_datagram_unverified': 'Pinned Xray uses 8192-byte buffers',
             'wrong_uuid_origin_packets': 0, 'vision_required_origin_packets': 0,
+            'blocked_route_origin_packets': 0,
             'expected_payload_bytes_per_direction': expected,
-            'reported_payload_bytes_per_direction': [after[i] - before[i] for i in range(2)],
+            'accounted_payload_bytes_per_direction': [after[i] - before[i] for i in range(2)],
+            'accounting_scope': 'ACKed synthetic panel reports plus durable unsent pending/prepared queue; native counters drained',
             'client_logs_sha256': {label: hashlib.sha256(body.encode()).hexdigest() for label, body in logs.items()}}
     except BaseException:
         for label, body in logs.items(): print('Xray UDP ' + label + ':\n' + body[-16000:])
         raise
     finally:
         config.pop('flow', None)
+        config['routes'] = previous_routes
         for server in servers: server.shutdown(); server.server_close()

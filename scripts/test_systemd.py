@@ -419,7 +419,14 @@ def main():
                 run('stop')
                 book = json.loads((STATE_DIR / 'native-traffic.json').read_text())
                 assert not book['counters'] and book['frozen'] is None, 'Synthetic accepted reports must drain native counters'
-                return [sum(report.get('1', [0, 0])[i] for report in reports) for i in range(2)]
+                outbox = json.loads((STATE_DIR / 'traffic.json').read_text())
+                flight = outbox['flight']
+                assert flight is None or flight['stage'] == 'prepared', 'Ambiguous delivery cannot prove exact accounting'
+                pending = outbox['pending'].get('1', [0, 0])
+                prepared = flight['traffic'].get('1', [0, 0]) if flight else [0, 0]
+                # Graceful stop collects into the durable queue; it does not
+                # send an HTTP request. Include unsent bytes on both snapshots.
+                return [sum(report.get('1', [0, 0])[i] for report in reports) + pending[i] + prepared[i] for i in range(2)]
             reality_exercise(config, run, wait, cases, measurements, node_port, cert, key, USER, temp, args.binary.resolve(), traffic_snapshot)
             run('restart'); wait(lambda: fetch(tls=True))
             udp_roundtrip('vless')

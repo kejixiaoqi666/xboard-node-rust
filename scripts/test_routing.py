@@ -1,6 +1,7 @@
 """Real installed-ELF DNS, routing and SOCKS5 checks, imported by test_systemd."""
 import collections
 import json
+import errno
 import socket
 import socketserver
 import struct
@@ -113,8 +114,16 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
             except OSError:
                 pass
 
-    dns_udp = UDP(('127.0.0.1', 0), DNSUDP)
-    dns_tcp = TCP(dns_udp.server_address, DNSTCP)
+    # Reserve the TCP listener first: a free UDP port can still collide with
+    # an occupied/TIME_WAIT TCP port after the preceding connection tests.
+    for attempt in range(8):
+        dns_tcp = TCP(('127.0.0.1', 0), DNSTCP)
+        try:
+            dns_udp = UDP(dns_tcp.server_address, DNSUDP)
+            break
+        except OSError as error:
+            dns_tcp.server_close()
+            if error.errno != errno.EADDRINUSE or attempt == 7: raise
     socks = TCP(('127.0.0.1', 0), Socks)
     private_origin = TCP(('127.0.0.2', echo_port), PrivateOrigin)
     servers = [dns_udp, dns_tcp, socks, private_origin]
