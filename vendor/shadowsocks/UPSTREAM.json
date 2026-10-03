@@ -8,7 +8,17 @@
     {
       "path": "src/relay/udprelay/aead_2022.rs",
       "original_sha256": "981956d46206211c56e927030458a9162183249609abe0a71c3090099229372f",
-      "reason": "Cache credentials by bytes, use a total ordering consistent with equality, and bound UDP crypto cache to 4096 entries."
+      "reason": "Cache credentials by bytes, use a total ordering consistent with equality, and bound UDP crypto cache to 4096 entries. Initialize UDP padding before encryption to prevent reused/uninitialized buffer disclosure."
+    },
+    {
+      "path": "src/relay/tcprelay/proxy_stream/client.rs",
+      "original_sha256": "a5c9c7a4b3b03e84862fb5922103a926549373976b5f028582e24a50bbfeac74",
+      "reason": "Initialize client TCP padding before encryption rather than exposing uninitialized buffer bytes."
+    },
+    {
+      "path": "src/relay/tcprelay/proxy_stream/protocol/v2.rs",
+      "original_sha256": "c7b642e4c00eaba978c9ba1157c2d139b5ed223889aba76d14e13963addfafeb",
+      "reason": "Initialize request serializer padding before publishing bytes through BufMut."
     }
   ]
 }

@@ -488,9 +488,7 @@ pub fn encrypt_client_payload_aead_2022(
     dst.put_u64(get_now_timestamp());
     dst.put_u16(padding_size as u16);
     if padding_size > 0 {
-        unsafe {
-            dst.advance_mut(padding_size);
-        }
+        dst.resize(dst.len() + padding_size, 0);
     }
     addr.write_to_buf(dst);
     dst.put_slice(payload);
@@ -605,9 +603,7 @@ pub fn encrypt_server_payload_aead_2022(
     dst.put_u64(control.client_session_id);
     dst.put_u16(padding_size as u16);
     if padding_size > 0 {
-        unsafe {
-            dst.advance_mut(padding_size);
-        }
+        dst.resize(dst.len() + padding_size, 0);
     }
     addr.write_to_buf(dst);
     dst.put_slice(payload);

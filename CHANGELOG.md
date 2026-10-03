@@ -5,7 +5,7 @@
 - Add native Shadowsocks TCP/UDP for aes-128-gcm, aes-256-gcm, chacha20-ietf-poly1305 and 2022-blake3-aes-128/256-gcm.
 - Preserve original Go UUID-to-2022-key conversion and reject derived-key collisions; integrate hot users, shared TCP/UDP limits, routing and payload counters.
 - Bound handshake concurrency, UDP queues/associations/peers and replay windows; join datagram writers before final accounting checkpoints.
-- Vendor pinned MIT framing with value-based UDP cache keys and a 4,096-entry cap, retaining source and license notices.
+- Vendor pinned MIT framing with initialized TCP/UDP padding, value-based UDP cache keys and a 4,096-entry cap, retaining source and license notices.
 - Add genuine installed Xray interoperability and independent AEAD negative tests; keep existing protocol and installer regression coverage.
 
 ## v0.1.0-preview.9

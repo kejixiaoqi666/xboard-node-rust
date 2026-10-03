@@ -397,6 +397,15 @@ mod tests {
     use shadowsocks::config::{ServerConfig, ServerType};
 
     fn encrypted(method: Cipher, password: &str, target: Address, packet_id: u64) -> BytesMut {
+        encrypted_payload(method, password, target, packet_id, b"datagram-roundtrip")
+    }
+    fn encrypted_payload(
+        method: Cipher,
+        password: &str,
+        target: Address,
+        packet_id: u64,
+        payload: &[u8],
+    ) -> BytesMut {
         let user = ServerConfig::new(
             ("127.0.0.1", 1),
             user_password(method, password).into_owned(),
@@ -426,7 +435,7 @@ mod tests {
             &target,
             &control,
             &keys,
-            b"datagram-roundtrip",
+            payload,
             &mut encrypted,
         );
         encrypted
@@ -471,6 +480,51 @@ mod tests {
                     crypto_io::decrypt_server_payload(&context(), method, &independent, &mut body)
                         .unwrap();
                 assert_eq!(&body[..size], b"changed-secret");
+            }
+        }
+    }
+    #[test]
+    fn empty_udp_response_padding_never_exposes_reused_buffer_contents() {
+        use aes::{
+            Aes128, Aes256,
+            cipher::{BlockDecrypt, KeyInit},
+        };
+        use shadowsocks::crypto::v2::udp::UdpCipher;
+        for name in ["2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm"] {
+            let method: shadowsocks::crypto::CipherKind = name.parse().unwrap();
+            let key = vec![42; method.key_len()];
+            let mut control = UdpSocketControlData::default();
+            control.server_session_id = 987;
+            control.client_session_id = 777;
+            for packet in 0..20 {
+                control.packet_id = packet;
+                let mut wire = BytesMut::from(vec![0xa5; 2048].as_slice());
+                wire.clear();
+                crypto_io::encrypt_server_payload(
+                    &context(),
+                    method,
+                    &key,
+                    &Address::SocketAddress("127.0.0.1:53".parse().unwrap()),
+                    &control,
+                    b"",
+                    &mut wire,
+                );
+                let (header, body) = wire.split_at_mut(16);
+                let mut block = aes::Block::default();
+                block.copy_from_slice(header);
+                if name.contains("aes-128") {
+                    Aes128::new_from_slice(&key)
+                        .unwrap()
+                        .decrypt_block(&mut block);
+                } else {
+                    Aes256::new_from_slice(&key)
+                        .unwrap()
+                        .decrypt_block(&mut block);
+                }
+                header.copy_from_slice(&block);
+                assert!(UdpCipher::new(method, &key, 987).decrypt_packet(&header[4..16], body));
+                let padding = u16::from_be_bytes([body[17], body[18]]) as usize;
+                assert!(body[19..19 + padding].iter().all(|byte| *byte == 0));
             }
         }
     }
@@ -538,9 +592,11 @@ mod tests {
             let origin = UdpSocket::bind("127.0.0.1:0").await.unwrap();
             let target = origin.local_addr().unwrap();
             let echo = tokio::spawn(async move {
-                let mut buffer = [0; 4096];
-                let (size, peer) = origin.recv_from(&mut buffer).await.unwrap();
-                origin.send_to(&buffer[..size], peer).await.unwrap();
+                let mut buffer = [0; 8192];
+                for _ in 0..3 {
+                    let (size, peer) = origin.recv_from(&mut buffer).await.unwrap();
+                    origin.send_to(&buffer[..size], peer).await.unwrap();
+                }
             });
             let listener = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
             let bind = listener.local_addr().unwrap();
@@ -562,33 +618,47 @@ mod tests {
             .await
             .unwrap();
             let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-            let body = encrypted(method, "user-first-key", Address::SocketAddress(target), 1);
-            client.send_to(&body, bind).await.unwrap();
-            let mut response = vec![0; 65536];
-            let (size, _) =
-                tokio::time::timeout(Duration::from_secs(5), client.recv_from(&mut response))
-                    .await
-                    .unwrap()
-                    .unwrap();
-            let key = ServerConfig::new(
-                ("127.0.0.1", 1),
-                user_password(method, "user-first-key").into_owned(),
-                method.name().parse().unwrap(),
-            )
-            .unwrap();
-            let (size, from, _) = crypto_io::decrypt_server_payload(
-                &context(),
-                key.method(),
-                key.key(),
-                &mut response[..size],
-            )
-            .unwrap();
-            assert_eq!(from, Address::SocketAddress(target));
-            assert_eq!(&response[..size], b"datagram-roundtrip");
+            for (index, payload) in [vec![], b"datagram-roundtrip".to_vec(), vec![42; 8000]]
+                .iter()
+                .enumerate()
+            {
+                let body = encrypted_payload(
+                    method,
+                    "user-first-key",
+                    Address::SocketAddress(target),
+                    index as u64 + 1,
+                    payload,
+                );
+                client.send_to(&body, bind).await.unwrap();
+                let mut response = vec![0; 65536];
+                let (size, _) =
+                    tokio::time::timeout(Duration::from_secs(5), client.recv_from(&mut response))
+                        .await
+                        .unwrap()
+                        .unwrap();
+                let key = ServerConfig::new(
+                    ("127.0.0.1", 1),
+                    user_password(method, "user-first-key").into_owned(),
+                    method.name().parse().unwrap(),
+                )
+                .unwrap();
+                let (size, from, _) = crypto_io::decrypt_server_payload(
+                    &context(),
+                    key.method(),
+                    key.key(),
+                    &mut response[..size],
+                )
+                .unwrap();
+                assert_eq!(from, Address::SocketAddress(target));
+                assert_eq!(&response[..size], payload);
+            }
             echo.await.unwrap();
             handle.shutdown().await.unwrap();
             assert!(UdpSocket::bind(bind).await.is_ok());
-            assert_eq!(traffic.snapshot().unwrap().unwrap().traffic["7"], [18, 18]);
+            assert_eq!(
+                traffic.snapshot().unwrap().unwrap().traffic["7"],
+                [8018, 8018]
+            );
         }
     }
     #[tokio::test]

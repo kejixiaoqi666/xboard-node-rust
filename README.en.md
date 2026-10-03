@@ -70,7 +70,9 @@ TCP and UDP bind the same port; permit both in your firewall. No TLS/REALITY/Vis
 
 Bounds: 64 simultaneous TCP handshakes with a 10-second deadline; 65,536 TCP salt entries retained for 120 seconds; 65,536 traditional UDP salts retained for 60 seconds; a 1,024-packet 2022 UDP reordering window with at most 4,096 session records retained for 120 idle seconds. Full replay caches reject new entries rather than evict unexpired ones. UDP has at most 1,024 active associations, 64 targets each, an 8 MiB global allocation budget for queued/in-flight packets and eight queue slots per association. Associations expire after 60 idle seconds. The **encrypted datagram** must fit 65,507 bytes, leaving a smaller plaintext maximum. These are resource limits, not measured capacity. Replay state is process-local and time-bounded.
 
-2022 ChaCha, legacy stream ciphers, SIP003 plugins and other transports remain unsupported. The pinned MIT `shadowsocks-rust` framing library retains provenance. Its UDP cipher cache is patched to compare key contents across hot reloads, with a 4,096-entry cap; see [UPSTREAM.json](vendor/shadowsocks/UPSTREAM.json).
+2022 ChaCha, legacy stream ciphers, SIP003 plugins and other transports remain unsupported. The pinned MIT `shadowsocks-rust` framing library retains provenance. Its UDP cipher cache is patched to compare key contents across hot reloads, with a 4,096-entry cap. TCP/UDP padding is initialized before encryption to avoid exposing old buffer contents. See [UPSTREAM.json](vendor/shadowsocks/UPSTREAM.json).
+
+Shadowsocks acceptance uses the same pinned official Xray client against the installed Rust ELF for all five methods: multiframe TCP, IPv4/domain/IPv6 UDP, fragmented fixed headers, wrong TCP/UDP passwords and exact payload accounting across stop. Independent AEAD packets cover replay, bad tags and blocked routes; hot-user updates preserve process IDs. Library regressions cover empty/8,000-byte UDP payloads, initialized reused-buffer padding and reassignment of the same credential to a new user.
 
 ## Configure Vision
 

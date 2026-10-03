@@ -275,9 +275,7 @@ fn make_first_packet_buffer(method: CipherKind, addr: &Address, buf: &[u8]) -> B
         buffer.put_u16(padding_size as u16);
 
         if padding_size > 0 {
-            unsafe {
-                buffer.advance_mut(padding_size);
-            }
+            buffer.resize(buffer.len() + padding_size, 0);
         }
     }
 

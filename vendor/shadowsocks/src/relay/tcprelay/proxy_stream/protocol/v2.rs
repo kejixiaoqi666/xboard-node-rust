@@ -81,9 +81,7 @@ impl Aead2022TcpRequestHeaderRef<'_> {
 
         buf.put_u16(self.padding_size);
         if self.padding_size > 0 {
-            unsafe {
-                buf.advance_mut(self.padding_size as usize);
-            }
+            buf.put_bytes(0, self.padding_size as usize);
         }
     }
 
