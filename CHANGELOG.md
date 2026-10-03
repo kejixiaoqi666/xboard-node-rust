@@ -1,5 +1,11 @@
 # 更新记录
 
+## v0.1.0-preview.11
+
+- 修复 GitHub 发行列表乱序时，一键安装/更新的 `latest` 选到旧版的问题。分页读取全部发行记录，过滤草稿、非法标签、无发布时间和缺少当前架构附件的记录，再按发布时间及发行 ID 选择。
+- 新增实际安装器函数的乱序、架构过滤、无有效候选、分页及固定版本分支回归。保留全部 18 项安装生命周期与 88 项服务用例。
+- 保留 preview.10 的五种 Shadowsocks TCP/UDP 与其他协议能力；本补丁不扩大协议、性能或生产计费声明。
+
 ## v0.1.0-preview.10
 
 - Add native Shadowsocks TCP/UDP for aes-128-gcm, aes-256-gcm, chacha20-ietf-poly1305 and 2022-blake3-aes-128/256-gcm.

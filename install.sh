@@ -207,16 +207,42 @@ fetch() { curl --fail --silent --show-error --location --retry 3 --connect-timeo
 
 select_version() {
     if [[ $VERSION == latest ]]; then
-        fetch "https://api.github.com/repos/$REPOSITORY/releases?per_page=20" "$WORK/releases.json"
-        VERSION=$(python3 - "$WORK/releases.json" "$ARCH" <<'PY'
+        local page=1 count
+        printf '[]\n' > "$WORK/releases.json"
+        while :; do
+            fetch "https://api.github.com/repos/$REPOSITORY/releases?per_page=100&page=$page" "$WORK/releases-page.json"
+            count=$(python3 - "$WORK/releases.json" "$WORK/releases-page.json" <<'PY'
 import json, sys
 items = json.load(open(sys.argv[1]))
+page = json.load(open(sys.argv[2]))
+if not isinstance(page, list):
+    sys.exit('发行列表响应格式错误')
+items.extend(page)
+with open(sys.argv[1], 'w') as out:
+    json.dump(items, out)
+print(len(page))
+PY
+            )
+            (( count < 100 )) && break
+            (( page += 1 ))
+        done
+        VERSION=$(python3 - "$WORK/releases.json" "$ARCH" <<'PY'
+import datetime, json, re, sys
+items = json.load(open(sys.argv[1]))
 required = {'SHA256SUMS', 'xboard-node-rust-linux-' + sys.argv[2] + '.tar.gz'}
+choices = []
 for release in items:
-    if not release.get('draft') and required <= {x['name'] for x in release.get('assets', [])}:
-        print(release['tag_name']); break
-else:
+    if release.get('draft') or not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9][A-Za-z0-9.-]*)?', release.get('tag_name', '')) or not required <= {x['name'] for x in release.get('assets', [])}:
+        continue
+    try:
+        published = datetime.datetime.fromisoformat(release.get('published_at', '').replace('Z', '+00:00'))
+    except (AttributeError, TypeError, ValueError):
+        continue
+    if published.tzinfo is not None:
+        choices.append((published, release.get('id', 0), release['tag_name']))
+if not choices:
     sys.exit('没有此架构的可下载发行版')
+print(max(choices)[2])
 PY
         )
     fi

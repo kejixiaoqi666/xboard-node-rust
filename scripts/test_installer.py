@@ -57,6 +57,45 @@ def main():
     cases = []
     with tempfile.TemporaryDirectory(prefix='xbr-install-test-') as temp:
         temp = Path(temp)
+        # Execute the installer's actual function against a captured-style API
+        # fixture; never assume GitHub's array order represents publication order.
+        selector = 'select_version() {\n' + (ROOT / 'install.sh').read_text().split('select_version() {\n', 1)[1].split('\nprepare_package()', 1)[0]
+        fixture = temp / 'release-list.json'
+        page_two = temp / 'release-list-page-two.json'
+        def select(items, arch='amd64', success=True, second_page=None, version='latest'):
+            fixture.write_text(json.dumps(items))
+            page_two.write_text(json.dumps(second_page or []))
+            env = dict(os.environ, VERSION=version, ARCH=arch, WORK=str(temp),
+                       FIXTURE=str(fixture), FIXTURE_PAGE_TWO=str(page_two), REPOSITORY='fixture/only')
+            source = ('set -euo pipefail\nfetch() { [[ $VERSION == latest ]] || exit 9; case "$1" in *"&page=1") cp -- "$FIXTURE" "$2" ;; *) cp -- "$FIXTURE_PAGE_TWO" "$2" ;; esac; }\n'
+                      'fail() { printf "%s\\n" "$*" >&2; exit 1; }\n' + selector +
+                      '\nselect_version\nprintf "%s\\n" "$VERSION"\n')
+            proc = subprocess.run(['bash', '-c', source], env=env, capture_output=True, text=True, timeout=15)
+            assert (proc.returncode == 0) == success, proc.stdout + proc.stderr
+            return proc.stdout.strip()
+        def published(tag, day, arches=('amd64', 'arm64'), draft=False, identifier=1):
+            return dict(tag_name=tag, published_at=f'2026-10-{day:02d}T12:00:00Z', id=identifier, draft=draft,
+                        assets=[{'name': name} for name in ['SHA256SUMS', *('xboard-node-rust-linux-' + a + '.tar.gz' for a in arches)]])
+        old, new = published('v0.1.0-preview.9', 2), published('v0.1.0-preview.10', 3)
+        assert select([old, new]) == select([new, old]) == 'v0.1.0-preview.10'
+        cases.append('latest-release-ignores-API-array-order-and-numeric-tag-lexical-order')
+        excluded = [published('v0.1.0-preview.12', 5, draft=True), published('v0.1.0-preview.11', 4, arches=('arm64',)), old, new]
+        assert select(excluded) == 'v0.1.0-preview.10'
+        assert select(excluded, 'arm64') == 'v0.1.0-preview.11'
+        cases.append('latest-release-skips-draft-and-missing-architecture')
+        malformed = published('v0.1.0-preview.13', 6)
+        malformed['published_at'] = 'invalid'
+        assert select([malformed, new]) == 'v0.1.0-preview.10'
+        select([malformed, excluded[0]], success=False)
+        assert select([new, published('v0.1.0-preview.11', 3, identifier=2)]) == 'v0.1.0-preview.11'
+        cases.append('latest-release-rejects-unpublished-list-and-breaks-publication-ties-by-ID')
+        invalid_tag = published('../untrusted', 7)
+        assert select([invalid_tag, new]) == 'v0.1.0-preview.10'
+        assert select([old] * 100, second_page=[new]) == 'v0.1.0-preview.10'
+        cases.append('latest-release-scans-all-pages-and-skips-invalid-tag')
+        assert select([], version='v0.1.0-preview.10') == 'v0.1.0-preview.10'
+        select([], version='../invalid', success=False)
+        cases.append('explicit-version-skips-release-discovery-and-validates-tag')
         target = temp / 'root'
         token = temp / 'token'
         token.write_text('installer fixture "$\\quoted token\' Unicode-Ω')

@@ -68,7 +68,7 @@ ARM64 改用 `xboard-node-rust-linux-arm64.tar.gz`。归档在解压前校验，
 ```bash
 xboard-rust                 # 菜单
 xboard-rust configure       # 重新配置；空 token 沿用已有 token
-xboard-rust update          # 最新有本架构文件的已发布版，含预览版
+xboard-rust update          # 分页读取并按发布时间选择兼容版，含预览版
 xboard-rust update --version v0.1.0-preview.6
 xboard-rust rollback        # 上一个程序版本；检查声明的状态格式
 xboard-rust start

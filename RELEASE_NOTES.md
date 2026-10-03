@@ -1,8 +1,14 @@
-# Xboard Node Rust v0.1.0-preview.10
+# Xboard Node Rust v0.1.0-preview.11
 
 新增 **Shadowsocks 原生 Rust TCP/UDP**：传统 AEAD 的 AES-128-GCM、AES-256-GCM、ChaCha20-IETF-Poly1305，以及 2022 BLAKE3-AES-128/256-GCM。客户端按面板节点配置连接，服务端不依赖 Go/Xray 程序。保留此前的 VLESS/Trojan、REALITY、Vision TCP 和安装器。
 
-## 本轮补齐
+## 安装器补丁
+
+修复公开下载核查发现的实际问题：GitHub 发行列表可能不按发布时间排序，旧脚本会默认选到 preview.9。现在分页读取全部记录，先排除草稿、非法标签、无效发布时间和缺少当前架构文件的版本，再按发布时间与发行 ID 选择。固定 `--version` 保持不查列表。
+
+新增五项实际安装器函数回归，覆盖乱序、架构缺失、草稿/无有效候选、第二页和固定版本；两架构各保留全部服务回归。
+
+## 保留 preview.10 的补齐
 
 - 用户密码与原 Go 节点一致；2022 使用 UUID 的 UTF-8 字节截断/零填充后 Base64 转换。派生密钥冲突会拒绝，具体字段见 [中文首页](README.md#shadowsocks-怎么用) / [English](README.en.md#configure-shadowsocks)。
 - 认证、热更新、共享 TCP/UDP 限速、来源 IP 名额、直接/阻断路由、DNS 和持久有效载荷计数接入现有体系。TCP 可使用已有 SOCKS5 上游；UDP 不支持 SOCKS5 上游。
@@ -13,7 +19,7 @@
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/main/install.sh) install
-xboard-rust update --version v0.1.0-preview.10
+xboard-rust update --version v0.1.0-preview.11
 ```
 
 Linux AMD64 / ARM64 的静态 musl 发行包、一键管理脚本、SHA256 校验、第三方许可和安装/systemd 测试报告随发行版提供。Shadowsocks 的 TCP 与 UDP 监听相同端口，防火墙需要放行两者。

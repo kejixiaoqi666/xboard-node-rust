@@ -6,6 +6,8 @@
 
 本项目从 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3) 的迁移工作继续开发，目标是保留原版的使用流程，改进运行架构、配置更新和资源管理。**`v0.1.0-preview.10` 新增 Shadowsocks 原生 Rust TCP/UDP**，覆盖传统 AEAD 三种方法和 2022 AES 两种方法；用户更新、限速、来源 IP 限制、路由和持久计数接入同一套基础能力。保留 VLESS/Trojan、REALITY、Vision TCP 与一键安装管理入口。服务端可以独立运行，完整原版功能仍在迁移。
 
+**当前发行 `v0.1.0-preview.11`** 修复一键安装/更新在 GitHub 发行列表乱序时选到旧版的问题，并保留上述协议能力。
+
 ## 先了解它做什么
 
 如果你已经有 Xboard 面板，这个程序负责 VPS 上的“节点”部分：
@@ -38,7 +40,7 @@ flowchart LR
 bash <(curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/main/install.sh) install
 ```
 
-脚本会自动识别 CPU 架构，选择有对应文件的最新已发布版本（包括预览版），下载并校验发行包。随后依次填写：
+脚本会自动识别 CPU 架构，分页读取发行记录，按发布时间选择有对应文件的最新已发布版本（包括预览版），下载并校验发行包。随后依次填写：
 
 | 输入项 | 怎么填 |
 | --- | --- |
@@ -309,7 +311,7 @@ SOCKS5 服务器目前必须填写 IP；`settings` 可同时添加 `username` �
 
 此发行版构建流程分别编译 AMD64/ARM64，验证包校验、文件权限、配置保留、程序切换/回退、异常拒绝和卸载。全新 systemd 安装使用回环模拟面板和真实 TCP/TLS/UDP 回显，覆盖不同目标端口、域名、IPv6、空包和 65,507 字节数据包，并计时验证两条连接的双向共享限速、IP 名额和不重启的用户策略更新。另使用已公开的 preview.1 实际二进制验证升级及双向回退，核对配置和原生计数身份保留。具体结果与测量随 Release 附带 `installer-tests-*.json` 与 `systemd-tests-*.json`。
 
-文件 TLS 和 REALITY 的 Vision 验收使用固定版本的官方 Xray **客户端**连接实际安装的 AMD64/ARM64 Rust 服务端：普通 TCP、内层 TLS 1.2/1.3、真实 HelloRetryRequest 后的 TLS 1.3、双向 DIRECT 指令与内容一致性、缺 flow/错 UUID 拒绝。还覆盖 512 字节传输缓冲、分片 UUID、类 TLS 尾部和只有 TLS close_notify 的半关闭。REALITY 还验证普通 TLS 探测的固定站点转发、错误短 ID 不连接代理目标、不带 Vision 的 VLESS。本轮还将 ClientHello 拆成六个 TLS 记录，在官方客户端下重复 TCP/Vision、DIRECT/内层 HRR 和认证拒绝矩阵。REALITY UDP 覆盖 IPv4、域名、IPv6、1/37/8,000 字节、错误身份、阻断路由与 Vision flow 拒绝、活跃关联停服及重新连接，并将模拟面板已确认报告与本地待报队列合并，对账每方向 24,188 字节有效载荷。该官方客户端的 SOCKS 层丢弃空包并使用 8,192 字节缓冲，因此这些测试不证明 REALITY 空包或 65,507 字节极限；前述空包/最大包回归属于文件 TLS。每架构附带 18 个安装器案例和 60 个实际 systemd 案例。本轮另使用官方 Xray 完成真实 REALITY 握手，再由仅在回环测试中运行的 TLS 记录适配器注入 3 次外层 KeyUpdate（含 5 记录分片），验证 2 次请求应答及双向各 98,340 字节内容一致；非法更新被拒绝且不连接目标。该结果不等于未经修改的官方客户端主动发出 KeyUpdate。测试密钥只存在于权限受限的临时目录，退出后删除，不进入报告或发行包。另外把服务端阈值设为 16，使用未经修改的官方 Xray 客户端持续回传双向各 262,240 字节；测试旁路只观察记录并原样转发密文，核对至少三次主动轮换、每代上限和完整回传。官方客户端和 Python cryptography 仅供测试，不随服务端包交付，也不是服务端依赖。
+文件 TLS 和 REALITY 的 Vision 验收使用固定版本的官方 Xray **客户端**连接实际安装的 AMD64/ARM64 Rust 服务端：普通 TCP、内层 TLS 1.2/1.3、真实 HelloRetryRequest 后的 TLS 1.3、双向 DIRECT 指令与内容一致性、缺 flow/错 UUID 拒绝。还覆盖 512 字节传输缓冲、分片 UUID、类 TLS 尾部和只有 TLS close_notify 的半关闭。REALITY 还验证普通 TLS 探测的固定站点转发、错误短 ID 不连接代理目标、不带 Vision 的 VLESS。本轮还将 ClientHello 拆成六个 TLS 记录，在官方客户端下重复 TCP/Vision、DIRECT/内层 HRR 和认证拒绝矩阵。REALITY UDP 覆盖 IPv4、域名、IPv6、1/37/8,000 字节、错误身份、阻断路由与 Vision flow 拒绝、活跃关联停服及重新连接，并将模拟面板已确认报告与本地待报队列合并，对账每方向 24,188 字节有效载荷。该官方客户端的 SOCKS 层丢弃空包并使用 8,192 字节缓冲，因此这些测试不证明 REALITY 空包或 65,507 字节极限；前述空包/最大包回归属于文件 TLS。每架构附带 23 个安装器案例和 88 个实际 systemd 案例，包含分页及乱序发行列表选择。本轮另使用官方 Xray 完成真实 REALITY 握手，再由仅在回环测试中运行的 TLS 记录适配器注入 3 次外层 KeyUpdate（含 5 记录分片），验证 2 次请求应答及双向各 98,340 字节内容一致；非法更新被拒绝且不连接目标。该结果不等于未经修改的官方客户端主动发出 KeyUpdate。测试密钥只存在于权限受限的临时目录，退出后删除，不进入报告或发行包。另外把服务端阈值设为 16，使用未经修改的官方 Xray 客户端持续回传双向各 262,240 字节；测试旁路只观察记录并原样转发密文，核对至少三次主动轮换、每代上限和完整回传。官方客户端和 Python cryptography 仅供测试，不随服务端包交付，也不是服务端依赖。
 
 Shadowsocks 验收使用同一固定官方 Xray 客户端连接实际安装的 Rust 服务端，逐一核对五种加密方式的多帧 TCP、UDP IPv4/域名/IPv6、分段固定头、错误 TCP/UDP 密码拒绝与停止后的有效载荷字节对账。独立 AEAD 报文还覆盖重放、坏标签和路由阻断，热换用户核对进程 PID 保持。库层回归覆盖空/8,000 字节 UDP、旧缓冲区填充泄露和同一凭据转给新用户后的计数归属。
 
