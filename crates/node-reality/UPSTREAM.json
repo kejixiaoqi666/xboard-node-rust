@@ -26,6 +26,7 @@
     "Removed debug/trace logs including key-schedule bytes",
     "Tokio AsyncRead/Write without shoes routing/ping trait",
     "Strict Finished content type and length, outer record header/size checks",
-    "Bound ciphertext/plaintext buffers; unsupported post-handshake messages fail closed"
+    "Bound ciphertext/plaintext buffers; unsupported post-handshake messages fail closed",
+    "Bounded peer TLS1.3 KeyUpdate and requested response; independent secrets/sequence reset, output ordering, async response flush/backpressure"
   ]
 }

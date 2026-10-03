@@ -146,9 +146,7 @@ where
 
     /// Drain all pending TLS writes to the underlying stream
     ///
-    /// Note: This is used for best-effort draining (e.g., sending alerts on error).
-    /// WriteZero is not treated as fatal here since the caller may want to continue
-    /// even if some writes fail.
+    /// Callers sending alerts may ignore the result; normal I/O propagates it.
     fn drain_all_writes(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         while self.session.wants_write() {
             match self.write_tls_direct(cx) {
@@ -160,6 +158,20 @@ where
                 }
                 Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
                 Poll::Pending => return Poll::Pending,
+            }
+        }
+        Poll::Ready(Ok(()))
+    }
+
+    fn flush_read_response(&mut self, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.drain_all_writes(cx) {
+            Poll::Ready(Ok(())) => {}
+            result => return result,
+        }
+        if self.need_flush {
+            match Pin::new(&mut self.io).poll_flush(cx) {
+                Poll::Ready(Ok(())) => self.need_flush = false,
+                result => return result,
             }
         }
         Poll::Ready(Ok(()))
@@ -193,7 +205,7 @@ where
         // application is waiting only for input. Drain before further reads
         // so a peer cannot grow output while the socket is backpressured.
         if this.state.writeable() {
-            match this.drain_all_writes(cx) {
+            match this.flush_read_response(cx) {
                 Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                 Poll::Pending => return Poll::Pending,
                 Poll::Ready(Ok(())) => {}
@@ -219,7 +231,7 @@ where
                         return Poll::Ready(Err(e));
                     }
                     if this.state.writeable() {
-                        match this.drain_all_writes(cx) {
+                        match this.flush_read_response(cx) {
                             Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
                             Poll::Pending => return Poll::Pending,
                             Poll::Ready(Ok(())) => {}
@@ -274,7 +286,16 @@ where
                         }
                         Ok(_) => {
                             // Got data, process and wake to retry
-                            let _ = this.session.process_new_packets();
+                            if let Err(error) = this.session.process_new_packets() {
+                                return Poll::Ready(Err(error));
+                            }
+                            if this.state.writeable() {
+                                match this.flush_read_response(cx) {
+                                    Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                                    Poll::Pending => return Poll::Pending,
+                                    Poll::Ready(Ok(())) => {}
+                                }
+                            }
                             cx.waker().wake_by_ref();
                             Poll::Pending
                         }

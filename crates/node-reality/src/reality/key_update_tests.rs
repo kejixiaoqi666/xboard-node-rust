@@ -236,3 +236,115 @@ fn requests_coalesce_before_write_and_close_uses_updated_key() {
     );
     assert!(wire.is_empty());
 }
+
+struct BufferedIo {
+    input: io::Cursor<Vec<u8>>,
+    buffered: Vec<u8>,
+    flushed: Vec<u8>,
+    flush_pending: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    write_mode: std::sync::Arc<std::sync::atomic::AtomicU8>, // 0 normal, 1 Pending, 2 WriteZero
+    reads: usize,
+}
+impl tokio::io::AsyncRead for BufferedIo {
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        self.reads += 1;
+        if self.input.position() == self.input.get_ref().len() as u64 {
+            return std::task::Poll::Pending;
+        }
+        let n = self.input.read(buf.initialize_unfilled())?;
+        buf.advance(n);
+        std::task::Poll::Ready(Ok(()))
+    }
+}
+impl tokio::io::AsyncWrite for BufferedIo {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<io::Result<usize>> {
+        match self.write_mode.load(std::sync::atomic::Ordering::SeqCst) {
+            1 => std::task::Poll::Pending,
+            2 => std::task::Poll::Ready(Ok(0)),
+            _ => {
+                let n = buf.len().min(3);
+                self.buffered.extend_from_slice(&buf[..n]);
+                std::task::Poll::Ready(Ok(n))
+            }
+        }
+    }
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        if self.flush_pending.load(std::sync::atomic::Ordering::SeqCst) {
+            return std::task::Poll::Pending;
+        }
+        let bytes = std::mem::take(&mut self.buffered);
+        self.flushed.extend(bytes);
+        std::task::Poll::Ready(Ok(()))
+    }
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<io::Result<()>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+}
+
+#[test]
+fn read_only_stream_flushes_update_response_without_application_write() {
+    use std::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+    use tokio::io::AsyncRead;
+    let cs = CipherSuite::AES_128_GCM_SHA256;
+    for mode in 0..3 {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, AtomicU8, Ordering},
+        };
+        let flush_pending = Arc::new(AtomicBool::new(true));
+        let write_mode = Arc::new(AtomicU8::new(mode));
+        let io = BufferedIo {
+            input: io::Cursor::new(record(cs, &secret(cs, 0), 0, &[24, 0, 0, 1, 1], 22)),
+            buffered: Vec::new(),
+            flushed: Vec::new(),
+            flush_pending: flush_pending.clone(),
+            write_mode: write_mode.clone(),
+            reads: 0,
+        };
+        let mut stream = crate::CryptoTlsStream::new(io, connection(cs));
+        let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+        let mut out = [0; 1];
+        let result =
+            Pin::new(&mut stream).poll_read(&mut cx, &mut tokio::io::ReadBuf::new(&mut out));
+        if mode == 2 {
+            assert!(matches!(result,Poll::Ready(Err(e)) if e.kind()==io::ErrorKind::WriteZero));
+            continue;
+        }
+        assert!(result.is_pending());
+        assert!(
+            Pin::new(&mut stream)
+                .poll_read(&mut cx, &mut tokio::io::ReadBuf::new(&mut out))
+                .is_pending()
+        );
+        // Emulate a socket becoming writable / the buffered writer waking.
+        write_mode.store(0, Ordering::SeqCst);
+        flush_pending.store(false, Ordering::SeqCst);
+        let result =
+            Pin::new(&mut stream).poll_read(&mut cx, &mut tokio::io::ReadBuf::new(&mut out));
+        assert!(result.is_pending());
+        let (mut io, _) = stream.into_inner();
+        assert_eq!(io.reads, 2);
+        assert_eq!(
+            decrypt_first(cs, &secret(cs, 1), 0, &mut io.flushed),
+            (22, vec![24, 0, 0, 1, 0])
+        );
+        assert!(io.flushed.is_empty() && io.buffered.is_empty());
+    }
+}
