@@ -124,6 +124,21 @@ async fn read_report(path: &Path) -> Value {
     .await
     .expect("SIP003 child did not write its environment evidence")
 }
+async fn read_ready_report(path: &Path) -> Value {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let state = read_report(path).await;
+            if state["ready"] == true {
+                return state;
+            }
+            // The public bind can be observed by the native readiness probe
+            // before the child atomically publishes its second evidence file.
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("SIP003 child never published its successful public bind")
+}
 fn child_endpoints(value: &Value, public_port: u16, expected_options: &str) -> (u32, SocketAddr) {
     let pid = value["pid"].as_u64().unwrap() as u32;
     assert_eq!(
@@ -175,7 +190,7 @@ async fn sip003_environment_private_endpoint_real_payload_readiness_and_stop_cle
         start.elapsed() >= Duration::from_millis(125),
         "ready was reported before delayed public bind"
     );
-    let state = read_report(&path).await;
+    let state = read_ready_report(&path).await;
     assert_eq!(state["ready"], true);
     let (pid, private) = child_endpoints(&state, port, &text);
     assert!(alive(pid));
