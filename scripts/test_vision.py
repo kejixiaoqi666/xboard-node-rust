@@ -28,7 +28,7 @@ def free_port():
         stream.bind(('127.0.0.1', 0))
         return stream.getsockname()[1]
 
-def exercise(config, run, wait, cases, measurements, node_port, cert, key, user, temp, reality=None):
+def exercise(config, run, wait, cases, measurements, node_port, cert, key, user, temp, reality=None, variant=''):
     binary = Path(os.environ['XRAY_TEST_BINARY'])
     assert binary.is_file()
     version = subprocess.check_output([str(binary), 'version'], text=True).splitlines()[0]
@@ -97,7 +97,7 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
     @contextlib.contextmanager
     def client(label, flow='xtls-rprx-vision', identity=user, short_id=None):
         port = free_port()
-        path = temp / ('xray-' + label + '.json')
+        path = temp / ('xray-' + variant + label + '.json')
         profile = {'log': {'loglevel': 'debug'}, 'inbounds': [{
             'listen': '127.0.0.1', 'port': port, 'protocol': 'socks', 'settings': {'auth': 'noauth', 'udp': False}}],
             'outbounds': [{'protocol': 'vless', 'settings': {'vnext': [{'address': '127.0.0.1', 'port': node_port,
@@ -109,7 +109,7 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
             profile['outbounds'][0]['streamSettings'] = {'network': 'tcp', 'security': 'reality',
                 'realitySettings': dict(reality, **({'shortId': short_id} if short_id else {}))}
         path.write_text(json.dumps(profile))
-        log_path = temp / ('xray-' + label + '.log')
+        log_path = temp / ('xray-' + variant + label + '.log')
         with log_path.open('wb') as output:
             process = subprocess.Popen([str(binary), 'run', '-c', str(path)], stdout=output, stderr=subprocess.STDOUT)
             try:
@@ -163,7 +163,7 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
             if label == 'tls12':
                 assert 'command 2' not in logs[label]
                 assert not re.search(r'XtlsPadding \d+ \d+ 2', logs[label])
-            cases.append('installed-native-' + ('REALITY-' if reality else '') + 'Vision-official-Xray-' + label + '-exact-bytes' + ('-bidirectional-DIRECT' if label in ['tls13','tls13-hrr'] else ''))
+            cases.append('installed-native-' + ('REALITY-' if reality else '') + variant + 'Vision-official-Xray-' + label + '-exact-bytes' + ('-bidirectional-DIRECT' if label in ['tls13','tls13-hrr'] else ''))
         assert hrr_observed[0], 'Fixture did not exercise a real HelloRetryRequest'
         denied_cases = [('missing-flow', '', user, None), ('wrong-uuid', 'xtls-rprx-vision', '00000000-0000-4000-8000-000000000999', None)]
         if reality: denied_cases.append(('wrong-short-id', 'xtls-rprx-vision', user, 'ffffffffffffffff'))
@@ -178,7 +178,7 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
                 except (OSError, EOFError): denied = True
                 assert denied
             with lock: assert accepted[0] == baseline, 'Denied credentials reached origin'
-            cases.append('installed-native-' + ('REALITY-' if reality else '') + 'Vision-' + label + '-denied-before-origin-connect')
+            cases.append('installed-native-' + ('REALITY-' if reality else '') + variant + 'Vision-' + label + '-denied-before-origin-connect')
         if reality:
             config.pop('flow', None); run('restart')
             with client('no-vision', flow='') as port:
@@ -188,8 +188,8 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
                         stream.sendall(body); assert receive(stream, len(body)) == body
                     return True
                 wait(plain)
-            cases.append('installed-native-REALITY-VLESS-without-Vision-exact-bytes')
-        measurements['reality' if reality else 'vision'] = {'client_version': version, 'client_binary_sha256': binary_sha,
+            cases.append('installed-native-REALITY-' + variant + 'VLESS-without-Vision-exact-bytes')
+        measurements[('reality' if reality else 'vision') + ('_' + variant.rstrip('-') if variant else '')] = {'client_version': version, 'client_binary_sha256': binary_sha,
             'client_only': True, 'loopback_only': True, 'payload_bytes_per_case': 32*8195 + len(b"complete-record-before-large-transfer"),
             'client_logs_sha256': {label: hashlib.sha256(body.encode()).hexdigest() for label,body in logs.items()},
             'tls13_client_sent_and_received_direct_command': True,

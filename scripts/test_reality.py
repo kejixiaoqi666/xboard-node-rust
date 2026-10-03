@@ -1,11 +1,14 @@
 """REALITY acceptance on the actual installed Rust ELF, with a local TLS mirror."""
 import json
+import hashlib
+import select
 import socket
 import socketserver
 import ssl
 import subprocess
 import threading
-from test_vision import exercise as vision_exercise
+from test_vision import exercise as vision_exercise, receive
+from test_reality_udp import exercise as udp_exercise
 
 def exercise(config, run, wait, cases, measurements, node_port, cert, key, user, temp, binary):
     keys = json.loads(subprocess.check_output([str(binary), 'generate-reality-keypair'], text=True))
@@ -29,6 +32,33 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
     mirror.tls.set_ecdh_curve('X25519')
     mirror.tls.load_cert_chain(str(cert), str(key))
     threading.Thread(target=mirror.serve_forever, daemon=True).start()
+    fragmented = []
+    class Fragment(socketserver.BaseRequestHandler):
+        def handle(self):
+            self.request.settimeout(20)
+            try:
+                with socket.create_connection(('127.0.0.1', node_port), timeout=20) as upstream:
+                    header = receive(self.request, 5)
+                    body = receive(self.request, int.from_bytes(header[3:5], 'big'))
+                    assert header[0] == 22 and body[0] == 1
+                    pieces = [body[:1], body[1:2], body[2:3], body[3:39], body[39:71], body[71:]]
+                    assert all(pieces) and b''.join(pieces) == body
+                    for piece in pieces:
+                        upstream.sendall(header[:3] + len(piece).to_bytes(2, 'big') + piece)
+                    fragmented.append(hashlib.sha256(body).hexdigest())
+                    upstream.settimeout(20)
+                    peers = {self.request: upstream, upstream: self.request}
+                    while peers:
+                        ready, _, _ = select.select(list(peers), [], [], 20)
+                        if not ready: break
+                        for source in ready:
+                            target = peers[source]; data = source.recv(65536)
+                            if data: target.sendall(data)
+                            else:
+                                target.shutdown(socket.SHUT_WR); del peers[source]
+            except (OSError, EOFError): pass
+    fragment = Mirror(('127.0.0.1', 0), Fragment)
+    threading.Thread(target=fragment.serve_forever, daemon=True).start()
     previous = {k: config.get(k) for k in ['tls', 'tls_settings', 'server_name', 'cert_config', 'flow']}
     try:
         config.pop('cert_config', None)
@@ -50,12 +80,19 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
             return True
         wait(ordinary_tls)
         cases.append('installed-native-REALITY-ordinary-TLS-probe-fixed-mirror-with-trusted-certificate')
-        vision_exercise(config, run, wait, cases, measurements, node_port, cert, key, user, temp,
-            reality={'serverName': 'localhost', 'password': keys['public_key'], 'shortId': '1234567890abcdef', 'fingerprint': 'chrome'})
+        client_settings = {'serverName': 'localhost', 'password': keys['public_key'], 'shortId': '1234567890abcdef', 'fingerprint': 'chrome'}
+        vision_exercise(config, run, wait, cases, measurements, node_port, cert, key, user, temp, reality=client_settings)
+        vision_exercise(config, run, wait, cases, measurements, fragment.server_address[1], cert, key, user, temp,
+            reality=client_settings, variant='fragmented-')
+        assert len(fragmented) >= 8
+        measurements['reality_fragmented'].update(client_hello_record_count=6,
+            actual_fragmented_client_hellos=len(fragmented), handshake_sha256=fragmented)
+        udp_exercise(config, run, wait, cases, measurements, node_port, user, temp, client_settings)
         measurements['reality'].update(fixed_mirror_tls13=True, ordinary_tls_probe_verified=True,
             no_vision_vless_verified=True, wrong_short_id_origin_connects=0)
     finally:
         for name, value in previous.items():
             if value is None: config.pop(name, None)
             else: config[name] = value
+        fragment.shutdown(); fragment.server_close()
         mirror.shutdown(); mirror.server_close()

@@ -12,6 +12,8 @@ use tokio::{
 
 const MAX_RECORD: usize = 16_640;
 const MAX_MIRROR_BYTES: usize = 65_536;
+const MAX_CLIENT_HELLO: usize = 16_384;
+const MAX_HELLO_RECORDS: usize = 16;
 
 async fn record<S: AsyncRead + Unpin>(s: &mut S) -> io::Result<Bytes> {
     let mut header = [0; 5];
@@ -27,6 +29,87 @@ async fn record<S: AsyncRead + Unpin>(s: &mut S) -> io::Result<Bytes> {
     data[..5].copy_from_slice(&header);
     s.read_exact(&mut data[5..]).await?;
     Ok(data.into())
+}
+
+struct ClientHello {
+    // Keep the original record boundaries for the fixed mirror. Authentication
+    // and the TLS transcript use the reassembled handshake, excluding headers.
+    wire: Vec<Bytes>,
+    authentication: Option<Bytes>,
+}
+
+async fn client_hello<S: AsyncRead + Unpin>(s: &mut S) -> io::Result<ClientHello> {
+    let first = record(s).await?;
+    // The usual one-record flight shares Bytes storage; reassembly allocates
+    // a handshake buffer only for fragmented or malformed input.
+    if first[0] == 22 && (1..=3).contains(&first[2]) && first.len() >= 9 && first[5] == 1 {
+        let n = 4 + ((first[6] as usize) << 16) + ((first[7] as usize) << 8) + first[8] as usize;
+        if n <= MAX_CLIENT_HELLO && n == first.len() - 5 {
+            return Ok(ClientHello {
+                authentication: Some(first.clone()),
+                wire: vec![first],
+            });
+        }
+    }
+    let mut wire = vec![first];
+    let mut handshake = Vec::new();
+    loop {
+        let r = wire.last().expect("first record is present");
+        if r[0] != 22 || !(1..=3).contains(&r[2]) {
+            return Ok(ClientHello {
+                wire,
+                authentication: None,
+            });
+        }
+        if handshake.len() + r.len() - 5 > MAX_CLIENT_HELLO {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ClientHello exceeds limit",
+            ));
+        }
+        handshake.extend_from_slice(&r[5..]);
+        if handshake[0] != 1 {
+            return Ok(ClientHello {
+                wire,
+                authentication: None,
+            });
+        }
+        if handshake.len() >= 4 {
+            let n = 4
+                + ((handshake[1] as usize) << 16)
+                + ((handshake[2] as usize) << 8)
+                + handshake[3] as usize;
+            if n > MAX_CLIENT_HELLO {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "ClientHello exceeds limit",
+                ));
+            }
+            if handshake.len() >= n {
+                let authentication = if handshake.len() != n {
+                    None
+                } else if wire.len() == 1 {
+                    Some(wire[0].clone())
+                } else {
+                    let mut data = wire[0][..3].to_vec();
+                    data.extend_from_slice(&(n as u16).to_be_bytes());
+                    data.extend_from_slice(&handshake);
+                    Some(data.into())
+                };
+                return Ok(ClientHello {
+                    wire,
+                    authentication,
+                });
+            }
+        }
+        if wire.len() == MAX_HELLO_RECORDS {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "too many ClientHello records",
+            ));
+        }
+        wire.push(record(s).await?);
+    }
 }
 
 struct Cursor<'a>(&'a [u8]);
@@ -178,7 +261,7 @@ pub(super) async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
 ) -> Result<(), Error> {
     let deadline = Instant::now() + Duration::from_secs(10);
     let accepted = timeout_at(deadline, async {
-        let hello = record(&mut client).await?;
+        let hello = client_hello(&mut client).await?;
         let (host, port) = settings.endpoint().map_err(|_| Error::Config)?;
         let address = host
             .parse::<IpAddr>()
@@ -196,12 +279,16 @@ pub(super) async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
         }
         let mut mirror =
             mirror.ok_or_else(|| Error::Io(io::ErrorKind::ConnectionRefused.into()))?;
-        mirror.write_all(&hello).await?;
+        for r in &hello.wire {
+            mirror.write_all(r).await?;
+        }
         mirror.flush().await?;
         let mut session = RealityServerConnection::new(crate::reality_config(settings)?)?;
-        let valid_name =
-            client_name(&hello).is_some_and(|n| n.eq_ignore_ascii_case(&settings.server_name));
-        if !valid_name || session.validate_client_hello(&hello).is_err() {
+        let authenticated = hello.authentication.as_ref().is_some_and(|h| {
+            client_name(h).is_some_and(|n| n.eq_ignore_ascii_case(&settings.server_name))
+                && session.validate_client_hello(h).is_ok()
+        });
+        if !authenticated {
             return Ok::<_, Error>(Err((client, mirror, Vec::new())));
         }
         let mut records = Vec::new();
@@ -265,9 +352,6 @@ pub(super) async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
     )
     .await
     .map_err(|_| Error::Protocol)??;
-    if request.command != protocol::Command::Tcp {
-        return Err(Error::Unsupported);
-    }
     if let Some(uuid) = request.vision_uuid {
         timeout_at(deadline, stream.flush())
             .await
@@ -312,6 +396,75 @@ mod tests {
         record.extend(body);
         record
     }
+    fn fragment(h: &[u8], cuts: &[usize]) -> Vec<u8> {
+        let mut result = Vec::new();
+        let mut start = 5;
+        for end in cuts.iter().copied().chain(std::iter::once(h.len())) {
+            result.extend_from_slice(&h[..3]);
+            result.extend_from_slice(&((end - start) as u16).to_be_bytes());
+            result.extend_from_slice(&h[start..end]);
+            start = end;
+        }
+        result
+    }
+    #[tokio::test]
+    async fn every_client_hello_split_reassembles_without_consuming_next_record() {
+        let h = hello("localhost");
+        let next = [20, 3, 3, 0, 1, 1];
+        for cut in 6..h.len() {
+            let wire = fragment(&h, &[cut]);
+            let mut input = [wire.as_slice(), &next].concat();
+            let mut reader = input.as_slice();
+            let flight = client_hello(&mut reader).await.unwrap();
+            assert_eq!(flight.authentication.unwrap().as_ref(), h);
+            assert_eq!(flight.wire.concat(), wire);
+            assert_eq!(reader, next);
+            input.clear();
+        }
+        let wire = fragment(&h, &[6, 7, 8, 44, 60]);
+        let flight = client_hello(&mut wire.as_slice()).await.unwrap();
+        assert_eq!(flight.authentication.unwrap().as_ref(), h);
+        assert_eq!(flight.wire.concat(), wire);
+    }
+    #[tokio::test]
+    async fn excessive_hello_length_and_record_count_fail_before_waiting() {
+        let oversized = [22, 3, 1, 0, 4, 1, 0, 64, 1];
+        let error = client_hello(&mut oversized.as_slice()).await.err().unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        let h = hello("localhost");
+        let cuts: Vec<_> = (6..22).collect();
+        let wire = fragment(&h, &cuts);
+        let error = client_hello(&mut wire.as_slice()).await.err().unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    }
+    #[tokio::test]
+    async fn incomplete_hello_remains_cancellable() {
+        let (mut peer, mut inbound) = tokio::io::duplex(64);
+        peer.write_all(&[22, 3, 1, 0, 1, 1]).await.unwrap();
+        assert!(
+            tokio::time::timeout(Duration::from_millis(10), client_hello(&mut inbound))
+                .await
+                .is_err()
+        );
+    }
+    #[tokio::test]
+    async fn trailing_handshake_or_interleaved_record_is_not_authenticated() {
+        let mut h = hello("localhost");
+        h.extend_from_slice(&[2, 0, 0, 0]);
+        let n = h.len() - 5;
+        h[3..5].copy_from_slice(&(n as u16).to_be_bytes());
+        assert!(
+            client_hello(&mut h.as_slice())
+                .await
+                .unwrap()
+                .authentication
+                .is_none()
+        );
+        let wire = [22, 3, 1, 0, 1, 1, 23, 3, 3, 0, 1, 0];
+        let flight = client_hello(&mut wire.as_slice()).await.unwrap();
+        assert!(flight.authentication.is_none());
+        assert_eq!(flight.wire.concat(), wire);
+    }
     #[test]
     fn strict_client_hello_rejects_truncation_and_duplicate_extensions() {
         let h = hello("localhost");
@@ -350,7 +503,7 @@ mod tests {
             .await
             .unwrap();
         let address = listener.local_addr().unwrap();
-        let h = hello("localhost");
+        let h = fragment(&hello("localhost"), &[6, 7, 8, 44, 60]);
         let expected = h.clone();
         let mirror = tokio::spawn(async move {
             let (mut s, _) = listener.accept().await.unwrap();
