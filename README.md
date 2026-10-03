@@ -4,7 +4,7 @@
 
 **用 Rust 重构的 Xboard 节点后端。** 安装在 Linux VPS 上，向 Xboard 面板获取节点配置和用户列表，并提供当前已迁移的代理协议、用户同步和流量统计能力。
 
-本项目从 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3) 的迁移工作继续开发，目标是保留原版的使用流程，改进运行架构、配置更新和资源管理。**`v0.1.0-preview.6`** 增加原生 VLESS REALITY TCP，可搭配 Vision，也保留文件 TLS 下的 Vision TCP：支持填充、去填充和内层 TLS 1.3 的双向直通切换。保留 TCP/UDP、共享限速、来源 IP 限制、路由、自定义 DNS 和 SOCKS5 TCP 上游。Rust 服务端可独立运行，一键安装和管理入口已提供，完整原版功能仍在迁移。
+本项目从 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3) 的迁移工作继续开发，目标是保留原版的使用流程，改进运行架构、配置更新和资源管理。**`v0.1.0-preview.7`** 增加普通 VLESS REALITY UDP 和多记录 ClientHello 认证；REALITY TCP 可搭配 Vision，也保留文件 TLS 下的 Vision TCP：支持填充、去填充和内层 TLS 1.3 的双向直通切换。保留 TCP/UDP、共享限速、来源 IP 限制、路由、自定义 DNS 和 SOCKS5 TCP 上游。Rust 服务端可独立运行，一键安装和管理入口已提供，完整原版功能仍在迁移。
 
 ## 先了解它做什么
 
@@ -65,9 +65,9 @@ xboard-rust
 | VLESS TCP | 已实现；UUID 认证和 TCP 转发 |
 | VLESS TCP + TLS | 已实现；使用本机已有证书与私钥文件 |
 | VLESS Vision TCP | 外层文件 TLS 1.3 或 REALITY，`xtls-rprx-vision`；普通 TCP、内层 TLS 1.2/1.3，TLS 1.3 可双向直通；不含 Vision UDP、mux/XUDP |
-| VLESS REALITY TCP | 已实现；单个 SNI、X25519、短 ID、时间/版本校验、固定目标站点转发；可带或不带 Vision，不支持 REALITY UDP |
+| VLESS REALITY TCP / UDP | TCP 可带或不带 Vision；UDP 使用普通 VLESS，不带 Vision/mux/XUDP。单个 SNI、X25519、短 ID、时间/版本校验、固定站点转发与多记录 ClientHello |
 | Trojan TCP + TLS | 已实现；认证、文件 TLS 和转发 |
-| VLESS / Trojan UDP | 已实现；通过协议连接转发 UDP，支持 IPv4、IPv6、域名解析和文件 TLS |
+| VLESS / Trojan UDP | 已实现；通过协议连接转发 UDP，支持 IPv4、IPv6、域名解析和文件 TLS；普通 VLESS UDP 也支持 REALITY |
 | 路由 | 域名、域名后缀、IPv4/IPv6 CIDR、目标端口/范围、TCP/UDP、来源 IP/端口；按顺序匹配 |
 | 出站 | 直连、阻断、SOCKS5 TCP 上游（可用用户名/密码）；不支持 SOCKS5 UDP 或代理链 |
 | DNS | 默认系统解析；可指定 UDP/TCP DNS、静态 hosts、地址族偏好、超时和共享缓存 |
@@ -93,7 +93,7 @@ VLESS UDP 每个连接使用固定目标；Trojan UDP 一个连接可访问多�
 
 ### 还没有迁完的部分
 
-REALITY UDP、外层 KeyUpdate/PQ/HRR 扩展、Vision UDP、mux/XUDP、VMess、Shadowsocks、AnyTLS、TUIC、Hysteria2、其他传输方式、GeoIP/GeoSite、正则/规则集、其他代理出站、加密 DNS、单进程多节点/多面板、在线 IP 向面板上报和自动 ACME 证书管理仍未完成。**当前不能视作原版的完整替换。**
+REALITY 外层 KeyUpdate/PQ/HRR 扩展、Vision UDP、mux/XUDP、VMess、Shadowsocks、AnyTLS、TUIC、Hysteria2、其他传输方式、GeoIP/GeoSite、正则/规则集、其他代理出站、加密 DNS、单进程多节点/多面板、在线 IP 向面板上报和自动 ACME 证书管理仍未完成。**当前不能视作原版的完整替换。**
 
 未支持的协议和配置会明确拒绝。原生 Rust 模式会执行上述非零用户限制；可选的旧外部内核适配器仍拒绝非零限制，避免没有执行却声称支持。当前 JSON 运行配置与原版 Go `config.yml` 不直接互换。面板已绑定的旧节点不会被安装器自动迁移或停掉。
 
@@ -160,11 +160,11 @@ REALITY 是这一版新增的 VLESS 连接方式，可搭配 Vision。服务端�
 
 `short_id` 接受偶数长度的十六进制字符串（0–16 个字符），或最多 16 个这样的字符串组成的列表；短于 16 字符时向右补零。省略或空字符串表示允许空短 ID。`max_time_diff` 为毫秒，默认 300000，最大 3600000；0 表示关闭时间差检查。可用三字节数组 `min_client_version` / `max_client_version` 限制客户端版本；VPS 和客户端的时间应正确。服务端可省略 `public_key`；若填写则必须对应私钥。
 
-本版的范围是 **VLESS REALITY TCP，带或不带 Vision**。不使用 Vision 时从面板和客户端同时去掉 flow。REALITY 认证后，代理有效载荷继续经过既有的目标路由、共享限速、来源 IP 限制和持久计数；固定目标站点的认证前转发使用同一有界 DNS 解析器，然后直接连接，不走用户的 SOCKS5 规则，也不算入用户代理流量。目标配置变化会更换数据进程并断开连接。
+本版支持 **VLESS REALITY TCP（带或不带 Vision）和普通 VLESS REALITY UDP（不带 Vision/mux/XUDP）**。普通 UDP 必须从面板和客户端同时去掉 flow；配置为 Vision 的用户不会接受普通 UDP。客户端关闭 mux/XUDP，使用固定目标的普通 VLESS UDP。Xray v26.3.27 默认 cone 模式可能转成 XUDP；本项目使用该版本的官方开关 `XRAY_CONE_DISABLED=true xray run -c config.json` 做兼容验收。其他客户端需确认使用普通 VLESS UDP；不能将这个开关当作所有版本、所有客户端通用配置。REALITY 认证后，代理有效载荷继续经过既有的目标路由、共享限速、来源 IP 限制和持久计数；固定目标站点的认证前转发使用同一有界 DNS 解析器，然后直接连接，不走用户的 SOCKS5 规则，也不算入用户代理流量。目标配置变化会更换数据进程并断开连接。
 
-当前要求完整的 ClientHello 在一个 TLS 记录内、目标站点能直接返回非 HRR 的 TLS 1.3 ServerHello；不满足时只能转发目标站点或拒绝，不能作为 REALITY 代理使用。外层 KeyUpdate 等未实现的握手后消息明确拒绝；**内层** TLS HRR 已有实际客户端回归。握手总时限 10 秒，镜像握手最多 16 个记录/64 KiB，认证前转发最长 300 秒；记录和缓冲都有上限，超限关闭。转发由节点连接任务持有，服务停止会一起取消。这些是实现边界，不是承载能力或抗探测证明。
+ClientHello 可以分成最多 16 个 TLS 记录，重组后的握手消息最多 16 KiB；认证使用重组消息，固定目标站点仍收到原始记录。完整单记录走共享缓冲快速路径，未据此宣称整体性能提升。目标站点须直接返回非 HRR 的 TLS 1.3 ServerHello；不满足时只能转发目标站点或拒绝，不能作为 REALITY 代理使用。外层 KeyUpdate 等未实现的握手后消息明确拒绝；**内层** TLS HRR 已有实际客户端回归。握手总时限 10 秒，镜像握手最多 16 个记录/64 KiB，认证前转发最长 300 秒；记录和缓冲都有上限，超限关闭。转发由节点连接任务持有，服务停止会一起取消。这些是实现边界，不是承载能力或抗探测证明。
 
-回退到 preview.5 或更早版本前，需要先把面板和客户端改为对应旧版支持的文件 TLS 或普通 VLESS；只切换程序版本不会自动转换 REALITY 配置。
+回退 preview.6 前应停止使用 REALITY UDP 和多记录 ClientHello 客户端；旧程序不会自动转换这些能力。回退到 preview.5 或更早版本前，需要先把面板和客户端改为对应旧版支持的文件 TLS 或普通 VLESS；只切换程序版本不会自动转换 REALITY 配置。
 
 ## 路由与 DNS 怎么用
 
@@ -273,7 +273,7 @@ SOCKS5 服务器目前必须填写 IP；`settings` 可同时添加 `username` �
 
 此发行版构建流程分别编译 AMD64/ARM64，验证包校验、文件权限、配置保留、程序切换/回退、异常拒绝和卸载。全新 systemd 安装使用回环模拟面板和真实 TCP/TLS/UDP 回显，覆盖不同目标端口、域名、IPv6、空包和 65,507 字节数据包，并计时验证两条连接的双向共享限速、IP 名额和不重启的用户策略更新。另使用已公开的 preview.1 实际二进制验证升级及双向回退，核对配置和原生计数身份保留。具体结果与测量随 Release 附带 `installer-tests-*.json` 与 `systemd-tests-*.json`。
 
-文件 TLS 和 REALITY 的 Vision 验收使用固定版本的官方 Xray **客户端**连接实际安装的 AMD64/ARM64 Rust 服务端：普通 TCP、内层 TLS 1.2/1.3、真实 HelloRetryRequest 后的 TLS 1.3、双向 DIRECT 指令与内容一致性、缺 flow/错 UUID 拒绝。还覆盖 512 字节传输缓冲、分片 UUID、类 TLS 尾部和只有 TLS close_notify 的半关闭。REALITY 还验证普通 TLS 探测的固定站点转发、错误短 ID 不连接代理目标、不带 Vision 的 VLESS。官方客户端不随服务端包交付，也不是服务端依赖。
+文件 TLS 和 REALITY 的 Vision 验收使用固定版本的官方 Xray **客户端**连接实际安装的 AMD64/ARM64 Rust 服务端：普通 TCP、内层 TLS 1.2/1.3、真实 HelloRetryRequest 后的 TLS 1.3、双向 DIRECT 指令与内容一致性、缺 flow/错 UUID 拒绝。还覆盖 512 字节传输缓冲、分片 UUID、类 TLS 尾部和只有 TLS close_notify 的半关闭。REALITY 还验证普通 TLS 探测的固定站点转发、错误短 ID 不连接代理目标、不带 Vision 的 VLESS。本轮还将 ClientHello 拆成六个 TLS 记录，在官方客户端下重复 TCP/Vision、DIRECT/内层 HRR 和认证拒绝矩阵。REALITY UDP 覆盖 IPv4、域名、IPv6、1/37/8,000 字节、错误身份、阻断路由与 Vision flow 拒绝、活跃关联停服及重新连接，并将模拟面板已确认报告与本地待报队列合并，对账每方向 24,188 字节有效载荷。该官方客户端的 SOCKS 层丢弃空包并使用 8,192 字节缓冲，因此这些测试不证明 REALITY 空包或 65,507 字节极限；前述空包/最大包回归属于文件 TLS。每架构附带 18 个安装器案例和 57 个实际 systemd 案例。官方客户端不随服务端包交付，也不是服务端依赖。
 
 重要边界：未落盘的强杀尾部仍可能丢失；周期存档不是断电零丢失保证。上报结果不明时保留队列并暂停该批次，需要与面板记录核对；接口接收确认不等于实际计费数据库已对账。当前测试不证明公网最大吞吐、TCP 极限、长期生产稳定性或与真实面板的完整兼容。
 

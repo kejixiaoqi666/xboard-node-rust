@@ -129,6 +129,7 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, real
         with lock: assert len(observed) == 11 and sum(map(len, observed)) == expected
         cases.append('installed-REALITY-UDP-exact-payload-counters-and-graceful-drain-exclude-framing-and-denied-packets')
         measurements['reality_udp'] = {'client_only': True, 'loopback_only': True,
+            'client_binary_sha256': hashlib.sha256(Path(os.environ['XRAY_TEST_BINARY']).read_bytes()).hexdigest(),
             'flow': '', 'mux': False, 'cone_disabled': True, 'payload_sizes': [1, 37, 8000],
             'zero_datagram_unverified': 'Pinned Xray SOCKS drops empty datagrams',
             'maximum_datagram_unverified': 'Pinned Xray uses 8192-byte buffers',

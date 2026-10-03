@@ -1,31 +1,31 @@
-# Xboard Node Rust v0.1.0-preview.6
+# Xboard Node Rust v0.1.0-preview.7
 
-增加 **原生 Rust VLESS REALITY TCP**，可带或不带 Vision，保留文件 TLS、TCP/UDP、路由/DNS、SOCKS5 TCP、共享限速、来源 IP 名额、持久流量统计和一键安装管理。
+补上 **普通 VLESS REALITY UDP** 和 **多记录 ClientHello 认证**。TCP/Vision、文件 TLS、共享限制、路由/DNS、持久流量统计、一键安装与管理继续保留。
 
 ## 本版变化
 
-- 面板 `tls=2` 和扁平 `tls_settings` 映射到原生 REALITY：X25519 密钥、单个 SNI、短 ID、时间差/客户端版本校验及固定目标站点。生成密钥命令与完整字段说明已加入中英文首页。
-- REALITY + Vision 与不带 Vision 的 VLESS TCP；认证后仍使用原来的用户策略、目标路由和有效载荷计数。普通 TLS/认证失败连接只转发固定站点，不获得代理权限。
-- 同一连接任务持有转发，停止时一起取消；10 秒握手、有限镜像记录和缓冲、最长 300 秒认证前转发，没有分离任务遗留。
-- 采用 shoes 的固定 MIT 源码子集，以 ring/x25519-dalek 处理加密原语。独立审查修复短 ID 日志、握手后消息 panic、外层记录头未校验、Finished 类型/长度和缓冲边界；保留恶意消息与 close_notify 回归。Vision 读写接口不新增逐次堆分配。
-- 双架构实际 systemd 安装使用固定官方 Xray v26.3.27 **客户端**验证 REALITY/文件 TLS、普通 TCP、内层 TLS1.2/1.3、双向 DIRECT、实际内层 HRR、错误 UUID/flow/短 ID 不连接目标、普通 TLS 固定站点转发和无 Vision VLESS。服务端不含或依赖 Xray。
+- 普通 VLESS 的 UDP 使用既有认证、路由、限速、来源 IP 名额和计数。两端移除 flow、关闭 mux/XUDP；Vision UDP 和 mux/XUDP 仍明确拒绝。固定官方 Xray v26.3.27 验收使用 `XRAY_CONE_DISABLED=true`，避免默认 cone 转成 XUDP。
+- ClientHello 可分在最多 16 个 TLS 记录，握手消息最多 16 KiB；重组消息用于认证与 TLS transcript，固定站点收到原始记录边界。握手仍受 10 秒总时限控制；单记录共享缓冲路径避免新增重组拷贝，不宣称整体性能提升。
+- 官方客户端 ClientHello 被实际拆成六个记录，重复普通 TCP、TLS1.2/1.3、双向 DIRECT、真实内层 HRR、缺 flow/错 UUID/短 ID 拒绝和不带 Vision 的矩阵。
+- AMD64/ARM64 实际安装的 Rust ELF 验证 UDP IPv4/域名/IPv6、1/37/8000 字节、错误 UUID、阻断路由、Vision 用户拒绝普通 UDP、活跃关联停服与重连。双向有效载荷各 24188 字节，与模拟面板已确认报告与本地待报队列精确对账，TLS/VLESS/SOCKS 封装和拒绝包不计入。
+- 每架构 18 个安装器和 57 个实际 systemd 案例，保留实际 preview.1 二进制升级及双向回退、配置与原生计数身份校验。服务端保持全 Rust，官方 Xray 仅为测试客户端。
 
 ## 安装与升级
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/main/install.sh) install
 # 已安装：
-xboard-rust update
+xboard-rust update --version v0.1.0-preview.7
 ```
 
-AMD64/ARM64 静态 Linux 包、SHA256SUMS、构建来源、精确第三方许可及安装/systemd JSON 报告随附件提供。字段与限制见[中文首页](https://github.com/kejixiaoqi666/xboard-node-rust)和[English README](https://github.com/kejixiaoqi666/xboard-node-rust/blob/main/README.en.md)。
+提供 AMD64/ARM64 静态 Linux 包、SHA256SUMS、确切源码来源、第三方许可、安装/systemd JSON 报告。详见[中文首页](https://github.com/kejixiaoqi666/xboard-node-rust)和[English README](https://github.com/kejixiaoqi666/xboard-node-rust/blob/main/README.en.md)。
 
 ## 当前边界
 
-仍是预览版。REALITY 外层要求单记录 ClientHello、TLS1.3/X25519 目标、非 HRR 的 ServerHello；外层 KeyUpdate、PQ 扩展、REALITY UDP、Vision UDP、mux/XUDP、其他协议/传输、GeoIP/GeoSite/规则集、加密 DNS、其他代理出站/代理链、SOCKS5 UDP、多节点、在线 IP 上报、自动 ACME 和原 Go YAML 导入仍未迁完。
+仍是预览版。REALITY 外层需要 TLS1.3/X25519 固定站点和非 HRR ServerHello；KeyUpdate/PQ/外层 HRR、Vision UDP、mux/XUDP、其他协议/传输、规则集、加密 DNS、其他代理出站/代理链、SOCKS5 UDP、多节点、在线 IP 上报、ACME、原 Go YAML 导入尚未迁完。
 
-认证前固定站点转发使用有界 DNS 后直接连接，不走用户 SOCKS5 路由、不计入用户有效载荷。DIRECT 仍使用有界 Tokio 复制，不宣称 splice/零拷贝、低 CPU、抗探测效果或最大承载。周期存档不保证强杀/断电尾部零丢失；未知上报与实际面板计费仍需对账，回环测试不代表长期公网稳定性。
+官方 SOCKS 客户端丢弃空包且使用8192字节缓冲，本轮不声称 REALITY 空包/65507字节极限已验证；保留的空包/最大包回归是文件 TLS。认证前固定站点转发不走用户 SOCKS5 路由、不算用户代理流量。DIRECT 仍用有界 Tokio 复制。未证明零拷贝、低 CPU、抗探测、公网最大承载、真实面板计费或长期生产稳定性。周期落盘不保证强杀/断电尾部零丢失。
 
-回退 preview.5 或更早前先将面板和客户端改为旧版支持的 TLS/VLESS；回退 preview.3 或更早还须删除 Vision flow，preview.1/2 还须移除新路由/DNS/出站配置。升级/回退保留当前流量状态，不撤销计费。
+回退 preview.6 前停止 REALITY UDP/多记录 ClientHello；回退 preview.5 或更早还须改为旧版支持的 TLS/VLESS；preview.3 或更早移除 Vision flow，preview.1/2 移除新 DNS/路由/出站配置。升级/回退保留当前流量状态，不撤销计费。
 
-English: Adds native Rust VLESS REALITY TCP with optional Vision, bounded owned mirror forwarding, strict configuration/authentication/TLS record validation, and preserved shared policy/routing/durable counters. Pinned official-client tests cover installed AMD64/ARM64 servers, inner TLS DIRECT/HRR, negative authentication and ordinary fixed-mirror TLS. Full parity, REALITY UDP, outer KeyUpdate/PQ/HRR, zero-copy, anti-probing, WAN capacity and production billing guarantees are not claimed.
+English: Adds ordinary VLESS REALITY UDP without Vision/mux/XUDP and bounded multi-record ClientHello authentication, preserving the mirror's original wire. Official-client installed AMD64/ARM64 tests cover six-record TCP/Vision/DIRECT/inner-HRR, UDP IPv4/domain/IPv6, negative identity/flow/routes, active shutdown/reconnection and exact 24188-byte payload counters per direction. Each architecture includes 18 installer and 57 systemd cases. Zero/maximum REALITY datagrams, full protocol parity, outer KeyUpdate/PQ/HRR, zero-copy, WAN capacity and production billing/stability are not claimed.
