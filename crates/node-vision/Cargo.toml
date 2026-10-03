@@ -5,6 +5,7 @@ edition = "2024"
 license = "MIT"
 
 [dependencies]
+node-reality = { path = "../node-reality" }
 bytes = "1"
 log = "0.4"
 memchr = "2"

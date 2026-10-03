@@ -5,6 +5,8 @@ edition = "2024"
 license = "MPL-2.0"
 
 [dependencies]
+bytes = "1"
+node-reality = { path = "../node-reality" }
 node-vision = { path = "../node-vision" }
 node-core = { path = "../node-core" }
 arc-swap = "1.9.2"

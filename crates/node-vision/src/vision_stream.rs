@@ -156,11 +156,12 @@ where
     /// Create a new VisionStream for server-side (inbound) connections with VLESS response writing
     pub fn new_server(
         tcp: IO,
-        session: CryptoConnection,
+        session: impl Into<CryptoConnection>,
         user_uuid: [u8; 16],
         initial_read_data: &[u8],
     ) -> std::io::Result<Self> {
-        if !matches!(session, rustls::Connection::Server(_)) {
+        let session = session.into();
+        if !session.is_server() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "VisionStream::new_server requires a server-side connection",
@@ -182,8 +183,9 @@ where
     }
 
     /// Create a new VisionStream for client-side connections with VLESS response handling
-    pub fn new_client(tcp: IO, session: CryptoConnection, user_uuid: [u8; 16]) -> Self {
-        if !matches!(session, rustls::Connection::Client(_)) {
+    pub fn new_client(tcp: IO, session: impl Into<CryptoConnection>, user_uuid: [u8; 16]) -> Self {
+        let session = session.into();
+        if !session.is_client() {
             panic!("VisionStream::new_client requires a client-side connection");
         }
 

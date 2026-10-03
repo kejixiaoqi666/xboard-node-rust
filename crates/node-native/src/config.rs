@@ -11,7 +11,11 @@ pub const MAX_CONFIG: usize = 16 * 1024 * 1024;
 #[serde(deny_unknown_fields)]
 pub struct Tls {
     pub enabled: bool,
+    #[serde(default)]
+    pub reality: Option<node_core::reality::Settings>,
+    #[serde(default)]
     pub certificate_path: String,
+    #[serde(default)]
     pub key_path: String,
     #[serde(default)]
     pub server_name: Option<String>,
@@ -127,12 +131,28 @@ pub fn decode(data: &[u8]) -> Result<Candidate, Error> {
     if protocol == Protocol::Trojan && inbound.tls.is_none() {
         return Err(Error::Unsupported);
     }
-    if let Some(tls) = &inbound.tls
-        && (!tls.enabled
-            || !Path::new(&tls.certificate_path).is_absolute()
-            || !Path::new(&tls.key_path).is_absolute())
-    {
-        return Err(Error::Config);
+    if let Some(tls) = &inbound.tls {
+        if !tls.enabled {
+            return Err(Error::Config);
+        }
+        if let Some(reality) = &tls.reality {
+            if protocol != Protocol::Vless
+                || !tls.certificate_path.is_empty()
+                || !tls.key_path.is_empty()
+                || tls
+                    .server_name
+                    .as_deref()
+                    .is_some_and(|s| s != reality.server_name)
+            {
+                return Err(Error::Unsupported);
+            }
+            reality.validate().map_err(|_| Error::Config)?;
+            crate::reality_config(reality)?;
+        } else if !Path::new(&tls.certificate_path).is_absolute()
+            || !Path::new(&tls.key_path).is_absolute()
+        {
+            return Err(Error::Config);
+        }
     }
     let auth = Arc::new(Snapshot::new(protocol, inbound.users)?);
     if auth.has_vision() && inbound.tls.is_none() {
@@ -172,6 +192,9 @@ pub fn tls_config(tls: Option<&Tls>) -> Result<Option<Arc<rustls::ServerConfig>>
     let Some(tls) = tls else {
         return Ok(None);
     };
+    if tls.reality.is_some() {
+        return Ok(None);
+    }
     let cert_data = read_bounded(Path::new(&tls.certificate_path), 1024 * 1024)?;
     let key_data = read_bounded(Path::new(&tls.key_path), 1024 * 1024)?;
     let certificates: Vec<_> = CertificateDer::pem_slice_iter(&cert_data)

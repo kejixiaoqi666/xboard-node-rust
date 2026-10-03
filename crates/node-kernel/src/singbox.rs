@@ -68,6 +68,9 @@ impl SingBoxConfigBuilder {
         supported.server_name = node.server_name.clone();
         if self.native {
             supported.flow = node.flow.clone();
+            if node.tls == 2 {
+                supported.tls_settings = node.tls_settings.clone();
+            }
             supported.routes = node.routes.clone();
             supported.custom_routes = node.custom_routes.clone();
             supported.custom_route_rules = node.custom_route_rules.clone();
@@ -154,18 +157,37 @@ impl SingBoxConfigBuilder {
                 }
                 Some(tls)
             }
+            2 if self.native && node.protocol == "vless" && node.cert_config.is_none() => {
+                let settings: node_core::reality::Settings =
+                    serde_json::from_value(node.tls_settings.clone())
+                        .map_err(|_| KernelError::Invalid("invalid REALITY settings".into()))?;
+                settings
+                    .validate()
+                    .map_err(|_| KernelError::Invalid("invalid REALITY settings".into()))?;
+                if node
+                    .server_name
+                    .as_deref()
+                    .is_some_and(|s| s != settings.server_name)
+                {
+                    return Err(KernelError::Invalid(
+                        "conflicting REALITY server names".into(),
+                    ));
+                }
+                Some(json!({"enabled":true,"server_name":settings.server_name,"reality":settings}))
+            }
             _ => {
                 return Err(KernelError::Invalid(
-                    "unsupported TLS mode; Trojan requires TLS and REALITY is pending".into(),
+                    "unsupported TLS mode or incompatible certificate/REALITY settings".into(),
                 ));
             }
         };
         let flow = node.flow.as_deref().filter(|flow| !flow.is_empty());
         if flow.is_some_and(|flow| flow != "xtls-rprx-vision")
-            || flow.is_some() && (!self.native || node.protocol != "vless" || node.tls != 1)
+            || flow.is_some()
+                && (!self.native || node.protocol != "vless" || !matches!(node.tls, 1 | 2))
         {
             return Err(KernelError::Invalid(
-                "Vision requires native VLESS with file TLS".into(),
+                "Vision requires native VLESS with file TLS or REALITY".into(),
             ));
         }
         let mut ids = std::collections::HashSet::with_capacity(users.len());

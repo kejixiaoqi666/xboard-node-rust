@@ -1,0 +1,29 @@
+{
+  "repository": "https://github.com/cfal/shoes",
+  "commit": "60ed3838b346268615c81e4eace4e15e717da23e",
+  "license": "MIT",
+  "files": {
+    "src/reality/common.rs": "9a7696105e044b431217d81c747f65baccbe6c32cb70ed3f423f84a4f96ea1e2",
+    "src/reality/reality_aead.rs": "a275dee6517656d11280fb51dd65b163c36b1de87a78375d9de9e5c9a8d19ef8",
+    "src/reality/reality_auth.rs": "f8fcf84b556c9c2e5a989c68b7459745c3e2c3262f6cc0639274dbb476c5822d",
+    "src/reality/reality_certificate.rs": "4490cad65e673e60c7551229d37b5c171fd79edd63748635f73337809a4b0801",
+    "src/reality/reality_cipher_suite.rs": "6ce96c015eeed2c0505a8dff2564ee754adb7b9ef926457431efb0c1680a5063",
+    "src/reality/reality_io_state.rs": "7fe887bc6572d72929b2ab6f41a648d4ea949de26eaf57534aa5eedd8940208b",
+    "src/reality/reality_reader_writer.rs": "f6816e299181511af785a12ca89e312d64710f6af04dfb46dadee4f462b350eb",
+    "src/reality/reality_records.rs": "5fb8b42a8e807731a185f1ca5eba722ef6669bbe57a462eab9946568b0ff19ed",
+    "src/reality/reality_server_connection.rs": "2e7359fb98a8edeb1a5067237f72c37e89a4a86a429cfa2ab910ad49266e448b",
+    "src/reality/reality_tls13_keys.rs": "9f527f3e4d610984297fe52a714ecc702b165c5673a321e1433c605e03feedbd",
+    "src/reality/reality_tls13_messages.rs": "4898d5b1d6585c459203a861921bddd4a0e64f5ca23c2150a0e7e8f5d4a9d167",
+    "src/reality/reality_util.rs": "c6d1a7a42615c695c7010b57bcfe6a67bc4b115012904aa2990b1c9b4e8d546d",
+    "src/slide_buffer.rs": "081446c37d5e77f669aa459415dd13f752668e7aa5fdd46c9bf18cc85bce4fb0",
+    "src/buf_reader.rs": "d8814c5b3f178d56b06a770ced6f4f6f75b1d62a507c1de07cbb6fde5b261fff",
+    "src/crypto/crypto_tls_stream.rs": "ca579e68d7702021ee768a13172ebb24b9f941037bc8ee676b975b7e64fbd2c6"
+  },
+  "adaptations": [
+    "Server-only extraction; no external runtime or client stack",
+    "Existing ring crypto provider, x25519-dalek X25519; no hand-written primitive",
+    "Server-name config separated from dial destination",
+    "Removed debug/trace logs including key-schedule bytes",
+    "Tokio AsyncRead/Write without shoes routing/ping trait"
+  ]
+}

@@ -1,0 +1,17 @@
+[package]
+name="node-reality"
+version="0.1.0"
+edition="2024"
+license="MIT"
+[dependencies]
+ring="0.17"
+x25519-dalek={version="2",features=["static_secrets"]}
+rcgen={version="0.14.8",default-features=false,features=["ring"]}
+base64="0.22"
+bytes="1"
+rand="0.9"
+log="0.4"
+subtle="2"
+tokio={version="1",features=["io-util"]}
+[dev-dependencies]
+futures="0.3"

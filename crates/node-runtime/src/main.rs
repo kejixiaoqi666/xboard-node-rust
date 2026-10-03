@@ -19,6 +19,14 @@ fn main() {
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    if args == ["generate-reality-keypair"] {
+        let (private, public) = node_native::generate_reality_keypair()?;
+        println!(
+            "{}",
+            serde_json::json!({"private_key":private,"public_key":public})
+        );
+        return Ok(());
+    }
     if args
         .first()
         .is_some_and(|arg| matches!(arg.as_str(), "run" | "check"))

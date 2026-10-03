@@ -10,6 +10,38 @@ mod network;
 mod os_dns;
 pub mod protocol;
 #[cfg(any(unix, test))]
+mod reality;
+
+pub fn reality_config(
+    s: &node_core::reality::Settings,
+) -> Result<node_reality::RealityServerConfig, Error> {
+    s.validate().map_err(|_| Error::Config)?;
+    let private = node_reality::decode_private_key(&s.private_key).map_err(|_| Error::Config)?;
+    if let Some(public) = &s.public_key
+        && node_reality::decode_public_key(public).map_err(|_| Error::Config)?
+            != node_reality::public_key_from_private(private)
+    {
+        return Err(Error::Config);
+    }
+    Ok(node_reality::RealityServerConfig {
+        private_key: private,
+        short_ids: s
+            .short_id
+            .values()
+            .iter()
+            .map(|v| node_reality::decode_short_id(v).map_err(|_| Error::Config))
+            .collect::<Result<_, _>>()?,
+        server_name: s.server_name.clone(),
+        max_time_diff: (s.max_time_diff != 0).then_some(s.max_time_diff),
+        min_client_version: s.min_client_version,
+        max_client_version: s.max_client_version,
+        cipher_suites: Vec::new(),
+    })
+}
+pub fn generate_reality_keypair() -> std::io::Result<(String, String)> {
+    node_reality::generate_keypair()
+}
+#[cfg(any(unix, test))]
 mod traffic;
 #[cfg(any(unix, test))]
 mod traffic_store;
@@ -161,6 +193,12 @@ async fn serve(
     )?);
     let mut listener =
         Some(TcpListener::bind(SocketAddr::new(initial.base.listen, initial.base.port)).await?);
+    let initial_reality = initial
+        .base
+        .tls
+        .as_ref()
+        .and_then(|t| t.reality.clone())
+        .map(Arc::new);
     let protocol = initial.base.protocol;
     let users: auth::Users = Arc::new(ArcSwap::from(initial.auth.clone()));
     let control_users = Arc::clone(&users);
@@ -185,6 +223,7 @@ async fn serve(
             done: quiesced_rx,
         },
     ));
+    let reality = initial_reality;
     let tls = tls.map(TlsAcceptor::from);
     let limits = Arc::new(limits::Registry::new(Arc::clone(&users)));
     let udp_slots = Arc::new(tokio::sync::Semaphore::new(1024));
@@ -236,6 +275,7 @@ async fn serve(
                 };
                 let users=Arc::clone(&users);
                 let tls=tls.clone();
+                let reality=reality.clone();
                 let traffic=Arc::clone(&traffic);
                 let limits=Arc::clone(&limits);
                 let udp_slots=Arc::clone(&udp_slots);
@@ -243,7 +283,7 @@ async fn serve(
                 connections.spawn(async move {
                     let _=stream.set_nodelay(true);
                     let context=ConnectionContext { users: &users, traffic: &traffic, source, limits: &limits, udp_slots: &udp_slots, network: &network };
-                    if let Some(tls)=tls {
+                    if let Some(reality)=reality {let _=reality::connection(stream,&reality,context).await;} else if let Some(tls)=tls {
                         if let Ok(Ok(stream))=tokio::time::timeout(Duration::from_secs(10),tls.accept(vision::RecordIo::new(stream))).await {
                             let _=connection_tls(stream,protocol,context).await;
                         }

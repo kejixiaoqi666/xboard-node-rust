@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/node-core", "crates/node-panel", "crates/node-kernel", "crates/node-native", "crates/node-vision", "crates/node-runtime"]
+members = ["crates/node-core", "crates/node-panel", "crates/node-kernel", "crates/node-native", "crates/node-vision", "crates/node-reality", "crates/node-runtime"]
 
 [profile.release]
 lto = "thin"

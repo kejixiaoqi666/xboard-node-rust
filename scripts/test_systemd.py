@@ -414,6 +414,8 @@ def main():
             cases.append('installed-native-VLESS-file-TLS-with-verified-certificate')
             from test_vision import exercise as vision_exercise
             vision_exercise(config, run, wait, cases, measurements, node_port, cert, key, USER, temp)
+            from test_reality import exercise as reality_exercise
+            reality_exercise(config, run, wait, cases, measurements, node_port, cert, key, USER, temp, args.binary.resolve())
             run('restart'); wait(lambda: fetch(tls=True))
             udp_roundtrip('vless')
             config['protocol'] = 'trojan'

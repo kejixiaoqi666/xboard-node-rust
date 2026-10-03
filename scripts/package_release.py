@@ -66,6 +66,8 @@ def dependency_notices(target):
         raise RuntimeError('Static musl license notice missing from /usr/share/doc')
     files['vendored/node-vision/LICENSE'] = (ROOT / 'crates/node-vision/LICENSE').read_bytes()
     files['vendored/node-vision/UPSTREAM.json'] = (ROOT / 'crates/node-vision/UPSTREAM.json').read_bytes()
+    files['vendored/node-reality/LICENSE'] = (ROOT / 'crates/node-reality/LICENSE').read_bytes()
+    files['vendored/node-reality/UPSTREAM.json'] = (ROOT / 'crates/node-reality/UPSTREAM.json').read_bytes()
     files['NOTICE_MANIFEST.json'] = (json.dumps({'target': target, 'dependencies': entries,
         'files': [{'path': name, 'sha256': sha(body)} for name, body in sorted(files.items())]}, indent=2) + '\n').encode()
     output = io.BytesIO()

@@ -233,3 +233,26 @@ fn vision_flow_is_retained_and_unsupported_security_modes_never_write_candidates
         assert!(output.is_empty());
     }
 }
+
+#[test]
+fn native_reality_preserves_flat_panel_settings_and_rejects_ambiguous_tls() {
+    let mut node = NodeSpec::new("vless", 443);
+    node.tls = 2;
+    node.flow = Some("xtls-rprx-vision".into());
+    node.tls_settings = serde_json::json!({"private_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","server_name":"example.test","short_id":"1234","dest":"example.test:443"});
+    let users = [user(7, "00000000-0000-4000-8000-000000000007")];
+    let config = SingBoxConfigBuilder::native().build(&node, &users).unwrap();
+    assert_eq!(
+        config["inbounds"][0]["tls"]["reality"]["dest"],
+        "example.test:443"
+    );
+    assert_eq!(
+        config["inbounds"][0]["users"][0]["flow"],
+        "xtls-rprx-vision"
+    );
+    node.server_name = Some("other.test".into());
+    assert!(SingBoxConfigBuilder::native().build(&node, &users).is_err());
+    node.server_name = None;
+    node.tls_settings["unsupported"] = serde_json::json!(true);
+    assert!(SingBoxConfigBuilder::native().build(&node, &users).is_err());
+}
