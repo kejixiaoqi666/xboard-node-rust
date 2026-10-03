@@ -1,6 +1,6 @@
 // Derived from cfal/shoes 60ed3838b346268615c81e4eace4e15e717da23e.
 // Copyright (c) 2021-2023 Alex Lau; MIT license retained in this crate.
-// TLS 1.3 AEAD encryption/decryption using aws-lc-rs.
+// TLS 1.3 AEAD encryption/decryption using ring.
 // Record framing is handled by reality_records.rs.
 
 use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey};
@@ -11,7 +11,7 @@ use super::reality_cipher_suite::CipherSuite;
 
 /// AEAD key for TLS 1.3 encryption/decryption.
 ///
-/// Wraps aws-lc-rs LessSafeKey and provides a cleaner API.
+/// Wraps ring LessSafeKey and provides a cleaner API.
 /// Create once per connection direction and reuse for all records.
 pub struct AeadKey(LessSafeKey);
 

@@ -33,13 +33,14 @@
     }
   ],
   "adaptations": [
-    "Rustls-only crypto adapter; no REALITY or upstream full proxy runtime",
+    "Rustls and narrow local REALITY server crypto adapter; no upstream full proxy runtime",
     "No AsyncPing abstraction; Tokio AsyncRead/AsyncWrite only",
     "Use std::task::ready and rand 0.9",
     "Strict fragmented UUID validation and bounded stream state fixes are local",
     "Separate forwarding from TLS classification, preserving incomplete TLS-like tails",
     "Track authenticated TLS close_notify without waiting for TCP FIN",
     "Retain HelloRetryRequest detection and restrict accepted TLS13 ciphers",
-    "Drain bounded writes on flush and shutdown"
+    "Drain bounded writes on flush and shutdown",
+    "Remove state debug output that could include authentication UUIDs or payload"
   ]
 }

@@ -24,6 +24,8 @@
     "Existing ring crypto provider, x25519-dalek X25519; no hand-written primitive",
     "Server-name config separated from dial destination",
     "Removed debug/trace logs including key-schedule bytes",
-    "Tokio AsyncRead/Write without shoes routing/ping trait"
+    "Tokio AsyncRead/Write without shoes routing/ping trait",
+    "Strict Finished content type and length, outer record header/size checks",
+    "Bound ciphertext/plaintext buffers; unsupported post-handshake messages fail closed"
   ]
 }
