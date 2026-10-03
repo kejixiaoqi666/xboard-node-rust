@@ -3,6 +3,11 @@
 use node_kernel::{EmbeddedLauncher, EmbeddedWorker, KernelError};
 use std::{io, path::Path, time::Duration};
 use tokio::{runtime::Handle, sync::watch, task::JoinHandle};
+
+// A direct embedded stop can enter the same native cleanup path as the
+// structured traffic_quiesce request.  Keep a margin beyond that protocol
+// deadline so the synchronous worker join cannot abort the final checkpoint.
+const EMBEDDED_SHUTDOWN_TIMEOUT_SECS: u64 = node_core::TRAFFIC_QUIESCE_TIMEOUT_SECS + 15;
 pub struct Launcher(pub Handle);
 struct Worker {
     runtime: Handle,
@@ -58,7 +63,12 @@ impl EmbeddedWorker for Worker {
         };
         let _ = self.stop.send(true);
         let wait = async {
-            match tokio::time::timeout(Duration::from_secs(15), &mut task).await {
+            match tokio::time::timeout(
+                Duration::from_secs(EMBEDDED_SHUTDOWN_TIMEOUT_SECS),
+                &mut task,
+            )
+            .await
+            {
                 Ok(Ok(Ok(()))) => Ok(()),
                 Ok(_) => Err(io::Error::other("embedded kernel shutdown failed")),
                 Err(_) => {
