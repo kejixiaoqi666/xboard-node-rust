@@ -189,7 +189,18 @@ pub async fn echo() -> (SocketAddr, watch::Sender<bool>, JoinHandle<()>) {
         loop {
             tokio::select! {
                 _=receiver.changed()=>break,
-                result=listener.accept()=> {let (mut stream,_)=result.unwrap();workers.spawn(async move {let mut bytes=[0;8192];loop {let len=stream.read(&mut bytes).await.unwrap_or(0);if len==0 {return;}if stream.write_all(&bytes[..len]).await.is_err(){return;}}});},
+                result=listener.accept()=> {
+                    let (mut stream, _) = result.unwrap();
+                    workers.spawn(async move {
+                        let mut bytes = [0; 8192];
+                        loop {
+                            let len = stream.read(&mut bytes).await.unwrap_or(0);
+                            if len == 0 || stream.write_all(&bytes[..len]).await.is_err() {
+                                return;
+                            }
+                        }
+                    });
+                },
                 _=workers.join_next(),if !workers.is_empty()=>(),
             }
         }
