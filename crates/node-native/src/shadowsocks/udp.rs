@@ -199,7 +199,9 @@ fn canonical(source: SocketAddr) -> SocketAddr {
     }
     source
 }
-type Key = (SocketAddr, [u8; 32], u64);
+// Credentials can be reassigned to a different panel account by a hot update.
+// Keep that authenticated identity in the association/counter ownership key.
+type Key = (SocketAddr, [u8; 32], u64, Arc<str>);
 struct Association {
     generation: u64,
     sender: mpsc::Sender<Packet>,
@@ -265,7 +267,7 @@ pub(crate) async fn serve(
                     let snapshot=context.users.load_full();
                     let Some(credentials)=snapshot.shadowsocks.as_ref() else {continue;};
                     let Ok(mut decoded)=decrypt(credentials,&buffer[..size],&mut replay) else {continue;};
-                    let key=(canonical(source),*blake3::hash(&decoded.user.key).as_bytes(),decoded.session);
+                    let key=(canonical(source),*blake3::hash(&decoded.user.key).as_bytes(),decoded.session,decoded.user.name.clone());
                     // Decrypted padding can leave retained Vec capacity much
                     // larger than the payload. Bound allocation, not just len.
                     let Ok(permit)=budget.clone().try_acquire_many_owned(decoded.packet.payload.capacity().max(1) as u32) else {continue;};
@@ -279,7 +281,7 @@ pub(crate) async fn serve(
                     let (sender,receiver)=mpsc::channel(8);
                     let _=sender.try_send(decoded.packet);
                     generation=generation.checked_add(1).ok_or(Error::Task)?;
-                    associations.insert(key,Association{generation,sender});
+                    associations.insert(key.clone(),Association{generation,sender});
                     let socket=socket.clone();let context=context.clone();let user=decoded.user;
                     workers.spawn(async move {let _=relay(socket,source,user,method,key.2,receiver,lease,context).await;(key,generation)});
                 }
@@ -587,6 +589,62 @@ mod tests {
             handle.shutdown().await.unwrap();
             assert!(UdpSocket::bind(bind).await.is_ok());
             assert_eq!(traffic.snapshot().unwrap().unwrap().traffic["7"], [18, 18]);
+        }
+    }
+    #[tokio::test]
+    async fn hot_reassigned_key_on_same_source_uses_new_user_counter() {
+        for method in [Cipher::Aes128, Cipher::Aes128V2] {
+            let origin = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            let target = origin.local_addr().unwrap();
+            let echo = tokio::spawn(async move {
+                let mut buffer = [0; 4096];
+                for _ in 0..2 {
+                    let (size, peer) = origin.recv_from(&mut buffer).await.unwrap();
+                    origin.send_to(&buffer[..size], peer).await.unwrap();
+                }
+            });
+            let listener = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+            let bind = listener.local_addr().unwrap();
+            drop(listener);
+            let users: Users = Arc::new(ArcSwap::from(
+                candidate(method, &[("7", "shared-key")]).auth,
+            ));
+            let traffic = Arc::new(Traffic::new("ss-reassign-test".into()));
+            let handle = serve(
+                bind,
+                Context {
+                    limits: Arc::new(limits::Registry::new(users.clone())),
+                    users: users.clone(),
+                    traffic: traffic.clone(),
+                    network: Arc::new(Network::direct()),
+                },
+                Arc::new(Service::new()),
+            )
+            .await
+            .unwrap();
+            let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            let mut buffer = [0; 4096];
+            for packet_id in [1, 2] {
+                if packet_id == 2 {
+                    users.store(candidate(method, &[("8", "shared-key")]).auth);
+                }
+                let packet = encrypted(
+                    method,
+                    "shared-key",
+                    Address::SocketAddress(target),
+                    packet_id,
+                );
+                client.send_to(&packet, bind).await.unwrap();
+                tokio::time::timeout(Duration::from_secs(5), client.recv_from(&mut buffer))
+                    .await
+                    .unwrap()
+                    .unwrap();
+            }
+            handle.shutdown().await.unwrap();
+            echo.await.unwrap();
+            let counters = traffic.snapshot().unwrap().unwrap().traffic;
+            assert_eq!(counters["7"], [18, 18]);
+            assert_eq!(counters["8"], [18, 18]);
         }
     }
 }

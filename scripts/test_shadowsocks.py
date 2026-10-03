@@ -152,6 +152,7 @@ def exercise(config, users, run, wait, cases, measurements, node_port, user, tem
         return True
 
     def no_origin(wire, udp_packet=False, source='127.0.0.1'):
+        wait(node_ready)
         with lock: before = (accepted[0], len(observed))
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM if udp_packet else socket.SOCK_STREAM) as sock:
             sock.bind((source, 0)); sock.settimeout(0.5)
@@ -163,6 +164,10 @@ def exercise(config, users, run, wait, cases, measurements, node_port, user, tem
         time.sleep(0.1)
         with lock: assert (accepted[0], len(observed)) == before, 'Denied SS packet opened origin'
 
+    def node_ready():
+        # Readiness does not authenticate or count a proxy request.
+        with socket.create_connection(('127.0.0.1', node_port), timeout=1): return True
+
     try:
         per_method = []
         for method in METHODS:
@@ -170,7 +175,7 @@ def exercise(config, users, run, wait, cases, measurements, node_port, user, tem
             config.update(protocol='shadowsocks', tls=0, cipher=method, routes=None)
             if method.startswith('2022-'): config['server_key'] = converted(method, 'server-unique-key')
             else: config.pop('server_key', None)
-            before = traffic_snapshot(); run('start')
+            before = traffic_snapshot(); run('start'); wait(node_ready)
             with client(method, method) as local:
                 assert tcp(local, 131072)
                 cases.append('installed-SS-' + method + '-official-Xray-multiframe-TCP-exact-payload')
@@ -184,6 +189,9 @@ def exercise(config, users, run, wait, cases, measurements, node_port, user, tem
                 try: tcp(local, 37)
                 except (OSError, EOFError): pass
                 else: raise AssertionError('Wrong SS password accepted')
+                try: udp(local, 0, 37)
+                except (OSError, EOFError): pass
+                else: raise AssertionError('Wrong SS UDP password accepted')
             with lock: assert (accepted[0], len(observed)) == origin_before
             cases.append('installed-SS-' + method + '-wrong-user-denied-before-origin')
             after = traffic_snapshot(); expected = 131072 + 37 + 3*(1+37+8000)
@@ -191,6 +199,7 @@ def exercise(config, users, run, wait, cases, measurements, node_port, user, tem
             cases.append('installed-SS-' + method + '-exact-TCP-UDP-payload-only-graceful-accounting')
             per_method.append({'method': method, 'payload_bytes_per_direction': expected, 'udp_address_types': ['IPv4','domain','IPv6'], 'TCP_initial_fragment_bytes': 3})
         config['cipher'] = 'aes-128-gcm'; config.pop('server_key', None); run('start')
+        wait(node_ready)
         tcp_address = b'\1' + socket.inet_aton('127.0.0.1') + struct.pack('!H', origin.server_address[1])
         udp_address = b'\1' + socket.inet_aton('127.0.0.1') + struct.pack('!H', datagrams[0].server_address[1])
         tcp_wire = classic_tcp('aes-128-gcm', user, tcp_address, b'replay-probe')
@@ -211,6 +220,7 @@ def exercise(config, users, run, wait, cases, measurements, node_port, user, tem
         assert traffic_snapshot() == before
         cases.append('installed-SS-TCP-UDP-blocked-route-no-origin-or-counted-payload')
         config['routes'] = None; run('start')
+        with client('aes-128-gcm', 'before-hot-update') as local: wait(lambda: tcp(local, 37))
         pids = parent(), child_ids()
         replacement = 'replacement-user-key'
         users[:] = [{'id':1, 'uuid':replacement, 'speed_limit':0, 'device_limit':0}]
@@ -224,7 +234,7 @@ def exercise(config, users, run, wait, cases, measurements, node_port, user, tem
         measurements['shadowsocks'] = {'client_version': version, 'client_binary_sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
             'methods': per_method, 'real_independent_AEAD_replay_negatives': True, 'route_negatives': True,
             'hot_update_without_restart': True, 'server_runtime': 'installed Rust ELF', 'loopback_only': True,
-            'logs': logs}
+            'client_logs_sha256': {name: hashlib.sha256(body.encode()).hexdigest() for name, body in logs.items()}}
     finally:
         users[:] = original_users; config.clear(); config.update(original)
         for server in [fragment, origin, *datagrams]: server.shutdown(); server.server_close()
