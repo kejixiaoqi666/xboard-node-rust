@@ -207,13 +207,13 @@ where
         if this.state.writeable() {
             match this.flush_read_response(cx) {
                 Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
-                Poll::Pending => return Poll::Pending,
+                Poll::Pending => io_pending = true,
                 Poll::Ready(Ok(())) => {}
             }
         }
 
         // Read from TCP while the session wants more data (tokio-rustls pattern)
-        while this.state.readable() && this.session.wants_read() {
+        while !io_pending && this.state.readable() && this.session.wants_read() {
             let mut adapter = SyncReadAdapter {
                 io: &mut this.io,
                 cx,
@@ -233,7 +233,10 @@ where
                     if this.state.writeable() {
                         match this.flush_read_response(cx) {
                             Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
-                            Poll::Pending => return Poll::Pending,
+                            Poll::Pending => {
+                                io_pending = true;
+                                break;
+                            }
                             Poll::Ready(Ok(())) => {}
                         }
                     }

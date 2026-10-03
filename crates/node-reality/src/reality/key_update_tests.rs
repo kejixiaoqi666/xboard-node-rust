@@ -348,3 +348,62 @@ fn read_only_stream_flushes_update_response_without_application_write() {
         assert!(io.flushed.is_empty() && io.buffered.is_empty());
     }
 }
+
+#[test]
+fn blocked_update_response_still_delivers_already_decrypted_plaintext() {
+    use std::{
+        pin::Pin,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, AtomicU8, Ordering},
+        },
+        task::Context,
+    };
+    use tokio::io::AsyncRead;
+    let cs = CipherSuite::AES_128_GCM_SHA256;
+    let mut wire = record(cs, &secret(cs, 0), 0, &[24, 0, 0, 1, 1], 22);
+    wire.extend(record(
+        cs,
+        &update_traffic_secret(&secret(cs, 0), cs).unwrap(),
+        0,
+        b"ready",
+        23,
+    ));
+    let write_mode = Arc::new(AtomicU8::new(1));
+    let io = BufferedIo {
+        input: io::Cursor::new(wire),
+        buffered: Vec::new(),
+        flushed: Vec::new(),
+        flush_pending: Arc::new(AtomicBool::new(false)),
+        write_mode: write_mode.clone(),
+        reads: 0,
+    };
+    let mut stream = crate::CryptoTlsStream::new(io, connection(cs));
+    let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+    let mut out = [0; 5];
+    let mut buf = tokio::io::ReadBuf::new(&mut out);
+    assert!(
+        Pin::new(&mut stream)
+            .poll_read(&mut cx, &mut buf)
+            .is_ready()
+    );
+    assert_eq!(buf.filled(), b"ready");
+    assert!(
+        Pin::new(&mut stream)
+            .poll_read(&mut cx, &mut tokio::io::ReadBuf::new(&mut out))
+            .is_pending()
+    );
+    write_mode.store(0, Ordering::SeqCst);
+    assert!(
+        Pin::new(&mut stream)
+            .poll_read(&mut cx, &mut tokio::io::ReadBuf::new(&mut out))
+            .is_pending()
+    );
+    let (mut io, _) = stream.into_inner();
+    assert_eq!(io.reads, 2);
+    assert_eq!(
+        decrypt_first(cs, &secret(cs, 1), 0, &mut io.flushed),
+        (22, vec![24, 0, 0, 1, 0])
+    );
+    assert!(io.flushed.is_empty());
+}
