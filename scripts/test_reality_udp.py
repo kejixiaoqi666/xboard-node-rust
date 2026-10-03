@@ -73,9 +73,13 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, real
     def roundtrip(datagram, relay, index, size):
         wire, body, ip, port = packet(index, size)
         datagram.sendto(wire, relay); reply, source = datagram.recvfrom(65536)
-        assert source == relay and reply[:3] == bytes(3) and reply[3] in [1, 4]
-        end = 8 if reply[3] == 1 else 20
-        assert socket.inet_ntop(socket.AF_INET if reply[3] == 1 else socket.AF_INET6, reply[4:end]) == ip
+        assert source == relay and reply[:3] == bytes(3) and reply[3] in [1, 3, 4]
+        if reply[3] == 3:
+            end = 5 + reply[4]
+            assert index == 1 and reply[5:end] == b'localhost'
+        else:
+            end = 8 if reply[3] == 1 else 20
+            assert socket.inet_ntop(socket.AF_INET if reply[3] == 1 else socket.AF_INET6, reply[4:end]) == ip
         assert struct.unpack('!H', reply[end:end+2])[0] == port and reply[end+2:] == body
 
     try:
