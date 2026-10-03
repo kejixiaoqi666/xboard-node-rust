@@ -96,9 +96,8 @@ impl VisionUnpadder {
         // Reuse the accumulated buffer - clear but keep capacity
         self.accumulated_buffer.clear();
         log::debug!(
-            "UNPADDER: unpad() called with {} bytes, state before: {:?}, first_block: {}",
+            "UNPADDER: unpad() called with {} bytes, first_block: {}",
             data.len(),
-            self.state,
             self.first_block
         );
 
