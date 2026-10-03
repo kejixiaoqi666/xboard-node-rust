@@ -393,9 +393,10 @@ async fn run_loop_applies_initial_snapshot_and_shutdown_reaps_kernel() {
         while !fake.0.lock().unwrap().running {
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
-        // `Fake::activate` is the worker-side commit. Give `run` one scheduling
-        // turn to publish its caller-visible applied metric before requesting stop.
-        tokio::time::sleep(Duration::from_millis(25)).await;
+        // `Fake::activate` is the worker-side commit. Give `run` a bounded
+        // scheduling window to publish its caller-visible applied metric
+        // before requesting stop; a single yield is flaky on busy ARM hosts.
+        tokio::time::sleep(Duration::from_millis(100)).await;
     })
     .await
     .unwrap();
