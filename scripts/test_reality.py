@@ -9,6 +9,7 @@ import subprocess
 import threading
 from test_vision import exercise as vision_exercise, receive
 from test_reality_udp import exercise as udp_exercise
+from test_reality_key_update import exercise as key_update_exercise
 
 def exercise(config, run, wait, cases, measurements, node_port, cert, key, user, temp, binary, traffic_snapshot):
     keys = json.loads(subprocess.check_output([str(binary), 'generate-reality-keypair'], text=True))
@@ -88,6 +89,7 @@ def exercise(config, run, wait, cases, measurements, node_port, cert, key, user,
         measurements['reality_fragmented'].update(client_hello_record_count=6,
             actual_fragmented_client_hellos=len(fragmented), handshake_sha256=fragmented)
         udp_exercise(config, run, wait, cases, measurements, node_port, user, temp, client_settings, traffic_snapshot)
+        key_update_exercise(config, run, wait, cases, measurements, node_port, user, temp, client_settings)
         measurements['reality'].update(fixed_mirror_tls13=True, ordinary_tls_probe_verified=True,
             no_vision_vless_verified=True, wrong_short_id_origin_connects=0)
     finally:

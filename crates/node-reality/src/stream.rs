@@ -153,8 +153,7 @@ where
         while self.session.wants_write() {
             match self.write_tls_direct(cx) {
                 Poll::Ready(Ok(0)) => {
-                    // WriteZero - can't make progress, but not fatal for drain
-                    break;
+                    return Poll::Ready(Err(io::ErrorKind::WriteZero.into()));
                 }
                 Poll::Ready(Ok(_)) => {
                     self.need_flush = true;
@@ -190,6 +189,17 @@ where
         let mut io_pending = false;
         let mut eof = false;
 
+        // Read-triggered KeyUpdate responses must progress even when the
+        // application is waiting only for input. Drain before further reads
+        // so a peer cannot grow output while the socket is backpressured.
+        if this.state.writeable() {
+            match this.drain_all_writes(cx) {
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Ok(())) => {}
+            }
+        }
+
         // Read from TCP while the session wants more data (tokio-rustls pattern)
         while this.state.readable() && this.session.wants_read() {
             let mut adapter = SyncReadAdapter {
@@ -207,6 +217,13 @@ where
                         // Try last-gasp write to send any pending TLS alerts (tokio-rustls pattern)
                         let _ = this.drain_all_writes(cx);
                         return Poll::Ready(Err(e));
+                    }
+                    if this.state.writeable() {
+                        match this.drain_all_writes(cx) {
+                            Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                            Poll::Pending => return Poll::Pending,
+                            Poll::Ready(Ok(())) => {}
+                        }
                     }
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {

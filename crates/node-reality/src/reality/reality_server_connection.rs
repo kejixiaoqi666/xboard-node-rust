@@ -25,7 +25,7 @@ use super::reality_reader_writer::{RealityReader, RealityWriter};
 use super::reality_records::{RecordDecryptor, RecordEncryptor};
 use super::reality_tls13_keys::{
     compute_finished_verify_data, derive_application_secrets, derive_handshake_keys,
-    derive_traffic_keys,
+    derive_traffic_keys, update_traffic_secret,
 };
 use super::reality_tls13_messages::{
     construct_certificate, construct_certificate_verify, construct_encrypted_extensions,
@@ -105,6 +105,12 @@ pub struct RealityServerConnection {
     app_read_iv: Option<Vec<u8>>,
     app_write_key: Option<AeadKey>,
     app_write_iv: Option<Vec<u8>>,
+    app_read_secret: Option<Vec<u8>>,
+    app_write_secret: Option<Vec<u8>>,
+    // A KeyUpdate is five bytes, must end at a record boundary, and may
+    // be fragmented. No generic/unbounded post-handshake accumulator.
+    key_update_fragment: Vec<u8>,
+    key_update_response_pending: bool,
     read_seq: u64,
     write_seq: u64,
     cipher_suite: Option<CipherSuite>,
@@ -133,6 +139,10 @@ impl RealityServerConnection {
             app_read_iv: None,
             app_write_key: None,
             app_write_iv: None,
+            app_read_secret: None,
+            app_write_secret: None,
+            key_update_fragment: Vec::new(),
+            key_update_response_pending: false,
             read_seq: 0,
             write_seq: 0,
             cipher_suite: None,
@@ -158,6 +168,26 @@ impl RealityServerConnection {
         self.app_write_key = Some(AeadKey::new(cipher_suite, &key)?);
         self.app_write_iv = Some(iv);
         self.cipher_suite = Some(cipher_suite);
+        Ok(self)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn complete_with_secrets_for_test(
+        mut self,
+        cs: CipherSuite,
+        read: Vec<u8>,
+        write: Vec<u8>,
+    ) -> io::Result<Self> {
+        let (key, iv) = derive_traffic_keys(&read, cs)?;
+        self.app_read_key = Some(AeadKey::new(cs, &key)?);
+        self.app_read_iv = Some(iv);
+        let (key, iv) = derive_traffic_keys(&write, cs)?;
+        self.app_write_key = Some(AeadKey::new(cs, &key)?);
+        self.app_write_iv = Some(iv);
+        self.app_read_secret = Some(read);
+        self.app_write_secret = Some(write);
+        self.cipher_suite = Some(cs);
+        self.handshake_state = HandshakeState::Complete;
         Ok(self)
     }
 
@@ -839,6 +869,8 @@ impl RealityServerConnection {
         self.app_read_iv = Some(client_app_iv);
         self.app_write_key = Some(server_app_key);
         self.app_write_iv = Some(server_app_iv);
+        self.app_read_secret = Some(client_app_secret);
+        self.app_write_secret = Some(server_app_secret);
         self.read_seq = 0;
         self.write_seq = 0;
         self.cipher_suite = Some(cipher_suite);
@@ -853,11 +885,6 @@ impl RealityServerConnection {
     #[inline]
     fn process_application_data(&mut self) -> io::Result<()> {
         // Check if we have application keys
-        let (app_read_key, app_read_iv) = match (&self.app_read_key, &self.app_read_iv) {
-            (Some(key), Some(iv)) => (key, iv),
-            _ => unreachable!(), // Wrong state
-        };
-
         // Process all complete TLS records in the buffer
         while self.ciphertext_read_buf.len() >= 5 {
             // Parse TLS record header
@@ -883,9 +910,18 @@ impl RealityServerConnection {
             let ciphertext_slice = self
                 .ciphertext_read_buf
                 .slice_mut(TLS_RECORD_HEADER_SIZE..total_record_len);
+            let app_read_key = self.app_read_key.as_ref().expect("complete read key");
+            let app_read_iv = self.app_read_iv.as_ref().expect("complete read IV");
             let mut decryptor = RecordDecryptor::new(app_read_key, app_read_iv, &mut self.read_seq);
             let (content_type, plaintext) =
                 decryptor.decrypt_record_in_place(ciphertext_slice, record_len as u16)?;
+
+            if content_type != CONTENT_TYPE_HANDSHAKE && !self.key_update_fragment.is_empty() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "interleaved KeyUpdate",
+                ));
+            }
 
             match content_type {
                 CONTENT_TYPE_APPLICATION_DATA => {
@@ -926,8 +962,52 @@ impl RealityServerConnection {
                         }
                     }
                 }
-                // CONTENT_TYPE_HANDSHAKE is invalid after handshake complete
-                // strip_content_type() validates and returns error for invalid types
+                CONTENT_TYPE_HANDSHAKE => {
+                    if plaintext.is_empty() || self.key_update_fragment.len() + plaintext.len() > 5
+                    {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "invalid KeyUpdate size",
+                        ));
+                    }
+                    self.key_update_fragment.extend_from_slice(plaintext);
+                    let expected = [24, 0, 0, 1];
+                    let n = self.key_update_fragment.len().min(4);
+                    if self.key_update_fragment[..n] != expected[..n] {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "unsupported post-handshake TLS message",
+                        ));
+                    }
+                    if self.key_update_fragment.len() == 5 {
+                        let requested = self.key_update_fragment[4];
+                        if requested > 1 {
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "invalid KeyUpdate request",
+                            ));
+                        }
+                        let cs = self.cipher_suite.expect("complete cipher suite");
+                        let secret = update_traffic_secret(
+                            self.app_read_secret.as_deref().ok_or_else(|| {
+                                io::Error::new(
+                                    io::ErrorKind::InvalidData,
+                                    "read traffic secret unavailable",
+                                )
+                            })?,
+                            cs,
+                        )?;
+                        let (key, iv) = derive_traffic_keys(&secret, cs)?;
+                        self.app_read_key = Some(AeadKey::new(cs, &key)?);
+                        self.app_read_iv = Some(iv);
+                        self.app_read_secret = Some(secret);
+                        self.read_seq = 0;
+                        self.key_update_fragment.clear();
+                        // RFC 8446 permits coalescing requests before the next
+                        // write. One bit bounds responses under backpressure.
+                        self.key_update_response_pending |= requested == 1;
+                    }
+                }
                 _ => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
@@ -965,6 +1045,9 @@ impl RealityServerConnection {
     /// Large plaintext is automatically fragmented into multiple TLS records
     /// to comply with the TLS 1.3 record size limit.
     pub fn write_tls(&mut self, wr: &mut dyn Write) -> io::Result<usize> {
+        if let Some(kind) = self.fatal_error {
+            return Err(io::Error::new(kind, "connection previously failed"));
+        }
         // If handshake not complete, just write buffered handshake data
         if !matches!(self.handshake_state, HandshakeState::Complete) {
             let n = wr.write(&self.ciphertext_write_buf)?;
@@ -972,6 +1055,7 @@ impl RealityServerConnection {
             return Ok(n);
         }
 
+        self.queue_key_update_response()?;
         // Encrypt any pending plaintext (with automatic fragmentation for large data)
         if !self.plaintext_write_buf.is_empty() {
             let (app_write_key, app_write_iv) = match (&self.app_write_key, &self.app_write_iv) {
@@ -1000,7 +1084,9 @@ impl RealityServerConnection {
 
     /// Check if the connection wants to write data
     pub fn wants_write(&self) -> bool {
-        !self.ciphertext_write_buf.is_empty() || !self.plaintext_write_buf.is_empty()
+        self.key_update_response_pending
+            || !self.ciphertext_write_buf.is_empty()
+            || !self.plaintext_write_buf.is_empty()
     }
 
     /// Check if handshake is still in progress
@@ -1053,6 +1139,11 @@ impl RealityServerConnection {
             return;
         }
 
+        if let Err(error) = self.queue_key_update_response() {
+            self.fatal_error = Some(error.kind());
+            return;
+        }
+
         // Get application keys
         let (app_write_key, app_write_iv) = match (&self.app_write_key, &self.app_write_iv) {
             (Some(key), Some(iv)) => (key, iv),
@@ -1069,6 +1160,38 @@ impl RealityServerConnection {
                 log::error!("REALITY: Failed to encrypt close_notify: {}", e);
             }
         }
+    }
+
+    fn queue_key_update_response(&mut self) -> io::Result<()> {
+        if !self.key_update_response_pending {
+            return Ok(());
+        }
+        let cs = self.cipher_suite.expect("complete cipher suite");
+        let secret = update_traffic_secret(
+            self.app_write_secret.as_deref().ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "write traffic secret unavailable",
+                )
+            })?,
+            cs,
+        )?;
+        let (key, iv) = derive_traffic_keys(&secret, cs)?;
+        let key = AeadKey::new(cs, &key)?;
+        // Already encrypted old-generation data stays ahead of this response.
+        // Buffered plaintext follows it under the next generation, seq = 0.
+        RecordEncryptor::new(
+            self.app_write_key.as_ref().expect("complete write key"),
+            self.app_write_iv.as_ref().expect("complete write IV"),
+            &mut self.write_seq,
+        )
+        .encrypt_handshake(&[24, 0, 0, 1, 0], &mut self.ciphertext_write_buf)?;
+        self.app_write_secret = Some(secret);
+        self.app_write_key = Some(key);
+        self.app_write_iv = Some(iv);
+        self.write_seq = 0;
+        self.key_update_response_pending = false;
+        Ok(())
     }
 }
 
@@ -1132,7 +1255,7 @@ mod tests {
         }
     }
     #[test]
-    fn unsupported_key_update_is_protocol_error_instead_of_task_panic() {
+    fn key_update_without_application_secret_fails_closed() {
         let mut s = complete();
         let record = encrypted(&[24, 0, 0, 1, 0], 22, 0);
         feed_reality_server_connection(&mut s, &record).unwrap();
@@ -1225,3 +1348,7 @@ mod tests {
         assert!(!conn.wants_write());
     }
 }
+
+#[cfg(test)]
+#[path = "key_update_tests.rs"]
+mod key_update_tests;

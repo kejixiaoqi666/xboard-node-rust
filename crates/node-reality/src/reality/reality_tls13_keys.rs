@@ -138,6 +138,19 @@ pub fn derive_traffic_keys(
     Ok((key, iv))
 }
 
+/// RFC 8446 section 7.2: advance one directional application secret.
+pub fn update_traffic_secret(secret: &[u8], cipher_suite: CipherSuite) -> Result<Vec<u8>> {
+    let algorithm = cipher_suite.hmac_algorithm();
+    let length = algorithm.digest_algorithm().output_len();
+    if secret.len() != length {
+        return Err(Error::new(
+            ErrorKind::InvalidData,
+            "invalid traffic secret length",
+        ));
+    }
+    hkdf_expand_label_with_algorithm(algorithm, secret, b"traffic upd", b"", length)
+}
+
 /// Derive TLS 1.3 handshake keys and master secret using CipherSuite (Phase 1)
 ///
 /// This function derives handshake traffic secrets and the master secret,
