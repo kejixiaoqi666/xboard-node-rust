@@ -6,11 +6,11 @@
 
 - Linux AMD64 或 ARM64，已运行 systemd，使用 root。推荐 Debian 12/13、Ubuntu 22.04/24.04。
 - 已有 Xboard 面板和一个明确的节点 ID；v2 machine 模式还需要服务器 ID 与对应 token。
-- 面板给该节点配置当前支持的 VLESS/Trojan/Shadowsocks；TCP 和协议内 UDP 已支持，原生 Rust 模式执行用户限速和来源 IP 限制。文件 TLS1.3 下的 VLESS Vision TCP 已支持，面板与客户端字段见[首页 Vision 配置](../README.md#vision-怎么用)。REALITY TCP 可带或不带 Vision，字段见[首页 REALITY 配置](../README.md#reality-怎么用)；普通 REALITY UDP 已支持；Vision UDP、mux 和其他未迁移配置会被拒绝。Shadowsocks 字段与密钥转换见[首页配置](../README.md#shadowsocks-怎么用)。
+- 支持的协议、传输与明确边界以[首页能力表](../README.md#现在有哪些能力)为准。
 - 文件 TLS 需要已有证书和私钥文件，并在面板填入 file 证书配置。推荐放在 `/etc/ssl/` 或 `/etc/letsencrypt/`，本服务启用了 `ProtectHome=true`。
 - 需要按面板设置开放节点端口；脚本不会修改防火墙或其他网络参数。
 
-机器模式是 **machine 认证 + 一个固定节点**，此版不会自动枚举一台服务器的全部节点。
+安装器的简单模式是 machine 认证 + 一个固定节点；高级 fleet 配置可以自动发现机器节点，并在单进程中运行多个节点。
 
 ## 交互安装
 
@@ -34,8 +34,8 @@ apt-get install -y ca-certificates curl
 先下载安装器，再运行指定版本：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.6/install.sh -o install.sh
-bash install.sh install --version v0.1.0-preview.6
+curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.12/install.sh -o install.sh
+bash install.sh install --version v0.1.0-preview.12
 ```
 
 自动化安装时，从权限为 0600 的文件或指定环境变量读取 token，避免把 token 直接写在命令参数中。例如先用编辑器准备 `/root/panel-token`：
@@ -69,7 +69,7 @@ ARM64 改用 `xboard-node-rust-linux-arm64.tar.gz`。归档在解压前校验，
 xboard-rust                 # 菜单
 xboard-rust configure       # 重新配置；空 token 沿用已有 token
 xboard-rust update          # 分页读取并按发布时间选择兼容版，含预览版
-xboard-rust update --version v0.1.0-preview.6
+xboard-rust update --version v0.1.0-preview.12
 xboard-rust rollback        # 上一个程序版本；检查声明的状态格式
 xboard-rust start
 xboard-rust stop
@@ -103,8 +103,14 @@ xboard-rust uninstall
 | 设置限速后单连接速率与预期不同 | 同一用户所有连接的上传和下载共用预算，单位是十进制 Mbps；有一秒突发额度，最小 64 KiB |
 | 同一 IP 多设备仍能连接 | 限制统计本节点不同来源 IP，同一个公网 IP 共用名额，不能识别实际设备数量 |
 | 文件证书不可读 | 检查文件路径与权限；`ProtectHome` 会隐藏家目录，私钥应放在服务可读取的位置 |
-| 用户删除后旧连接还在 | 当前仅拒绝新认证；已认证会话不会被强制断开 |
+| 用户删除后旧连接还在 | preview.12 会撤销删除用户或旧 UUID/密码的会话；确认面板新用户快照已被接收并激活 |
 | 上报批次显示 uncertain | 停机后用 `traffic-status` 看批次，先与实际面板记录核对；不盲目重发 |
 | 服务重启后面板暂不可用 | 当前控制配置成功快照不跨整个主进程重启持久恢复，仍需重新拉取面板 |
 
 HTTP 明文面板地址仅允许 literal 回环 IP，用于本地模拟面板测试；实际面板请使用 HTTPS。安装器不会禁用 TLS 校验。
+
+## 多节点与原版 YAML
+
+[两节点示例](../examples/runtime-fleet.json)把两份运行配置放入 nodes；每节点填自己的 ID 和独立绝对 state_dir，embedded=true 在同一个 Rust 进程运行。安装器生成单节点配置，高级部署可在停机和离线检查后替换 /etc/xboard-node-rust/runtime.json。令牌仍从 token_env 指定的环境变量读取。
+
+原版 YAML 可通过 --import-go-yaml 导入证书、路由/出站、间隔、日志、健康与机器发现的已支持设置；使用 --original-cwd 指明原进程工作目录，--secrets-output 把秘密写入独立文件。完整命令见[首页迁移段落](../README.md#多节点和迁移)。导入器拒绝未知或未映射字段，--check 不联系面板或签发证书。

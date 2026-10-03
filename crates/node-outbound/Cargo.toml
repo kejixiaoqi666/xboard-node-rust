@@ -1,0 +1,28 @@
+[package]
+name = "node-outbound"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+node-core = { path = "../node-core" }
+node-session = { path = "../node-session" }
+async-trait = "0.1"
+base64 = "0.22"
+bytes = "1"
+sha2 = "0.10"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pemfile = "2"
+webpki-roots = "1"
+tokio = { version = "1", features = ["net", "io-util", "sync", "time", "rt", "macros"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+shadowsocks = { path = "../../vendor/shadowsocks", default-features = false, features = ["aead-cipher", "aead-cipher-2022", "aead-cipher-extra", "aead-cipher-2022-extra", "stream-cipher"] }
+
+[dev-dependencies]
+serde_json = "1"
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring", "pem"] }
+tokio = { version = "1", features = ["rt-multi-thread", "process"] }
+hickory-resolver = { version = "0.26.3", default-features = false, features = ["tokio", "tls-ring", "https-ring", "quic-ring"] }
+quinn = { version = "0.11", default-features = false, features = ["runtime-tokio", "rustls-ring"] }
+h2 = "0.4"
+http = "1"

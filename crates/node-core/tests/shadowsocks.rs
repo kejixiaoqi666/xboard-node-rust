@@ -49,12 +49,11 @@ fn key_validation_and_redacted_debug_have_explicit_subset() {
         .validate()
         .is_err()
     );
-    for name in [
-        "none",
-        "aes-128-cfb",
-        "2022-blake3-chacha20-poly1305",
-        "unknown",
-    ] {
+    for name in ["unknown", "aes-256-cfb8", "2022-blake3-aes-192-gcm"] {
         assert!(serde_json::from_value::<Cipher>(serde_json::json!(name)).is_err());
+    }
+    for name in ["none", "aes-128-cfb", "2022-blake3-chacha20-poly1305"] {
+        let method = serde_json::from_value::<Cipher>(serde_json::json!(name)).unwrap();
+        assert_eq!(method.name(), name);
     }
 }

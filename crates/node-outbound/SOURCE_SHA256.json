@@ -1,0 +1,64 @@
+{
+  "frozen_utc": "2026-10-03T16:47:39.970477Z",
+  "test_session": 99718,
+  "native_business_test_session": 99718,
+  "lint_session": 46444,
+  "outbound_lint_chunk": "345e0d",
+  "retained_failure_session": 71894,
+  "files": {
+    "crates/node-core/src/routing.rs": "3953f33ea4ca694a3281a121b03b21941c3c420d17ff77158d7bb40e1f99eaac",
+    "crates/node-native/src/network_tests.rs": "2ac2b29ea1fc04f70fc3bd85fd708d06b286a1b10208cf2b9819a5411097bbd9",
+    "crates/node-native/src/network.rs": "c8d88b5b7d8a61d32e3080e354f30f645f7d42c7475bc37cf87e9fb6a8f05547",
+    "crates/node-native/src/session_integration.rs": "dd001bb8216d329c7e574ba71f25786731a1bdf478ae505107a6fab6d3d60480",
+    "crates/node-outbound/.gitignore": "7b89ab042dc652ecd69333c44aeafa07fa8e4714dada802357ec5ef541c278ae",
+    "crates/node-outbound/Cargo.toml": "22eee1229c0ba3a128c93175435650684a5701629de8c540818622617fbbd7d5",
+    "crates/node-outbound/README.md": "9277c626c529f964f4471aaafd00fe163e95f3cae628b705169314379f67b98b",
+    "crates/node-outbound/src/lib.rs": "a91b9b44dd4f49a04adaf882c928486d0064277d601a79a58ac4ed60257d6f6d",
+    "crates/node-outbound/src/stream.rs": "24e179f49301207a7d5997819463086d6b164206b859fb63887dea0be0916790",
+    "crates/node-outbound/src/tls.rs": "6cd1f30f4fba929135b4d3db6c5ecc030158fa23b1ed37a1f5063157cfd00427",
+    "crates/node-outbound/src/udp.rs": "1e03e1a4c38840801afe5caad84878f6eeb4631173b6da56e5f3bd178c9040d2",
+    "crates/node-outbound/tests/corecheck/Cargo.toml": "c7a3982f6ccf0c1c318932ad85b88877c25982f6140dff7403fcf6eb4716a1ac",
+    "crates/node-outbound/tests/isolated/Cargo.toml": "f44580284059b6f33b82a19cee7fa6947ffbb2ea679ad3165f04eb19db7db8d5",
+    "crates/node-outbound/tests/network_wire.rs": "b0275a1819006883b564cb21603e398a8f9252dd4c40ba6fb249f0533a61b7c3",
+    "crates/node-outbound/tests/proxy_wire.rs": "39aba296e66e5519cf123374d251f42d22e4c255e2267ad59c4dde5cedb92ab9",
+    "crates/node-outbound/tests/routing_extended.rs": "9fb8ae5c29a138fdf983994fe5573e7c9f3237cf8344aba76e958f6cc133f40f",
+    "crates/node-outbound/LICENSE": "fe05390d5db2a0e8f9ed422b5d6bb541ba0802b4199ba23be754613c7e6cb459",
+    "crates/node-outbound/NOTICE.md": "c266a18797f2840767922ad50b1b4c403bfb3f68b07d0807bf7c622e00192a35",
+    "crates/node-quic/tests/support/pinned_client.rs": "ecb8355d4f4ec11abe5484149f553c0c72ac83db345683de274a6564ddf4def3",
+    "crates/node-quic/tests/clients-lock.json": "ff3bb98ca79e8988d4cadcc9fb2812f2b4ddb9955b7e9d4d5c551bb748afe3ca"
+  },
+  "previous_source_bindings": {
+    "crates/node-native/src/session_integration.rs": "e10b5ab8ade0ae7ff3ea5e326db7c6c6e1f89ea014567ed5fafb3c5785d50347",
+    "crates/node-outbound/tests/proxy_wire.rs": "4a23d926ab0324556f650e6470aaa3594a25cac1db6c47e018b500cdc05b38ae"
+  },
+  "post_freeze_qa": {
+    "native_watch_test": {
+      "session_id": 98457,
+      "chunk_id": "3acc69",
+      "passed": 1,
+      "failed": 0,
+      "filtered": 68,
+      "exit_code": 0
+    },
+    "quic_official_fixture": {
+      "session_id": 60392,
+      "chunk_id": "8c4313",
+      "passed": 1,
+      "failed": 0,
+      "exit_code": 0
+    },
+    "outbound_official_fixture": {
+      "session_id": 21380,
+      "chunk_id": "7c4925",
+      "passed": 1,
+      "failed": 0,
+      "exit_code": 0
+    },
+    "native_clippy_chunk": "e4d960",
+    "quic_clippy_chunk": "9d7afa",
+    "outbound_clippy_chunk": "54513c",
+    "platform": "Windows x86_64",
+    "linux_official_interoperability": "NOT_RUN_BY_THIS_AGENT",
+    "full_native_9_and_outbound_23_rerun": "NOT_REPEATED; prior functional evidence retained"
+  }
+}

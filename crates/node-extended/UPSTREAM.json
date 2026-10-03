@@ -1,0 +1,112 @@
+{
+  "repository": "https://github.com/cfal/shoes",
+  "revision": "60ed3838b346268615c81e4eace4e15e717da23e",
+  "license": "MIT",
+  "sha256_definition": "Every sha256 hashes the original file bytes at the pinned upstream revision, before line-ending normalization or adaptation.",
+  "scope": "Only wire codecs and crypto helpers; no upstream listeners, policy, resolver, TUN, mobile or FFI runtime. VMess handler and frame algorithms, AnyTLS session behavior, WebSocket early data and UoT framing adapted through node-session Host.",
+  "files": [
+    {
+      "source": "src/vmess/md5.rs",
+      "destination": "src/vmess/md5.rs",
+      "sha256": "bef84f07a225b2ebac20da3173e6d444805a8426d1ff78e26a17cec6aa49061c",
+      "adapted": true
+    },
+    {
+      "source": "src/vmess/fnv1a.rs",
+      "destination": "src/vmess/fnv1a.rs",
+      "sha256": "d74cca97eaa1d78c8fde0bdda8a5a939f53a116cdfa986dc5cd39b569556f6b5",
+      "adapted": true
+    },
+    {
+      "source": "src/vmess/crc32.rs",
+      "destination": "src/vmess/crc32.rs",
+      "sha256": "a37aba1fcc36d8c8f4b8173d8340a53de57a6aa39f832c7de0a01be8f0602069",
+      "adapted": true
+    },
+    {
+      "source": "src/vmess/sha2.rs",
+      "destination": "src/vmess/sha2.rs",
+      "sha256": "fba96491b3eb6f2d2c5420a2cabe2184d57aebaca9b24d5934b2dc9be26c3e39",
+      "adapted": true
+    },
+    {
+      "source": "src/vmess/typed.rs",
+      "destination": "src/vmess/typed.rs",
+      "sha256": "dfd427dffd24df7cf6a91aebecf8611d25c98256c664df7bb371d358f3a5b57d",
+      "adapted": true
+    },
+    {
+      "source": "src/anytls/anytls_types.rs",
+      "destination": "src/anytls/anytls_types.rs",
+      "sha256": "93b8d86c4f57c50f1d007aee96290e9ea0b21e32b02a2491e1802a28b9d3aa69",
+      "adapted": true
+    },
+    {
+      "source": "src/anytls/anytls_padding.rs",
+      "destination": "src/anytls/anytls_padding.rs",
+      "sha256": "af2d82c6b6bb4b49756db1c54d7998b39afa4490fba015315430564815c1bcc3",
+      "adapted": true
+    },
+    {
+      "source": "src/h2mux/h2mux_protocol.rs",
+      "destination": "src/mux/h2mux/h2mux_protocol.rs",
+      "sha256": "4b44641202b171051b4df6d0d68121251e5444ed87708dbe91e4e922038c8043",
+      "adapted": true
+    },
+    {
+      "source": "src/h2mux/h2mux_stream.rs",
+      "destination": "src/mux/h2mux/h2mux_stream.rs",
+      "sha256": "96522da73f6cdb09ecf55343b184a4e55cf9a5a65b73ae65e76b45349ccc0099",
+      "adapted": true
+    },
+    {
+      "source": "src/h2mux/h2mux_padding.rs",
+      "destination": "src/mux/h2mux/h2mux_padding.rs",
+      "sha256": "f4dd40f5e838bacf7abbf6eb1ae40ab39734482e7d086a3696a43b654490d75b",
+      "adapted": true
+    },
+    {
+      "source": "src/xudp/frame.rs",
+      "destination": "src/mux/xudp/frame.rs",
+      "sha256": "2c22a2fd12966081b35721241e21674ed13866de8135225c2e7fab41e172d07c",
+      "adapted": true
+    }
+  ],
+  "algorithm_sources": [
+    {
+      "source": "src/vmess/vmess_handler.rs",
+      "sha256": "78db15b0cb009e5edc45da8f8df14ae9d0c34a2c5be18260aeae696df9b42ff0",
+      "adapted_into": ["src/vmess/mod.rs", "src/vmess/wire.rs", "src/auth.rs"]
+    },
+    {
+      "source": "src/vmess/vmess_stream.rs",
+      "sha256": "8bfca40f9569870aa763524bb51aa8321e2dc460479ce12816a0f9e058d74ad1",
+      "adapted_into": ["src/vmess/wire.rs"]
+    },
+    {
+      "source": "src/anytls/anytls_server_session.rs",
+      "sha256": "aeb8d7684edc6a72f0e05a86d60047485d700ca19fb7d4670ea7b8011490057c",
+      "adapted_into": ["src/anytls/mod.rs"]
+    },
+    {
+      "source": "src/websocket/websocket_handler.rs",
+      "sha256": "dd2bb23f03b2b1ba3e2a6e093e291559a6559a2bfd0869d558eed9aeb5186286",
+      "adapted_into": ["src/websocket.rs"]
+    },
+    {
+      "source": "src/websocket/websocket_stream.rs",
+      "sha256": "97bcb05d0a00968316a10602fba3ab7a6d32c5c95a566b2e7661e0729110edb9",
+      "adapted_into": ["src/websocket.rs"]
+    },
+    {
+      "source": "src/uot/uot_common.rs",
+      "sha256": "e5b3aeeb317ef83ecc95042524c96ae06c1ac70e7cd1faefbe95de613c240120",
+      "adapted_into": ["src/mux/uot.rs"]
+    },
+    {
+      "source": "src/uot/uot_v1_server_stream.rs",
+      "sha256": "6a3cec83288311e5e5f05539a49d2fee10f9a185811fcaba1615941805b94d2f",
+      "adapted_into": ["src/mux/uot.rs"]
+    }
+  ]
+}

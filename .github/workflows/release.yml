@@ -8,9 +8,16 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release tag (for example v0.1.0-preview.11)'
+        description: 'Release tag (for example v0.1.0-preview.12)'
         required: true
-        default: v0.1.0-preview.11
+        default: v0.1.0-preview.12
+      source_ref:
+        description: 'Exact Git source ref; blank uses the dispatched commit'
+        required: false
+      publish_draft:
+        description: 'Create a draft release after validation'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,11 +35,11 @@ jobs:
             target: aarch64-unknown-linux-musl
             arch: arm64
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.version || github.sha }}
+          ref: ${{ inputs.source_ref || github.sha }}
       - name: Install build tools and pinned Rust
         run: |
           sudo apt-get update
@@ -41,20 +48,36 @@ jobs:
           rustup target add ${{ matrix.target }} --toolchain 1.98.1
       - name: Rust and installer checks
         run: |
-          cargo fmt --all -- --check
-          cargo test --workspace --locked -- --test-threads=1
-          cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+          cargo fmt -- --check
+          cargo test --workspace --locked -j 2 -- --test-threads=1
+          cargo clippy --workspace --all-targets --all-features --locked -j 2 -- -D warnings
           bash -n install.sh
           shellcheck install.sh
       - name: Build static runtime
-        run: cargo build -p node-runtime --target ${{ matrix.target }} --release --locked
-      - name: Pin official Xray test client
+        run: cargo build -p node-runtime --target ${{ matrix.target }} --release --locked -j 2
+      - name: Pin official compatibility clients
         run: |
-          python3 scripts/fetch_xray_test_client.py --arch ${{ matrix.arch }} --output "$RUNNER_TEMP/xray-vision-test/xray"
-          echo "XRAY_TEST_BINARY=$RUNNER_TEMP/xray-vision-test/xray" >> "$GITHUB_ENV"
+          python3 crates/node-extended/tests/fetch_clients.py --client xray --platform linux-${{ matrix.arch }} --output "$RUNNER_TEMP/xbr-clients/xray"
+          python3 crates/node-extended/tests/fetch_clients.py --client sing-box --platform linux-${{ matrix.arch }} --output "$RUNNER_TEMP/xbr-clients/sing-box"
+          echo "XRAY_TEST_BINARY=$RUNNER_TEMP/xbr-clients/xray" >> "$GITHUB_ENV"
+          echo "XRAY_TEST_CLIENT=$RUNNER_TEMP/xbr-clients/xray" >> "$GITHUB_ENV"
+          echo "SING_BOX_TEST_CLIENT=$RUNNER_TEMP/xbr-clients/sing-box" >> "$GITHUB_ENV"
+          echo "SING_BOX_BIN=$RUNNER_TEMP/xbr-clients/sing-box" >> "$GITHUB_ENV"
+      - name: Official client and native plugin interoperability
+        run: |
+          mkdir -p dist
+          set -o pipefail
+          cargo test -p node-extended --test official_clients --locked -j 2 -- --ignored --nocapture 2>&1 | tee dist/official-extended-${{ matrix.arch }}.log
+          cargo test -p node-quic --test loopback --locked -j 2 -- --ignored --nocapture 2>&1 | tee dist/official-quic-${{ matrix.arch }}.log
+          cargo test -p node-outbound --test proxy_wire --locked -j 2 -- --ignored --nocapture 2>&1 | tee dist/official-outbound-${{ matrix.arch }}.log
+          cargo test -p node-native --lib --locked -j 2 all_eighteen_methods_official -- --ignored --nocapture 2>&1 | tee dist/official-shadowsocks-${{ matrix.arch }}.log
+          cargo test -p node-native --test native_plugin_transport --locked -j 2 -- --ignored --nocapture 2>&1 | tee dist/official-plugin-${{ matrix.arch }}.log
+      - name: Production embedded fleet and payload accounting
+        run: |
+          python3 scripts/test_native_protocols.py --binary target/${{ matrix.target }}/release/xboard-node-rust --sing-box "$SING_BOX_TEST_CLIENT" --output dist/native-protocol-tests-${{ matrix.arch }}.json
       - name: Package and verify installer lifecycle
         env:
-          RELEASE_VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v0.1.0-preview.11' }}
+          RELEASE_VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v0.1.0-preview.12' }}
         run: |
           python3 scripts/package_release.py --target ${{ matrix.target }} --version "$RELEASE_VERSION" --binary target/${{ matrix.target }}/release/xboard-node-rust
           sudo python3 scripts/test_installer.py --binary target/${{ matrix.target }}/release/xboard-node-rust --package dist/xboard-node-rust-linux-${{ matrix.arch }}.tar.gz --checksums dist/SHA256SUMS --output dist/installer-tests-${{ matrix.arch }}.json
@@ -69,7 +92,7 @@ jobs:
           if-no-files-found: error
 
   draft:
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.publish_draft)
     needs: build
     runs-on: ubuntu-24.04
     permissions:
@@ -77,7 +100,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.version || github.sha }}
+          ref: ${{ inputs.source_ref || github.sha }}
       - uses: actions/download-artifact@v4
         with:
           path: artifacts

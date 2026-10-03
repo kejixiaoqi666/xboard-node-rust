@@ -42,7 +42,7 @@ impl Credentials {
             identities: HashMap::new(),
             manager: Arc::new(ServerUserManager::new()),
         };
-        if settings.method.is_v2() {
+        if settings.method.uses_identity_header() {
             out.server_key = ServerConfig::new(
                 ("127.0.0.1", 1),
                 settings.password.as_deref().ok_or(Error::Config)?,
@@ -55,12 +55,8 @@ impl Credentials {
         let mut seen = HashSet::with_capacity(users.len());
         for (name, password) in users {
             if settings.method.is_v2() {
-                Settings {
-                    method: settings.method,
-                    password: Some(password.clone()),
-                }
-                .validate()
-                .map_err(|_| Error::Auth)?;
+                node_core::shadowsocks::validate_user_key(settings.method, &password)
+                    .map_err(|_| Error::Auth)?;
             }
             let key = ServerConfig::new(("127.0.0.1", 1), password, method)
                 .map_err(|_| Error::Auth)?
@@ -73,7 +69,7 @@ impl Credentials {
                 name: name.clone(),
                 key: key.clone(),
             });
-            if settings.method.is_v2() {
+            if settings.method.uses_identity_header() {
                 let user = ServerUser::new(name.to_string(), key);
                 let hash: [u8; 16] = user.identity_hash().try_into().map_err(|_| Error::Auth)?;
                 if out.identities.insert(hash, credential.clone()).is_some() {
@@ -251,7 +247,9 @@ impl<S: tokio::io::AsyncWrite + Unpin> tokio::io::AsyncWrite for Prefix<S> {
 }
 
 #[cfg(any(unix, test))]
-pub(crate) async fn connection<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin>(
+pub(crate) async fn connection<
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+>(
     mut stream: S,
     service: &Service,
     context: crate::ConnectionContext<'_>,
@@ -272,11 +270,33 @@ pub(crate) async fn connection<S: tokio::io::AsyncRead + tokio::io::AsyncWrite +
         // Upstream's 2022 reader requires its entire fixed header in one read.
         // Buffer salt + EIH + type + timestamp + length + tag, so TCP packet
         // fragmentation and our credential pre-read cannot shorten that read.
-        let mut prefix = vec![0; n + if method.is_aead_2022() { 43 } else { 18 }];
-        stream.read_exact(&mut prefix).await?;
-        let selected = if method.is_aead_2022() {
-            identity(credentials, &prefix)?
+        let eih = matches!(
+            method,
+            CipherKind::AEAD2022_BLAKE3_AES_128_GCM | CipherKind::AEAD2022_BLAKE3_AES_256_GCM
+        );
+        let prefix_len = if eih {
+            n + 43
+        } else if method.is_aead_2022() {
+            n + 27
+        } else if method.is_aead() {
+            n + 18
         } else {
+            method.iv_len()
+        };
+        let mut prefix = vec![0; prefix_len];
+        stream.read_exact(&mut prefix).await?;
+        let selected = if eih {
+            identity(credentials, &prefix)?
+        } else if method.is_aead_2022() {
+            let selected = credentials.users.first().cloned().ok_or(Error::Auth)?;
+            let mut fixed = prefix[n..].to_vec();
+            if !shadowsocks::crypto::v2::tcp::TcpCipher::new(method, &selected.key, &prefix[..n])
+                .decrypt_packet(&mut fixed)
+            {
+                return Err(Error::Auth);
+            }
+            selected
+        } else if method.is_aead() {
             credentials
                 .users
                 .iter()
@@ -289,21 +309,31 @@ pub(crate) async fn connection<S: tokio::io::AsyncRead + tokio::io::AsyncWrite +
                 })
                 .cloned()
                 .ok_or(Error::Auth)?
+        } else {
+            // Legacy stream/none cannot identify users by a MAC. Their config
+            // is restricted to one account rather than guessing an identity.
+            credentials.users.first().cloned().ok_or(Error::Auth)?
         };
         let policy = snapshot.policy(&selected.name).ok_or(Error::Auth)?;
+        let profile = snapshot.profile(&selected.name).ok_or(Error::Auth)?;
         let mut manager = ServerUserManager::new();
-        if method.is_aead_2022() {
+        if eih {
             manager.add_user(ServerUser::new(
                 selected.name.to_string(),
                 selected.key.clone(),
             ));
         }
-        let key = if method.is_aead_2022() {
+        let key = if eih {
             &credentials.server_key
         } else {
             &selected.key
         };
-        let salt = prefix[..n].to_vec();
+        let salt_len = if method.is_stream() || method.is_none() {
+            method.iv_len()
+        } else {
+            method.salt_len()
+        };
+        let salt = prefix[..salt_len].to_vec();
         let mut encrypted = ProxyServerStream::from_stream_with_user_manager(
             self::context(),
             Prefix {
@@ -312,12 +342,15 @@ pub(crate) async fn connection<S: tokio::io::AsyncRead + tokio::io::AsyncWrite +
             },
             method,
             key,
-            method.is_aead_2022().then(|| Arc::new(manager)),
+            eih.then(|| Arc::new(manager)),
         );
         drop(snapshot);
         let (address, port) = address(encrypted.handshake().await?)?;
-        service.claim(&selected.key, &salt)?;
+        if !method.is_none() {
+            service.claim(&selected.key, &salt)?;
+        }
         let request = crate::protocol::Request {
+            profile: Some(profile),
             user: selected.name.clone(),
             policy,
             address,
@@ -343,6 +376,10 @@ pub(crate) async fn connection<S: tokio::io::AsyncRead + tokio::io::AsyncWrite +
 
 #[cfg(any(unix, test))]
 mod udp;
+
+#[cfg(test)]
+#[path = "shadowsocks/official.rs"]
+mod official;
 #[cfg(unix)]
 pub(crate) use udp::serve as serve_udp;
 #[cfg(unix)]
@@ -360,31 +397,27 @@ mod tests {
         net::TcpListener,
     };
 
-    const METHODS: [Cipher; 5] = [
-        Cipher::Aes128,
-        Cipher::Aes256,
-        Cipher::Chacha20,
-        Cipher::Aes128V2,
-        Cipher::Aes256V2,
-    ];
+    const METHODS: [Cipher; 18] = Cipher::ALL;
     pub(super) fn candidate(method: Cipher, passwords: &[(&str, &str)]) -> config::Candidate {
         let mut value = crate::tests::config(serde_json::json!([]));
         let inbound = &mut value["inbounds"][0];
         inbound["type"] = serde_json::json!("shadowsocks");
         inbound["method"] = serde_json::json!(method);
-        if method.is_v2() {
+        if method.uses_identity_header() {
             inbound["password"] = serde_json::json!(user_password(method, "server-unique-key"));
         }
         inbound["users"]=serde_json::json!(passwords.iter().map(|(name,key)|serde_json::json!({"name":name,"password":user_password(method,key)})).collect::<Vec<_>>());
         config::decode(value.to_string().as_bytes()).unwrap()
     }
     fn client_config(method: Cipher, user: &str) -> ServerConfig {
-        let password = if method.is_v2() {
+        let password = if method.uses_identity_header() {
             format!(
                 "{}:{}",
                 user_password(method, "server-unique-key"),
                 user_password(method, user)
             )
+        } else if method.is_v2() {
+            user_password(method, user).into_owned()
         } else {
             user.into()
         };
@@ -393,6 +426,9 @@ mod tests {
     #[test]
     fn derived_keys_collision_and_hot_base_boundaries() {
         for method in METHODS {
+            if method.max_users() == 1 {
+                continue;
+            }
             let a = candidate(method, &[("7", "user-first-key"), ("8", "user-second-key")]);
             let b = candidate(method, &[("8", "user-second-key")]);
             assert_eq!(a.base, b.base);
@@ -452,16 +488,19 @@ mod tests {
                 socket.write_all(&data).await.unwrap();
                 socket.shutdown().await.unwrap();
             });
-            let users: auth::Users = Arc::new(ArcSwap::from(
-                candidate(method, &[("7", "user-first-key"), ("8", "user-second-key")]).auth,
-            ));
+            let passwords = if method.max_users() == 1 {
+                vec![("8", "user-second-key")]
+            } else {
+                vec![("7", "user-first-key"), ("8", "user-second-key")]
+            };
+            let users: auth::Users = Arc::new(ArcSwap::from(candidate(method, &passwords).auth));
             let counters = Arc::new(traffic::Traffic::new("ss-tcp-test".into()));
             let copy = counters.clone();
             let (server, client) = tokio::io::duplex(2048);
             let task = tokio::spawn(async move {
                 let limits = Arc::new(limits::Registry::new(users.clone()));
                 let slots = Arc::new(tokio::sync::Semaphore::new(1024));
-                let network = network::Network::direct();
+                let network = Arc::new(network::Network::direct());
                 let result = connection(
                     server,
                     &Service::new(),
@@ -472,6 +511,9 @@ mod tests {
                         udp_slots: &slots,
                         network: &network,
                         source: "127.0.0.1:12345".parse().unwrap(),
+                        extended: node_extended::Config::default(),
+                        stop: None,
+                        tag: Arc::from("shadowsocks-in"),
                     },
                 )
                 .await;
@@ -504,6 +546,91 @@ mod tests {
                 counters.snapshot().unwrap().unwrap().traffic["8"],
                 [131072, 131072]
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn idle_tcp_key_rotation_closes_original_profile_and_releases_lease() {
+        for method in [Cipher::Aes128, Cipher::Aes128V2, Cipher::Chacha20V2] {
+            let origin = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let target = origin.local_addr().unwrap();
+            let echo = tokio::spawn(async move {
+                let (mut stream, _) = origin.accept().await.unwrap();
+                let mut buffer = [0; 4096];
+                let mut received = 0;
+                loop {
+                    let size = stream.read(&mut buffer).await.unwrap();
+                    if size == 0 {
+                        return received;
+                    }
+                    received += size;
+                    stream.write_all(&buffer[..size]).await.unwrap();
+                    stream.flush().await.unwrap();
+                }
+            });
+            let users: auth::Users = Arc::new(ArcSwap::from(
+                candidate(method, &[("7", "old-user-key")]).auth,
+            ));
+            let limits = Arc::new(limits::Registry::new(users.clone()));
+            let counters = Arc::new(traffic::Traffic::new("ss-tcp-key-rotation".into()));
+            let (server, client) = tokio::io::duplex(2048);
+            let server_users = users.clone();
+            let server_limits = limits.clone();
+            let server_counters = counters.clone();
+            let task = tokio::spawn(async move {
+                let slots = Arc::new(tokio::sync::Semaphore::new(1024));
+                let network = Arc::new(network::Network::direct());
+                connection(
+                    server,
+                    &Service::new(),
+                    crate::ConnectionContext {
+                        users: &server_users,
+                        traffic: &server_counters,
+                        limits: &server_limits,
+                        udp_slots: &slots,
+                        network: &network,
+                        source: "127.0.0.1:12346".parse().unwrap(),
+                        extended: node_extended::Config::default(),
+                        stop: None,
+                        tag: Arc::from("shadowsocks-in"),
+                    },
+                )
+                .await
+            });
+            let mut client = ProxyClientStream::from_stream(
+                Arc::new(shadowsocks::context::Context::new(ServerType::Local)),
+                client,
+                &client_config(method, "old-user-key"),
+                Address::SocketAddress(target),
+            );
+            let payload = b"tcp-key-rotation";
+            client.write_all(payload).await.unwrap();
+            client.flush().await.unwrap();
+            let mut returned = [0; 16];
+            tokio::time::timeout(Duration::from_secs(5), client.read_exact(&mut returned))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(&returned, payload);
+            assert_eq!(limits.activity().sessions, 1);
+            users.store(candidate(method, &[("7", "new-user-key")]).auth);
+            limits.notify_users_changed();
+            let _ = tokio::time::timeout(Duration::from_secs(1), task)
+                .await
+                .expect("idle TCP session survived same-name credential replacement")
+                .unwrap();
+            assert_eq!(
+                tokio::time::timeout(Duration::from_secs(1), echo)
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                payload.len()
+            );
+            assert_eq!(limits.activity().sessions, 0);
+            assert_eq!(counters.snapshot().unwrap().unwrap().traffic["7"], [16, 16]);
+            // Keep the old client open until after the server closes: a client
+            // EOF must not be the reason the revoked session released its lease.
+            drop(client);
         }
     }
 }

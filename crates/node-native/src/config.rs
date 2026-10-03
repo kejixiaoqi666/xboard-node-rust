@@ -52,6 +52,14 @@ struct Inbound {
     method: Option<node_core::shadowsocks::Cipher>,
     #[serde(default)]
     password: Option<String>,
+    #[serde(default)]
+    quic: Option<Quic>,
+    #[serde(default)]
+    extended: Option<Extended>,
+    #[serde(default)]
+    transport: Option<Transport>,
+    #[serde(default)]
+    plugin: Option<Plugin>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -77,6 +85,220 @@ pub enum Protocol {
     Vless,
     Trojan,
     Shadowsocks,
+    Vmess,
+    AnyTls,
+    Hysteria2,
+    Tuic,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Transport {
+    #[serde(rename = "type")]
+    pub kind: String,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub host: Option<String>,
+    #[serde(default)]
+    pub hosts: Vec<String>,
+    #[serde(default)]
+    pub method: Option<String>,
+    #[serde(default)]
+    pub service_name: Option<String>,
+    #[serde(default = "default_early_data")]
+    pub max_early_data: usize,
+    #[serde(default)]
+    pub plugin_mux: bool,
+}
+fn default_early_data() -> usize {
+    2048
+}
+#[derive(Clone, PartialEq, Eq, Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Plugin {
+    pub binary: std::path::PathBuf,
+    #[serde(default)]
+    pub arguments: Vec<String>,
+    #[serde(default)]
+    pub options: Option<String>,
+}
+impl std::fmt::Debug for Plugin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Plugin")
+            .field("binary", &self.binary)
+            .field("options", &"[REDACTED]")
+            .finish()
+    }
+}
+impl Plugin {
+    fn validate(&self) -> Result<(), Error> {
+        if !self.binary.is_absolute()
+            || !std::fs::symlink_metadata(&self.binary).is_ok_and(|meta| meta.is_file())
+            || self.arguments.len() > 64
+            || self
+                .arguments
+                .iter()
+                .any(|arg| arg.len() > 4096 || arg.contains('\0'))
+            || self
+                .options
+                .as_ref()
+                .is_some_and(|options| options.len() > 16384 || options.contains('\0'))
+        {
+            return Err(Error::Config);
+        }
+        Ok(())
+    }
+    pub fn sip003(&self) -> node_extended::sip003::Sip003Config {
+        node_extended::sip003::Sip003Config {
+            binary: self.binary.clone(),
+            arguments: self
+                .arguments
+                .iter()
+                .map(std::ffi::OsString::from)
+                .collect(),
+            options: self.options.as_ref().map(std::ffi::OsString::from),
+        }
+    }
+}
+impl Transport {
+    fn validate(&self, protocol: Protocol, tls: Option<&Tls>) -> Result<(), Error> {
+        if !matches!(self.kind.as_str(), "ws" | "httpupgrade" | "http2" | "grpc")
+            || !(matches!(
+                protocol,
+                Protocol::Vless | Protocol::Vmess | Protocol::Trojan
+            ) || protocol == Protocol::Shadowsocks && self.kind == "ws")
+            || self.plugin_mux && !(protocol == Protocol::Shadowsocks && self.kind == "ws")
+            || tls.is_some_and(|tls| tls.reality.is_some())
+            || self.max_early_data > 2048
+            || self.path.as_ref().is_some_and(|path| {
+                !path.starts_with('/') || path.len() > 2048 || path.chars().any(char::is_control)
+            })
+            || self.hosts.len() > 16
+            || self.host.iter().chain(self.hosts.iter()).any(|host| {
+                host.is_empty()
+                    || host.len() > 253
+                    || !host.is_ascii()
+                    || host.chars().any(|c| c.is_control() || c.is_whitespace())
+            })
+            || self.method.as_ref().is_some_and(|method| {
+                method.is_empty()
+                    || method.len() > 16
+                    || !method.bytes().all(|c| c.is_ascii_uppercase())
+            })
+            || self.kind != "http2" && (!self.hosts.is_empty() || self.method.is_some())
+            || self.kind != "grpc" && self.service_name.is_some()
+            || self.kind == "grpc"
+                && self.service_name.as_ref().is_none_or(|service| {
+                    service.len() > 128
+                        || !service
+                            .bytes()
+                            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'-' | b'.'))
+                })
+            || self.kind != "ws" && self.max_early_data != 2048
+        {
+            return Err(Error::Unsupported);
+        }
+        Ok(())
+    }
+    pub fn websocket(&self) -> node_extended::websocket::WebSocketConfig {
+        node_extended::websocket::WebSocketConfig {
+            path: self.path.clone(),
+            host: self.host.clone(),
+            max_early_data: self.max_early_data,
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Quic {
+    #[serde(default)]
+    pub obfs_password: Option<String>,
+    #[serde(default = "default_congestion")]
+    pub congestion_control: String,
+    #[serde(default)]
+    pub allow_0rtt: bool,
+    #[serde(default = "default_udp")]
+    pub enable_udp: bool,
+}
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, serde::Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Extended {
+    pub vmess_security: String,
+    pub padding_scheme: Option<node_core::StringOrArray>,
+    pub max_sessions: Option<usize>,
+    pub multiplex_enabled: Option<bool>,
+}
+impl Extended {
+    pub fn config(&self) -> Result<node_extended::Config, Error> {
+        let mut config = node_extended::Config {
+            vmess_security: match self.vmess_security.as_str() {
+                "" | "any" | "auto" => node_extended::vmess::Security::Any,
+                "aes-128-gcm" => node_extended::vmess::Security::Aes128Gcm,
+                "chacha20-poly1305" => node_extended::vmess::Security::ChaCha20Poly1305,
+                "none" => node_extended::vmess::Security::None,
+                _ => return Err(Error::Config),
+            },
+            ..Default::default()
+        };
+        if let Some(enabled) = self.multiplex_enabled {
+            config.multiplex_enabled = enabled;
+        }
+        if let Some(max) = self.max_sessions {
+            if max == 0 || max > 1024 {
+                return Err(Error::Config);
+            }
+            config.max_sessions = max;
+        }
+        if let Some(scheme) = &self.padding_scheme {
+            let text = match scheme {
+                node_core::StringOrArray::String(value) => value.clone(),
+                node_core::StringOrArray::Array(values) => values.join("\n"),
+            };
+            if text.len() > 16384 {
+                return Err(Error::Config);
+            }
+            config.anytls_padding = Arc::new(
+                node_extended::anytls::anytls_padding::PaddingFactory::new(text.as_bytes())
+                    .map_err(|_| Error::Config)?,
+            );
+        }
+        Ok(config)
+    }
+}
+fn default_congestion() -> String {
+    "cubic".into()
+}
+fn default_udp() -> bool {
+    true
+}
+impl Default for Quic {
+    fn default() -> Self {
+        Self {
+            obfs_password: None,
+            congestion_control: default_congestion(),
+            allow_0rtt: false,
+            enable_udp: true,
+        }
+    }
+}
+impl Quic {
+    fn validate(&self, protocol: Protocol) -> Result<(), Error> {
+        if !matches!(
+            self.congestion_control.as_str(),
+            "cubic" | "new_reno" | "bbr"
+        ) || self
+            .obfs_password
+            .as_ref()
+            .is_some_and(|p| p.is_empty() || p.len() > 1024 || protocol != Protocol::Hysteria2)
+            || self.allow_0rtt && protocol != Protocol::Tuic
+        {
+            return Err(Error::Config);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -90,6 +312,10 @@ pub struct Base {
     pub port: u16,
     pub tls: Option<Tls>,
     pub shadowsocks: Option<node_core::shadowsocks::Settings>,
+    pub quic: Option<Quic>,
+    pub extended: Option<Extended>,
+    pub transport: Option<Transport>,
+    pub plugin: Option<Plugin>,
     log: Log,
 }
 
@@ -133,9 +359,17 @@ pub fn decode(data: &[u8]) -> Result<Candidate, Error> {
         "vless" => Protocol::Vless,
         "trojan" => Protocol::Trojan,
         "shadowsocks" => Protocol::Shadowsocks,
+        "vmess" => Protocol::Vmess,
+        "anytls" => Protocol::AnyTls,
+        "hysteria2" => Protocol::Hysteria2,
+        "tuic" => Protocol::Tuic,
         _ => return Err(Error::Unsupported),
     };
-    if protocol == Protocol::Trojan && inbound.tls.is_none() {
+    if matches!(
+        protocol,
+        Protocol::Trojan | Protocol::AnyTls | Protocol::Hysteria2 | Protocol::Tuic
+    ) && inbound.tls.is_none()
+    {
         return Err(Error::Unsupported);
     }
     if let Some(tls) = &inbound.tls {
@@ -162,7 +396,12 @@ pub fn decode(data: &[u8]) -> Result<Candidate, Error> {
         }
     }
     let shadowsocks = if protocol == Protocol::Shadowsocks {
-        if inbound.tls.is_some() {
+        if inbound.tls.is_some()
+            && !inbound
+                .transport
+                .as_ref()
+                .is_some_and(|transport| transport.kind == "ws")
+        {
             return Err(Error::Unsupported);
         }
         let settings = node_core::shadowsocks::Settings {
@@ -177,12 +416,52 @@ pub fn decode(data: &[u8]) -> Result<Candidate, Error> {
         }
         None
     };
+    let quic = if matches!(protocol, Protocol::Hysteria2 | Protocol::Tuic) {
+        let settings = inbound.quic.unwrap_or_default();
+        settings.validate(protocol)?;
+        Some(settings)
+    } else {
+        if inbound.quic.is_some() {
+            return Err(Error::Config);
+        }
+        None
+    };
+    let extended = if matches!(
+        protocol,
+        Protocol::Vmess
+            | Protocol::AnyTls
+            | Protocol::Vless
+            | Protocol::Trojan
+            | Protocol::Shadowsocks
+    ) {
+        let settings = inbound.extended.unwrap_or_default();
+        settings.config()?;
+        Some(settings)
+    } else {
+        if inbound.extended.is_some() {
+            return Err(Error::Config);
+        }
+        None
+    };
+    if let Some(transport) = &inbound.transport {
+        transport.validate(protocol, inbound.tls.as_ref())?;
+    }
+    if let Some(plugin) = &inbound.plugin {
+        plugin.validate()?;
+        if protocol != Protocol::Shadowsocks
+            || inbound.transport.is_some()
+            || inbound.tls.is_some()
+            || inbound.users.iter().any(|user| user.device_limit != 0)
+        {
+            return Err(Error::Unsupported);
+        }
+    }
     let mut auth = Snapshot::new(protocol, inbound.users)?;
     if let Some(settings) = &shadowsocks {
         auth.configure_shadowsocks(settings)?;
     }
     let auth = Arc::new(auth);
-    if auth.has_vision() && inbound.tls.is_none() {
+    if auth.has_vision() && (inbound.tls.is_none() || inbound.transport.is_some()) {
         return Err(Error::Unsupported);
     }
     Ok(Candidate {
@@ -196,6 +475,10 @@ pub fn decode(data: &[u8]) -> Result<Candidate, Error> {
             port: inbound.listen_port,
             tls: inbound.tls,
             shadowsocks,
+            quic,
+            extended,
+            transport: inbound.transport,
+            plugin: inbound.plugin,
             log: config.log,
         },
         auth,

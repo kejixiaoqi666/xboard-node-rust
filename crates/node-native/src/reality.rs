@@ -192,49 +192,6 @@ fn client_name(data: &[u8]) -> Option<&str> {
     name.filter(|n| tls13 && node_core::routing::valid_domain(n))
 }
 
-fn server_tls13(data: &[u8]) -> bool {
-    fn check(data: &[u8]) -> Option<()> {
-        if data.len() < 9 || data[0] != 22 || data[5] != 2 {
-            return None;
-        }
-        let n = ((data[6] as usize) << 16) | ((data[7] as usize) << 8) | data[8] as usize;
-        if n + 9 != data.len() {
-            return None;
-        }
-        let mut c = Cursor(&data[9..]);
-        c.take(2)?;
-        let random = c.take(32)?;
-        const HRR: [u8; 32] = [
-            0xcf, 0x21, 0xad, 0x74, 0xe5, 0x9a, 0x61, 0x11, 0xbe, 0x1d, 0x8c, 0x02, 0x1e, 0x65,
-            0xb8, 0x91, 0xc2, 0xa2, 0x11, 0x16, 0x7a, 0xbb, 0x8c, 0x5e, 0x07, 0x9e, 0x09, 0xe2,
-            0xc8, 0xa8, 0x33, 0x9c,
-        ];
-        if random == HRR {
-            return None;
-        }
-        let n = c.byte()? as usize;
-        c.take(n)?;
-        c.take(3)?;
-        let mut e = Cursor(c.vector()?);
-        if !c.0.is_empty() {
-            return None;
-        }
-        let mut version = false;
-        while !e.0.is_empty() {
-            let id = e.length()?;
-            let v = e.vector()?;
-            if id == 43 {
-                if version || v != [3, 4] {
-                    return None;
-                }
-                version = true;
-            }
-        }
-        version.then_some(())
-    }
-    check(data).is_some()
-}
-
 async fn fallback<S: AsyncRead + AsyncWrite + Unpin>(
     mut client: S,
     mut mirror: TcpStream,
@@ -254,7 +211,7 @@ async fn fallback<S: AsyncRead + AsyncWrite + Unpin>(
     Ok(())
 }
 
-pub(super) async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
+pub(super) async fn connection<S: AsyncRead + AsyncWrite + Unpin + Send + 'static>(
     mut client: S,
     settings: &Settings,
     context: ConnectionContext<'_>,
@@ -284,6 +241,9 @@ pub(super) async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
         }
         mirror.flush().await?;
         let mut session = RealityServerConnection::new(crate::reality_config(settings)?)?;
+        if let Some(seed) = &settings.mldsa65_seed {
+            session.configure_mldsa65(seed)?;
+        }
         let authenticated = hello.authentication.as_ref().is_some_and(|h| {
             client_name(h).is_some_and(|n| n.eq_ignore_ascii_case(&settings.server_name))
                 && session.validate_client_hello(h).is_ok()
@@ -291,29 +251,13 @@ pub(super) async fn connection<S: AsyncRead + AsyncWrite + Unpin>(
         if !authenticated {
             return Ok::<_, Error>(Err((client, mirror, Vec::new())));
         }
-        let mut records = Vec::new();
-        let mut total = 0;
-        for _ in 0..16 {
-            let r = record(&mut mirror).await?;
-            total += r.len();
-            if total > MAX_MIRROR_BYTES {
-                return Err(Error::Protocol);
-            }
-            let bad = records.is_empty() && !server_tls13(&r);
-            records.push(r);
-            if bad {
-                return Ok(Err((client, mirror, records)));
-            }
-            if records.len() >= 6 || (records.len() >= 3 && records[2].len() > 512) {
-                break;
-            }
-        }
-        if records.len() < 3
-            || records[1].as_ref() != [20, 3, 3, 0, 1, 1]
-            || records[2..].iter().any(|r| r[0] != 23)
-        {
-            return Err(Error::Protocol);
-        }
+        let records =
+            match node_reality::mirror_handshake(&mut session, &mut client, &mut mirror).await? {
+                node_reality::MirrorFlight::Ready(records) => records,
+                node_reality::MirrorFlight::Forward(records) => {
+                    return Ok(Err((client, mirror, records)));
+                }
+            };
         drop(mirror);
         session.build_server_response(records)?;
         let mut writes = Vec::with_capacity(4096);
@@ -526,7 +470,7 @@ mod tests {
         ));
         let limits = Arc::new(crate::limits::Registry::default());
         let slots = Arc::new(tokio::sync::Semaphore::new(1));
-        let network = crate::network::Network::direct();
+        let network = Arc::new(crate::network::Network::direct());
         let (mut peer, inbound) = tokio::io::duplex(4096);
         let work = async {
             connection(
@@ -539,6 +483,9 @@ mod tests {
                     limits: &limits,
                     udp_slots: &slots,
                     network: &network,
+                    extended: node_extended::Config::default(),
+                    stop: None,
+                    tag: Arc::from("vless-in"),
                 },
             )
             .await

@@ -132,6 +132,37 @@ pub struct WebSocketConfig {
     pub ws_url: String,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct MachineNode {
+    pub id: u32,
+    #[serde(rename = "type")]
+    pub kind: String,
+    #[serde(default)]
+    pub name: String,
+}
+#[derive(Deserialize)]
+struct MachineNodes {
+    nodes: Vec<MachineNode>,
+}
+fn telemetry_ack(data: &[u8]) -> Result<(), PanelError> {
+    let value: Value = serde_json::from_slice(data).map_err(|_| PanelError::Decode)?;
+    let object = value.as_object().ok_or(PanelError::Decode)?;
+    if object.get("data") != Some(&Value::Bool(true))
+        || object
+            .get("code")
+            .is_some_and(|code| code.as_i64() != Some(0))
+        || object
+            .get("message")
+            .is_some_and(|message| !message.is_string())
+        || object
+            .keys()
+            .any(|key| !matches!(key.as_str(), "data" | "code" | "message"))
+    {
+        return Err(PanelError::Decode);
+    }
+    Ok(())
+}
+
 #[derive(Debug, Serialize)]
 pub struct ResourceUse {
     pub total: u64,
@@ -312,10 +343,102 @@ impl Panel {
         }
         serde_json::from_value(value).map_err(|_| PanelError::Decode)
     }
-    pub async fn report(&self, report: Report) -> Result<(), PanelError> {
-        self.post("api/v2/server/report", report.json()?)
+    pub async fn machine_nodes(&self) -> Result<Vec<MachineNode>, PanelError> {
+        if self.auth.machine_id.is_none() {
+            return Err(PanelError::Auth);
+        }
+        let data = self.post("api/v2/server/machine/nodes", Map::new()).await?;
+        let response: MachineNodes =
+            serde_json::from_slice(&data).map_err(|_| PanelError::Decode)?;
+        let mut ids = std::collections::HashSet::new();
+        if response.nodes.len() > 64
+            || response.nodes.iter().any(|node| {
+                node.id == 0 || node.kind.is_empty() || node.kind.len() > 32 || !ids.insert(node.id)
+            })
+        {
+            return Err(PanelError::Decode);
+        }
+        Ok(response.nodes)
+    }
+    /// Observations contain no traffic deltas, so reconnecting cannot rebill.
+    pub async fn report_observations(
+        &self,
+        activity: &node_core::ActivitySnapshot,
+        status: Value,
+        metrics: Value,
+    ) -> Result<(), PanelError> {
+        if !activity.validate() {
+            return Err(PanelError::Decode);
+        }
+        let mut body = Map::new();
+        body.insert("alive".into(), json!(activity.alive));
+        body.insert("online".into(), json!(activity.online));
+        body.insert("status".into(), status);
+        body.insert("metrics".into(), metrics);
+        let data = self.post("api/v2/server/report", body).await?;
+        if serde_json::from_slice::<Value>(&data).ok() != Some(json!({"data":true})) {
+            return Err(PanelError::Decode);
+        }
+        Ok(())
+    }
+    async fn legacy_post(&self, path: &str, body: Value) -> Result<Vec<u8>, PanelError> {
+        let mut url = self.path(path)?;
+        self.auth.query(&mut url);
+        let response = self
+            .http
+            .post(url)
+            .json(&body)
+            .send()
             .await
-            .map(|_| ())
+            .map_err(|_| PanelError::Transport)?;
+        self.response(response).await
+    }
+    pub async fn report_activity(
+        &self,
+        activity: &node_core::ActivitySnapshot,
+    ) -> Result<(), PanelError> {
+        if !activity.validate() {
+            return Err(PanelError::Decode);
+        }
+        let data = if self.auth.machine_id.is_some() {
+            let mut body = Map::new();
+            body.insert("alive".into(), json!(activity.alive));
+            body.insert("online".into(), json!(activity.online));
+            self.post("api/v2/server/report", body).await?
+        } else {
+            self.legacy_post("api/v1/server/UniProxy/alive", json!(activity.alive))
+                .await?
+        };
+        telemetry_ack(&data)
+    }
+    pub async fn report_status(&self, status: Value, metrics: Value) -> Result<(), PanelError> {
+        let data = if self.auth.machine_id.is_some() {
+            let mut body = Map::new();
+            body.insert("status".into(), status);
+            body.insert("metrics".into(), metrics);
+            self.post("api/v2/server/report", body).await?
+        } else {
+            self.legacy_post("api/v1/server/UniProxy/status", status)
+                .await?
+        };
+        telemetry_ack(&data)
+    }
+    pub async fn machine_status(&self, status: Value) -> Result<(), PanelError> {
+        if self.auth.machine_id.is_none() || !status.is_object() {
+            return Err(PanelError::Auth);
+        }
+        telemetry_ack(
+            &self
+                .post(
+                    "api/v2/server/machine/status",
+                    status.as_object().cloned().ok_or(PanelError::Decode)?,
+                )
+                .await?,
+        )
+    }
+    pub async fn report(&self, report: Report) -> Result<(), PanelError> {
+        let data = self.post("api/v2/server/report", report.json()?).await?;
+        telemetry_ack(&data)
     }
 
     /// Stable, credential-free destination binding for a persisted traffic outbox.
@@ -340,11 +463,21 @@ impl Panel {
         {
             return ReportOutcome::NotSent;
         }
-        let Ok(url) = self.path("api/v2/server/report") else {
+        let Ok(mut url) = self.path(if self.auth.machine_id.is_some() {
+            "api/v2/server/report"
+        } else {
+            "api/v1/server/UniProxy/push"
+        }) else {
             return ReportOutcome::NotSent;
         };
-        let mut body = self.auth.payload();
-        body.insert("traffic".into(), json!(traffic));
+        let body = if self.auth.machine_id.is_some() {
+            let mut body = self.auth.payload();
+            body.insert("traffic".into(), json!(traffic));
+            Value::Object(body)
+        } else {
+            self.auth.query(&mut url);
+            json!(traffic)
+        };
         match self.http.post(url).json(&body).send().await {
             Ok(response) => match self.response(response).await {
                 Ok(body) => {
@@ -354,6 +487,15 @@ impl Panel {
                         Ok(Value::Object(object))
                             if object.len() == 1
                                 && object.get("data") == Some(&Value::Bool(true)) =>
+                        {
+                            ReportOutcome::Acknowledged
+                        }
+                        Ok(value)
+                            if self.auth.machine_id.is_none()
+                                && telemetry_ack(
+                                    &serde_json::to_vec(&value).unwrap_or_default(),
+                                )
+                                .is_ok() =>
                         {
                             ReportOutcome::Acknowledged
                         }

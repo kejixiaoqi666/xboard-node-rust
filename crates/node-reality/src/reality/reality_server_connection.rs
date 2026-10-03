@@ -9,6 +9,7 @@ use rand::RngCore;
 use ring::digest;
 use std::io::{self, Read, Write};
 use subtle::ConstantTimeEq;
+use zeroize::{Zeroize, Zeroizing};
 
 use super::common::{
     ALERT_DESC_CLOSE_NOTIFY, ALERT_LEVEL_WARNING, CIPHERTEXT_READ_BUF_CAPACITY, CONTENT_TYPE_ALERT,
@@ -16,9 +17,10 @@ use super::common::{
     HANDSHAKE_TYPE_FINISHED, PLAINTEXT_READ_BUF_CAPACITY, TLS_MAX_RECORD_SIZE,
     TLS_RECORD_HEADER_SIZE,
 };
+use super::hello::{MLKEM_PUBLIC_LEN, SECP256R1, X25519_MLKEM768, parse_client, parse_server};
 use super::reality_aead::{AeadKey, decrypt_handshake_message};
 use super::reality_auth::{decrypt_session_id, derive_auth_key, perform_ecdh};
-use super::reality_certificate::generate_hmac_certificate;
+use super::reality_certificate::{decode_mldsa65_seed, generate_certificate};
 use super::reality_cipher_suite::{CipherSuite, DEFAULT_CIPHER_SUITES};
 use super::reality_io_state::RealityIoState;
 use super::reality_reader_writer::{RealityReader, RealityWriter};
@@ -29,11 +31,13 @@ use super::reality_tls13_keys::{
 };
 use super::reality_tls13_messages::{
     construct_certificate, construct_certificate_verify, construct_encrypted_extensions,
-    construct_finished, construct_server_hello, write_record_header,
+    construct_finished, construct_server_hello_for_group, write_record_header,
 };
-use super::reality_util::{
-    extract_client_cipher_suites, extract_client_public_key, extract_client_random,
-    extract_session_id_slice, negotiate_cipher_suite,
+use super::reality_util::{extract_client_cipher_suites, negotiate_cipher_suite};
+use ml_dsa::{MlDsa65, SigningKey};
+use ml_kem::{
+    EncapsulationKey768,
+    kem::{Encapsulate, Key},
 };
 
 use crate::slide_buffer::SlideBuffer;
@@ -66,7 +70,7 @@ pub struct RealityServerConfig {
 }
 
 /// Handshake state machine for REALITY server
-enum HandshakeState {
+pub(super) enum HandshakeState {
     /// Initial state, waiting for ClientHello
     Initial,
     /// ClientHello validated, waiting to build response with dest structure
@@ -96,15 +100,27 @@ pub struct ClientHelloInfo {
     pub cipher_suite: CipherSuite,
     /// Raw ClientHello handshake bytes (for transcript hash)
     pub client_hello_handshake: Vec<u8>,
+    client_hello_record: Vec<u8>,
+    pub(super) transcript_prefix: Vec<u8>,
+}
+
+struct RetryInfo {
+    record: Vec<u8>,
+    group: u16,
+    cookie: Option<Vec<u8>>,
+    suite: CipherSuite,
+    validated: bool,
 }
 
 /// REALITY server-side connection implementing rustls-compatible API
 pub struct RealityServerConnection {
     // Configuration
     config: RealityServerConfig,
+    mldsa65: Option<SigningKey<MlDsa65>>,
+    retry: Option<RetryInfo>,
 
     // Handshake state
-    handshake_state: HandshakeState,
+    pub(super) handshake_state: HandshakeState,
 
     // TLS 1.3 application traffic encryption (post-handshake)
     // Keys are cached as AeadKey to avoid per-record key setup overhead
@@ -149,6 +165,8 @@ impl RealityServerConnection {
         }
         Ok(RealityServerConnection {
             config,
+            mldsa65: None,
+            retry: None,
             handshake_state: HandshakeState::Initial,
             app_read_key: None,
             app_read_iv: None,
@@ -169,6 +187,109 @@ impl RealityServerConnection {
             received_close_notify: false,
             fatal_error: None,
         })
+    }
+
+    /// Configure optional Xray-compatible ML-DSA-65 certificate verification.
+    /// Configuration is accepted before reading the initial ClientHello only.
+    pub fn configure_mldsa65(&mut self, seed: &str) -> io::Result<()> {
+        if !matches!(self.handshake_state, HandshakeState::Initial) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ML-DSA configuration after handshake start",
+            ));
+        }
+        self.mldsa65 = Some(decode_mldsa65_seed(seed)?);
+        Ok(())
+    }
+
+    /// Accept one authenticated outer HRR. The caller forwards this exact record
+    /// to the client and retains the fixed mirror while receiving ClientHello2.
+    pub fn observe_hello_retry_request(&mut self, record: &[u8]) -> io::Result<()> {
+        let HandshakeState::ClientHelloValidated { info } = &self.handshake_state else {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "HRR in wrong handshake state",
+            ));
+        };
+        let first = parse_client(&info.client_hello_record)?;
+        let hrr = parse_server(record)?;
+        let suite = CipherSuite::from_id(hrr.suite)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "unsupported HRR cipher"))?;
+        if self.retry.is_some()
+            || !hrr.retry
+            || hrr.session_id != first.session_id
+            || !first.suites.contains(&hrr.suite)
+            || !first.groups.contains(&hrr.group)
+            || first.shares.contains_key(&hrr.group)
+            || (!self.config.cipher_suites.is_empty()
+                && !self.config.cipher_suites.contains(&suite))
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "invalid REALITY outer HRR",
+            ));
+        }
+        self.retry = Some(RetryInfo {
+            record: record.to_vec(),
+            group: hrr.group,
+            cookie: hrr.cookie.map(|v| v.to_vec()),
+            suite,
+            validated: false,
+        });
+        Ok(())
+    }
+
+    /// ClientHello2 must preserve the authenticated ClientHello1 identity and
+    /// every extension other than key_share, cookie and zero-valued padding.
+    /// Authentication stays bound to CH1; Xray does not re-encrypt its session ID.
+    pub fn validate_retry_client_hello(&mut self, record: &[u8]) -> io::Result<()> {
+        let HandshakeState::ClientHelloValidated { info } = &mut self.handshake_state else {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "retry ClientHello in wrong state",
+            ));
+        };
+        let retry = self
+            .retry
+            .as_mut()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "no outer HRR"))?;
+        let first = parse_client(&info.client_hello_record)?;
+        let next = parse_client(record)?;
+        let unchanged = |ext: &std::collections::BTreeMap<u16, &[u8]>| {
+            ext.iter()
+                .filter(|(id, _)| ![21, 44, 51].contains(id))
+                .map(|(id, v)| (*id, v.to_vec()))
+                .collect::<std::collections::BTreeMap<_, _>>()
+        };
+        if retry.validated
+            || first.random != next.random
+            || first.session_id != next.session_id
+            || first.suites != next.suites
+            || unchanged(&first.extensions) != unchanged(&next.extensions)
+            || next.extensions.get(&44).copied() != retry.cookie.as_deref()
+            || next.shares.len() != 1
+            || !next.shares.contains_key(&retry.group)
+            || next
+                .extensions
+                .get(&21)
+                .is_some_and(|v| v.iter().any(|b| *b != 0))
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "REALITY retry ClientHello changed authenticated identity",
+            ));
+        }
+        // RFC 8446 4.4.1: replace CH1 with synthetic message_hash(Hash(CH1)).
+        let hash = digest::digest(retry.suite.digest_algorithm(), first.handshake);
+        let mut prefix = vec![254, 0, 0, hash.as_ref().len() as u8];
+        prefix.extend_from_slice(hash.as_ref());
+        prefix.extend_from_slice(&retry.record[5..]);
+        info.transcript_prefix = prefix;
+        info.client_hello_record = record.to_vec();
+        info.client_hello_handshake = next.handshake.to_vec();
+        info.cipher_suite = retry.suite;
+        retry.validated = true;
+        Ok(())
     }
 
     #[cfg(test)]
@@ -351,7 +472,12 @@ impl RealityServerConnection {
             ));
         }
 
-        self.build_server_response_internal(&dest_records)
+        let result = self.build_server_response_internal(&dest_records);
+        if let Err(error) = &result {
+            self.fatal_error = Some(error.kind());
+            self.ciphertext_write_buf.clear();
+        }
+        result
     }
 
     /// Phase 1: Validate ClientHello and extract info for later response building
@@ -366,9 +492,10 @@ impl RealityServerConnection {
         }
 
         // Extract fields from ClientHello
-        let client_random = extract_client_random(client_hello)?;
-        let session_id = extract_session_id_slice(client_hello)?;
-        let client_public_key = extract_client_public_key(client_hello)?;
+        let parsed = parse_client(client_hello)?;
+        let client_random = parsed.random;
+        let session_id = parsed.session_id;
+        let client_public_key = parsed.auth_public()?;
 
         // Perform ECDH to derive auth key
         let shared_secret = perform_ecdh(&self.config.private_key, &client_public_key)
@@ -521,6 +648,8 @@ impl RealityServerConnection {
                 auth_key,
                 cipher_suite,
                 client_hello_handshake: client_hello_handshake.to_vec(),
+                client_hello_record: client_hello.to_vec(),
+                transcript_prefix: Vec::new(),
             },
         };
 
@@ -536,35 +665,116 @@ impl RealityServerConnection {
             unreachable!()
         };
 
-        let cipher_suite = info.cipher_suite;
+        let hello = parse_server(dest_records.first().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidData, "missing mirror ServerHello")
+        })?)?;
+        let client = parse_client(&info.client_hello_record)?;
+        let cipher_suite = CipherSuite::from_id(hello.suite).ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidData, "unsupported mirror cipher")
+        })?;
+        if hello.retry
+            || hello.session_id != info.session_id
+            || !client.suites.contains(&hello.suite)
+            || (!self.config.cipher_suites.is_empty()
+                && !self.config.cipher_suites.contains(&cipher_suite))
+            || self
+                .retry
+                .as_ref()
+                .is_some_and(|r| !r.validated || r.group != hello.group || r.suite != cipher_suite)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "invalid mirror ServerHello selection",
+            ));
+        }
+        let peer_share = client.shares.get(&hello.group).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "mirror selected an unoffered key share",
+            )
+        })?;
 
         // Generate our server X25519 keypair
         let mut rng = rand::rng();
-        let mut our_private_bytes = [0u8; 32];
-        rng.fill_bytes(&mut our_private_bytes);
+        let mut our_private_bytes = Zeroizing::new([0u8; 32]);
+        rng.fill_bytes(&mut *our_private_bytes);
 
         let our_public_key_bytes =
-            x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(our_private_bytes));
+            x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(*our_private_bytes));
         // Generate server random
         let mut server_random = [0u8; 32];
         rng.fill_bytes(&mut server_random);
 
         // Build ServerHello
-        let server_hello = construct_server_hello(
+        let (mut tls_shared_secret, mut server_share) = if hello.group == SECP256R1 {
+            let private = ring::agreement::EphemeralPrivateKey::generate(
+                &ring::agreement::ECDH_P256,
+                &ring::rand::SystemRandom::new(),
+            )
+            .map_err(|_| io::Error::other("P-256 key generation failed"))?;
+            let public = private
+                .compute_public_key()
+                .map_err(|_| io::Error::other("P-256 public key failed"))?;
+            let peer =
+                ring::agreement::UnparsedPublicKey::new(&ring::agreement::ECDH_P256, peer_share);
+            let shared = ring::agreement::agree_ephemeral(private, &peer, |secret| secret.to_vec())
+                .map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidData, "invalid P-256 peer key")
+                })?;
+            (shared, public.as_ref().to_vec())
+        } else {
+            let peer_public: [u8; 32] =
+                peer_share[peer_share.len() - 32..]
+                    .try_into()
+                    .map_err(|_| {
+                        io::Error::new(io::ErrorKind::InvalidData, "invalid peer key share")
+                    })?;
+            (
+                perform_ecdh(&our_private_bytes, &peer_public)?.to_vec(),
+                our_public_key_bytes.as_bytes().to_vec(),
+            )
+        };
+        if hello.group == X25519_MLKEM768 {
+            let encoded: Key<EncapsulationKey768> =
+                peer_share[..MLKEM_PUBLIC_LEN].try_into().map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidData, "invalid ML-KEM key length")
+                })?;
+            let key = EncapsulationKey768::new(&encoded).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidData, "invalid ML-KEM public key")
+            })?;
+            let (ciphertext, mut secret) = key.encapsulate();
+            tls_shared_secret = secret
+                .as_slice()
+                .iter()
+                .chain(tls_shared_secret.iter())
+                .copied()
+                .collect();
+            secret.as_mut_slice().zeroize();
+            server_share = ciphertext
+                .as_slice()
+                .iter()
+                .chain(our_public_key_bytes.as_bytes().iter())
+                .copied()
+                .collect();
+        }
+        let server_hello = construct_server_hello_for_group(
             &server_random,
             &info.session_id,
             cipher_suite.id(),
-            our_public_key_bytes.as_ref(),
+            hello.group,
+            &server_share,
         )?;
 
         // Compute transcript hashes using cipher suite's digest algorithm
         let digest_alg = cipher_suite.digest_algorithm();
 
         let mut ch_transcript = digest::Context::new(digest_alg);
+        ch_transcript.update(&info.transcript_prefix);
         ch_transcript.update(&info.client_hello_handshake);
         let client_hello_hash = ch_transcript.finish();
 
         let mut ch_sh_transcript = digest::Context::new(digest_alg);
+        ch_sh_transcript.update(&info.transcript_prefix);
         ch_sh_transcript.update(&info.client_hello_handshake);
         ch_sh_transcript.update(&server_hello);
 
@@ -572,7 +782,6 @@ impl RealityServerConnection {
         let server_hello_hash = ch_sh_transcript.finish();
 
         // Perform ECDH for TLS 1.3 key derivation
-        let tls_shared_secret = perform_ecdh(&our_private_bytes, &info.client_public_key)?;
         // Derive TLS 1.3 keys
         let hs_keys = derive_handshake_keys(
             cipher_suite,
@@ -580,11 +789,26 @@ impl RealityServerConnection {
             client_hello_hash.as_ref(),
             server_hello_hash.as_ref(),
         )?;
+        tls_shared_secret.zeroize();
 
         // Get destination hostname for certificate
         let dest_hostname = self.config.server_name.as_str();
         // Generate HMAC-signed certificate
-        let (cert, signing_key) = generate_hmac_certificate(&info.auth_key, dest_hostname)?;
+        // Xray v26.3.27's pinned uTLS retains the public ServerHello slot as HRR
+        // during VerifyPeerCertificate, although its TLS transcript uses SH2.
+        // Match that exact extra-signature input; CertificateVerify and Finished
+        // still authenticate the RFC transcript including the final ServerHello.
+        let public_hello = self
+            .retry
+            .as_ref()
+            .map_or(server_hello.as_slice(), |r| &r.record[5..]);
+        let (cert, signing_key) = generate_certificate(
+            &info.auth_key,
+            dest_hostname,
+            self.mldsa65.as_ref(),
+            &info.client_hello_handshake,
+            public_hello,
+        )?;
 
         // Build encrypted handshake messages
         let encrypted_extensions = construct_encrypted_extensions()?;
@@ -614,11 +838,11 @@ impl RealityServerConnection {
 
         // Analyze dest's record structure to determine how to encrypt
         // dest_records: [0]=ServerHello, [1]=CCS, [2..]=encrypted handshake, possibly NewSessionTicket
-        let dest_encrypted_records: Vec<&bytes::Bytes> = if dest_records.len() > 2 {
-            dest_records[2..].iter().collect()
-        } else {
-            vec![]
-        };
+        let dest_encrypted_records: Vec<&bytes::Bytes> = dest_records
+            .iter()
+            .skip(1)
+            .filter(|r| r.first() == Some(&23))
+            .collect();
 
         // Build handshake messages array
         let messages: [&[u8]; 4] = [
@@ -686,9 +910,11 @@ impl RealityServerConnection {
         self.ciphertext_write_buf.extend_from_slice(&server_hello);
 
         // ChangeCipherSpec (for compatibility)
-        self.ciphertext_write_buf
-            .extend_from_slice(&write_record_header(CONTENT_TYPE_CHANGE_CIPHER_SPEC, 1));
-        self.ciphertext_write_buf.push(0x01);
+        if self.retry.is_none() {
+            self.ciphertext_write_buf
+                .extend_from_slice(&write_record_header(CONTENT_TYPE_CHANGE_CIPHER_SPEC, 1));
+            self.ciphertext_write_buf.push(0x01);
+        }
 
         // Encrypted handshake record(s)
         self.ciphertext_write_buf

@@ -34,10 +34,20 @@ fn canonical_ip(ip: IpAddr) -> IpAddr {
     }
 }
 
-#[derive(Default)]
 pub(crate) struct Registry {
     accounts: Mutex<HashMap<Arc<str>, Arc<Account>>>,
     users: Option<Users>,
+    auth_changes: tokio::sync::watch::Sender<u64>,
+}
+impl Default for Registry {
+    fn default() -> Self {
+        let (auth_changes, _) = tokio::sync::watch::channel(0);
+        Self {
+            accounts: Mutex::default(),
+            users: None,
+            auth_changes,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -53,7 +63,40 @@ impl Registry {
         Self {
             accounts: Mutex::default(),
             users: Some(users),
+            ..Self::default()
         }
+    }
+    pub fn subscribe_auth(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.auth_changes.subscribe()
+    }
+    pub fn notify_users_changed(&self) {
+        self.auth_changes
+            .send_modify(|epoch| *epoch = epoch.wrapping_add(1));
+    }
+    pub fn activity(&self) -> node_core::ActivitySnapshot {
+        let registry = self.accounts.lock().unwrap_or_else(|e| e.into_inner());
+        let mut result = node_core::ActivitySnapshot::default();
+        for (name, account) in registry.iter() {
+            let Ok(id) = name.parse::<i64>() else {
+                continue;
+            };
+            if id <= 0 {
+                continue;
+            }
+            let ips = account.ips.lock().unwrap_or_else(|e| e.into_inner());
+            if ips.is_empty() {
+                continue;
+            }
+            let sessions = ips.values().sum::<usize>();
+            result.sessions = result.sessions.saturating_add(sessions as u64);
+            let mut addresses: Vec<_> = ips.keys().map(ToString::to_string).collect();
+            addresses.sort_unstable();
+            result
+                .online
+                .insert(id, u32::try_from(sessions).unwrap_or(u32::MAX));
+            result.alive.insert(id, addresses);
+        }
+        result
     }
     pub fn acquire(
         self: &Arc<Self>,

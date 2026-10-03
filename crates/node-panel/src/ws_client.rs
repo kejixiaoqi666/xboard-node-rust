@@ -76,6 +76,8 @@ pub struct WsClient {
     auth: Auth,
     backoff_initial: Duration,
     backoff_max: Duration,
+    handshake_timeout: Duration,
+    ping_period: Duration,
 }
 impl WsClient {
     /// Handshake-discovered endpoints must remain on the configured HTTPS origin.
@@ -118,7 +120,25 @@ impl WsClient {
             auth,
             backoff_initial: backoff_initial.max(Duration::from_millis(1)),
             backoff_max: backoff_max.max(backoff_initial),
+            handshake_timeout: Duration::from_secs(15),
+            ping_period: Duration::from_secs(30),
         })
+    }
+    pub fn with_tuning(
+        mut self,
+        handshake: Duration,
+        ping: Duration,
+    ) -> Result<Self, WsClientError> {
+        if handshake.is_zero()
+            || handshake > Duration::from_secs(120)
+            || ping.is_zero()
+            || ping > Duration::from_secs(3600)
+        {
+            return Err(WsClientError::Url);
+        }
+        self.handshake_timeout = handshake;
+        self.ping_period = ping;
+        Ok(self)
     }
     pub fn authenticated_url_for_test(&self) -> Result<Url, WsClientError> {
         self.authenticated_url()
@@ -199,7 +219,7 @@ impl WsClient {
                 if changed.is_err() || *stop.borrow() { return Ok(()); }
                 return Err(WsClientError::Connect);
             }
-            result = tokio::time::timeout(Duration::from_secs(15), connect) => {
+            result = tokio::time::timeout(self.handshake_timeout, connect) => {
                 result.map_err(|_| WsClientError::Connect)?.map_err(|_| WsClientError::Connect)?
             }
         };
@@ -210,25 +230,29 @@ impl WsClient {
                 if changed.is_err() || *stop.borrow() { return Ok(()); }
                 return Err(WsClientError::Connect);
             }
-            result = tokio::time::timeout(Duration::from_secs(15), socket.next()) => {
+            result = tokio::time::timeout(self.handshake_timeout, socket.next()) => {
                 result.map_err(|_| WsClientError::Connect)?
                     .ok_or(WsClientError::Connect)?
                     .map_err(|_| WsClientError::Connect)?
             }
         };
         check_auth_ack(first)?;
+        let mut ping = tokio::time::interval(self.ping_period);
+        ping.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        ping.tick().await;
         loop {
-            let message = tokio::select! { changed = stop.changed() => { if changed.is_err() || *stop.borrow() { let _ = socket.close(None).await; return Ok(()); } continue; }, next = socket.next() => next };
+            let message = tokio::select! {
+                changed = stop.changed() => { if changed.is_err() || *stop.borrow() { let _ = tokio::time::timeout(Duration::from_secs(2),socket.close(None)).await; return Ok(()); } continue; },
+                _=ping.tick()=> { tokio::time::timeout(self.handshake_timeout,socket.send(Message::Ping(Default::default()))).await.map_err(|_|WsClientError::Message)?.map_err(|_|WsClientError::Message)?;continue; },
+                next = socket.next() => next
+            };
             let Some(message) = message else {
                 return Err(WsClientError::Message);
             };
             let message = message.map_err(|_| WsClientError::Message)?;
             match message {
                 Message::Ping(payload) => {
-                    socket
-                        .send(Message::Pong(payload))
-                        .await
-                        .map_err(|_| WsClientError::Message)?;
+                    tokio::select! {changed=stop.changed()=>{let _=changed;return Ok(());},result=tokio::time::timeout(self.handshake_timeout,socket.send(Message::Pong(payload)))=>{result.map_err(|_|WsClientError::Message)?.map_err(|_|WsClientError::Message)?;}}
                 }
                 Message::Pong(_) => {}
                 Message::Close(_) => return Err(WsClientError::Message),

@@ -58,8 +58,10 @@ async fn handshake_is_post_with_body_auth_and_no_url_secret() {
 
 #[tokio::test]
 async fn report_shape_matches_go_and_http_error_does_not_echo_secret() {
-    let (base, request) =
-        serve_once("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}").await;
+    let (base, request) = serve_once(
+        "HTTP/1.1 200 OK\r\nContent-Length: 13\r\nConnection: close\r\n\r\n{\"data\":true}",
+    )
+    .await;
     let panel = Panel::new_for_test(&base, auth()).unwrap();
     let mut traffic = BTreeMap::new();
     traffic.insert(9, [12, 34]);

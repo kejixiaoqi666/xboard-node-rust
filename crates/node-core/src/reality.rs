@@ -24,6 +24,9 @@ pub struct Settings {
     pub min_client_version: Option<[u8; 3]>,
     #[serde(default)]
     pub max_client_version: Option<[u8; 3]>,
+    /// URL-safe unpadded 32-byte ML-DSA-65 signing seed, matching Xray mldsa65.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mldsa65_seed: Option<String>,
 }
 pub const MAX_KEY_UPDATE_RECORDS: u64 = 1 << 20;
 pub const MIN_KEY_UPDATE_RECORDS: u64 = 16;
@@ -70,6 +73,7 @@ impl Settings {
             |s: &str| s.len() == 43 && URL_SAFE_NO_PAD.decode(s).is_ok_and(|b| b.len() == 32);
         if !valid_key(&self.private_key)
             || self.public_key.as_deref().is_some_and(|s| !valid_key(s))
+            || self.mldsa65_seed.as_deref().is_some_and(|s| !valid_key(s))
             || !crate::routing::valid_domain(&self.server_name)
             || self.server_port == 0
             || self.max_time_diff > 3_600_000
@@ -120,5 +124,36 @@ impl Settings {
             return Err("invalid REALITY destination");
         }
         Ok((host.to_string(), port))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mldsa_seed_is_strict_and_debug_redacted() {
+        let base = serde_json::json!({"private_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","server_name":"localhost"});
+        let seed = URL_SAFE_NO_PAD.encode([0x42; 32]);
+        let mut valid = base.clone();
+        valid["mldsa65_seed"] = serde_json::json!(seed);
+        let settings: Settings = serde_json::from_value(valid).unwrap();
+        settings.validate().unwrap();
+        assert!(!format!("{settings:?}").contains(&seed));
+        for value in [
+            "bad".to_owned(),
+            format!("{seed}="),
+            URL_SAFE_NO_PAD.encode([0x42; 33]),
+            "!".repeat(43),
+        ] {
+            let mut invalid = base.clone();
+            invalid["mldsa65_seed"] = serde_json::json!(value);
+            assert!(
+                serde_json::from_value::<Settings>(invalid)
+                    .unwrap()
+                    .validate()
+                    .is_err()
+            );
+        }
     }
 }

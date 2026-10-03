@@ -16,10 +16,21 @@ pub struct Snapshot {
     vision: HashSet<Arc<str>>,
     pub(crate) shadowsocks: Option<Arc<crate::shadowsocks::Credentials>>,
     ss_pending: Vec<(Arc<str>, String)>,
+    profiles: Arc<[node_session::User]>,
+    profile_indices: HashMap<Arc<str>, usize>,
 }
 
 impl Snapshot {
     pub fn new(protocol: Protocol, users: Vec<User>) -> Result<Self, Error> {
+        if users.len()
+            > if protocol == Protocol::Vmess {
+                node_extended::MAX_VMESS_USERS
+            } else {
+                node_extended::MAX_ANYTLS_USERS
+            }
+        {
+            return Err(Error::Config);
+        }
         let mut snapshot = Self {
             vless: HashMap::new(),
             trojan: HashMap::new(),
@@ -27,8 +38,11 @@ impl Snapshot {
             vision: HashSet::new(),
             shadowsocks: None,
             ss_pending: Vec::new(),
+            profiles: Arc::from([]),
+            profile_indices: HashMap::new(),
         };
         let mut names = HashSet::with_capacity(users.len());
+        let mut profiles = Vec::with_capacity(users.len());
         for user in users {
             if user.name.is_empty()
                 || user.name.len() > 128
@@ -38,19 +52,24 @@ impl Snapshot {
                     .flow
                     .as_deref()
                     .is_some_and(|flow| !matches!(flow, "" | "xtls-rprx-vision"))
-                || matches!(protocol, Protocol::Trojan | Protocol::Shadowsocks)
+                || protocol != Protocol::Vless
                     && user.flow.as_ref().is_some_and(|flow| !flow.is_empty())
             {
                 return Err(Error::Auth);
             }
             let policy = crate::limits::Policy::new(user.speed_limit, user.device_limit)?;
             let name: Arc<str> = user.name.into();
+            let profile = node_session::User {
+                name: Arc::clone(&name),
+                uuid: user.uuid.as_deref().and_then(uuid),
+                password: user.password.as_deref().map(Arc::from),
+            };
             if user.flow.as_deref() == Some("xtls-rprx-vision") {
                 snapshot.vision.insert(Arc::clone(&name));
             }
             snapshot.policies.insert(Arc::clone(&name), policy);
             match protocol {
-                Protocol::Vless => {
+                Protocol::Vless | Protocol::Vmess => {
                     if user.password.is_some() {
                         return Err(Error::Auth);
                     }
@@ -85,9 +104,44 @@ impl Snapshot {
                         return Err(Error::Auth);
                     }
                 }
+                Protocol::AnyTls | Protocol::Hysteria2 | Protocol::Tuic => {
+                    let password = user.password.ok_or(Error::Auth)?;
+                    if password.is_empty()
+                        || password.len() > 1024
+                        || protocol == Protocol::Tuic && profile.uuid.is_none()
+                        || protocol != Protocol::Tuic && user.uuid.is_some()
+                        || snapshot
+                            .trojan
+                            .insert(trojan_key(&password), name)
+                            .is_some()
+                    {
+                        return Err(Error::Auth);
+                    }
+                }
             }
+            snapshot
+                .profile_indices
+                .insert(Arc::clone(&profile.name), profiles.len());
+            profiles.push(profile);
         }
+        snapshot.profiles = profiles.into();
         Ok(snapshot)
+    }
+    #[cfg_attr(not(any(unix, test)), allow(dead_code))]
+    pub(crate) fn profiles(&self) -> Arc<[node_session::User]> {
+        Arc::clone(&self.profiles)
+    }
+    #[cfg_attr(not(any(unix, test)), allow(dead_code))]
+    pub(crate) fn contains_profile(&self, user: &node_session::User) -> bool {
+        self.profile_indices
+            .get(&user.name)
+            .is_some_and(|index| self.profiles.get(*index) == Some(user))
+    }
+    pub(crate) fn profile(&self, name: &str) -> Option<node_session::User> {
+        self.profile_indices
+            .get(name)
+            .and_then(|index| self.profiles.get(*index))
+            .cloned()
     }
     pub(crate) fn configure_shadowsocks(
         &mut self,

@@ -172,7 +172,7 @@ fn unsupported_routes_dns_and_credentials_are_rejected_before_activation() {
         assert!(from_node(&node).is_err());
     }
     assert!(
-        serde_json::from_value::<Rule>(json!({"outbound":"block","domain_regex":[".*"]})).is_err()
+        serde_json::from_value::<Rule>(json!({"outbound":"block","domain_regex":[".*"]})).is_ok()
     );
     let mut dns = DnsConfig::default();
     dns.validate().unwrap();

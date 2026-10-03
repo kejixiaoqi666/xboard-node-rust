@@ -1,0 +1,198 @@
+{
+  "implementation_status": "OWNED_IMPLEMENTATION_VERIFIED_AND_FROZEN_READY_FOR_ROOT_INTEGRATION",
+  "last_full_isolated_run": {
+    "session_id": 99718,
+    "exit_code": 0,
+    "passed": 23,
+    "failed": 0,
+    "ignored": 0,
+    "official_implementation": "sing-box v1.14.2 Windows amd64",
+    "client_lock": "../node-quic/tests/clients-lock.json",
+    "tcp_udp_protocols": [
+      "socks5",
+      "http-connect-tcp",
+      "vless-tls",
+      "trojan-tls",
+      "shadowsocks-six-methods"
+    ],
+    "chains": [
+      "vless-via-socks",
+      "trojan-via-http",
+      "ss-via-socks",
+      "socks-via-ss",
+      "http-via-vless-tcp",
+      "ss-via-vless-via-socks"
+    ],
+    "dns": [
+      "udp",
+      "tcp",
+      "tls-dot",
+      "http2-doh-custom-path",
+      "quic-doq"
+    ],
+    "cancel": "real TCP partial header/payload continuation and 64 idle UDP receivers without packet allocation",
+    "geo_regressions": [
+      "missing directory",
+      "unknown selector",
+      "truncated protobuf",
+      "SHA mismatch after content change",
+      "source IP distinct from destination IP",
+      "17MiB file shared by two selectors",
+      "native domain server deserialization"
+    ],
+    "command": "cargo test -j 2 --manifest-path crates/node-outbound/tests/isolated/Cargo.toml -- --include-ignored --nocapture"
+  },
+  "lint": {
+    "corecheck_session_id": 46444,
+    "outbound_chunk_id": "345e0d",
+    "exit_code": 0,
+    "outbound_all_targets": "PASS -j 2 -D warnings",
+    "corecheck": "PASS -j 2 -D warnings",
+    "post_freeze_all_targets": {
+      "chunk_id": "54513c",
+      "exit_code": 0,
+      "command": "cargo clippy -j 2 --manifest-path crates/node-outbound/tests/isolated/Cargo.toml --all-targets -- -D warnings",
+      "result": "PASS"
+    }
+  },
+  "native_session_business_tests": {
+    "file": "../node-native/src/session_integration.rs",
+    "session_id": 99718,
+    "passed": 9,
+    "failed": 0,
+    "ignored": 0,
+    "platform": "Windows real TCP/UDP sockets",
+    "command": "cargo test -p node-native --lib -j 2 session:: -- --nocapture",
+    "coverage": [
+      "payload counters once",
+      "VLESS UDP auth/framing excluded",
+      "distinct-IP device gate shared by all logical streams",
+      "TCP and UDP shared user rate",
+      "pending TCP/UDP revocation",
+      "same-ID UUID change",
+      "same-ID password change",
+      "pending proxy admission revocation",
+      "SOCKS5 UDP USER/PASS, relay source and association reuse",
+      "cancel cleanup and complete 8MiB/1024 association budget recovery"
+    ],
+    "retained_first_functional_failure": {
+      "session_id": 71894,
+      "passed": 8,
+      "failed": 1,
+      "test": "profile_change_cancels_a_real_pending_proxy_handshake_and_releases_its_lease",
+      "cause": "Host.connect did not watch profile changes during the pending proxy handshake",
+      "resolution": "Root wrapped complete connect/datagram admission in full-profile revocation futures; final session 99718 passed"
+    },
+    "native_lint": "PASS -j 2 --lib --tests -D warnings",
+    "native_lint_failure_session": 99718,
+    "native_lint_errors": [
+      "session.rs possible_missing_else",
+      "config.rs field_reassign_with_default"
+    ],
+    "latest_native_lint_chunk": "e4d960",
+    "native_lint_errors_retained_as_history": true,
+    "additional_watch_regression": {
+      "test": "reentrant_watch_ready_and_unchanged_profile_notifications_do_not_repoll_or_lose_wakes",
+      "command": "cargo test -p node-native --lib -j 2 reentrant_watch_ready_and_unchanged_profile_notifications_do_not_repoll_or_lose_wakes -- --nocapture",
+      "session_id": 98457,
+      "chunk_id": "3acc69",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "filtered": 68,
+      "coverage": [
+        "Real blocked duplex read/write",
+        "A real watch change arriving while a previous changed() returns Ready",
+        "32 repeated unchanged-profile notification pairs",
+        "Same-ID credential replacement wakes and denies pending I/O",
+        "No completed future repoll/panic",
+        "Lease/activity cleanup and rejected pending bytes absent"
+      ],
+      "source_sha256": "dd001bb8216d329c7e574ba71f25786731a1bdf478ae505107a6fab6d3d60480",
+      "full_suite_after_addition": "NOT_REPEATED; prior 9 PASS retained"
+    }
+  },
+  "unverified_root_tests": [
+    "native Network proxy-failure-no-direct-fallback regression",
+    "native Network configured-hosts proxy-bootstrap regression"
+  ],
+  "source_hashes": "SOURCE_SHA256.json",
+  "pending_exec_sessions": [],
+  "root_gates": [
+    "Linux official interoperability on x86_64 and aarch64",
+    "Root full workspace/parity validation",
+    "Release/production acceptance"
+  ],
+  "production_acceptance": "NOT_RUN",
+  "checkpoint": "IMPLEMENTATION_CHECKPOINT.md",
+  "last_source_freeze_utc": "2026-10-03T16:47:39.970477Z",
+  "post_freeze_official_fixture": {
+    "command": "cargo test -j 2 --manifest-path crates/node-outbound/tests/isolated/Cargo.toml --test proxy-wire official_sing_box_servers_tcp_udp_tls_and_multihop_chains -- --include-ignored --nocapture",
+    "session_id": 21380,
+    "chunk_id": "7c4925",
+    "passed": 1,
+    "failed": 0,
+    "filtered": 2,
+    "exit_code": 0,
+    "seconds": 6.9,
+    "platform": "Windows x86_64",
+    "client": "sing-box v1.14.2 checked by fixed OS/ARCH binary SHA before execution",
+    "current_fixture_sha256": "39aba296e66e5519cf123374d251f42d22e4c255e2267ad59c4dde5cedb92ab9",
+    "retained_command_failure": {
+      "chunk_id": "e1541e",
+      "exit_code": 1,
+      "cause": "Requested --test proxy_wire; isolated manifest declares --test proxy-wire; no product or fixture ran"
+    }
+  },
+  "linux_pinned_client_support": {
+    "architectures": [
+      "x86_64",
+      "aarch64"
+    ],
+    "version": "1.14.2",
+    "hashes": "../node-quic/tests/clients-lock.json",
+    "checker": "../node-quic/tests/support/pinned_client.rs",
+    "trust": "Fixed OS/ARCH SHA in source; SING_BOX_BIN only chooses file path; no mutable environment expected SHA",
+    "official_interoperability": "NOT_RUN_BY_THIS_AGENT; CI must run ignored fixture on both architectures"
+  },
+  "root_source_review": {
+    "reviewed_utc": "2026-10-03T16:47:39.970477Z",
+    "mode": "READ_ONLY; root-owned production files not modified by this agent",
+    "files_sha256": {
+      "crates/node-native/src/config.rs": "adc165ec4bdcf285501e91842132ccaef5366f6257f0d3670f2977b60143c444",
+      "crates/node-native/src/lib.rs": "56d4f1b1084b7881908ccd7071892d1f948229af01f1b658e12bed675dd7c8af",
+      "crates/node-native/src/plugin.rs": "3f65752d2ad37c4a3c84290eb111a2dae173e9732c11c5024a33e5f31f877d19",
+      "crates/node-native/src/control.rs": "88ce98458ab0978972f5a2fe9e90f3471a7df59a791154de58f5df07e413fb34",
+      "crates/node-native/src/session.rs": "a312c908946bee9407772c7fb30c89304f87ba21a882cecc24f1fec4e12d93b9",
+      "crates/node-kernel/src/singbox.rs": "b2a2d919ee4e4222e48d9f2b7b47d8a27661c4a561acac2d9db0391e22afb2ee",
+      "crates/node-runtime/src/administration.rs": "8de92bcef724fdc2c5295fba9d67fa805a1755752b5699c8dd091dc3c0e41e1f",
+      "crates/node-runtime/src/owned_task.rs": "f6bd983088d7ca7164fd9d06de97c301e22e874d4f2935824e5a9dba8cf6f860"
+    },
+    "checked": [
+      "Bind before readiness/control status",
+      "Normal shutdown abort and join task tree",
+      "Unix external plugin process-group termination and child reaping",
+      "Certificate generation paths and restart-required TLS replacement",
+      "Full profile/watch notification after users replacement",
+      "TCP/UDP payload accounting boundary without framing double count",
+      "Fixed first allowed outbound tag and no direct fallback",
+      "Services owned listener task cancellation on drop"
+    ],
+    "finding_fixed_by_root": {
+      "file": "crates/node-native/src/session.rs",
+      "finding": "Discarding a second Ready from eager polling a replacement auth watch waiter can retain a completed future",
+      "resolution": "Create a new auth waiter and wake_by_ref; register/poll it on next I/O poll",
+      "regression_session_id": 98457,
+      "regression_chunk_id": "3acc69",
+      "result": "PASS"
+    },
+    "services_recheck": "Services stores OwnedTask handles; normal join is bounded then abort+await; Drop aborts owned handles. No additional confirmed defect found in reviewed source.",
+    "platform_limit": "Unix lifecycle reviewed as source only; this agent did not execute Unix code. Root Linux suite evidence is separate.",
+    "status": "NO_ADDITIONAL_CONFIRMED_DEFECTS_IN_THIS_BOUND_SOURCE_VERSION"
+  },
+  "license": {
+    "own_license": "LICENSE",
+    "notice": "NOTICE.md",
+    "kind": "Self-authored MIT outgoing implementation; Shadowsocks dependency retains separate upstream notice"
+  }
+}

@@ -1,26 +1,21 @@
 //! VLESS length packets and Trojan UDP-over-stream associations.
 use crate::{
     Error,
-    auth::Users,
     config::Protocol,
-    limits::Lease,
     protocol::{self, Address, Request},
     traffic::Counter,
 };
 use std::{
-    collections::HashSet,
     net::{IpAddr, SocketAddr},
     sync::{Arc, Mutex},
     time::Duration,
 };
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
-    net::UdpSocket,
     time::Instant,
 };
 
 const MAX_DATAGRAM: usize = 65507;
-const MAX_PEERS: usize = 64;
 const IDLE: Duration = Duration::from_secs(60);
 
 struct Packet {
@@ -44,7 +39,11 @@ async fn packet<R: AsyncRead + Unpin>(
             let size = ((first as usize) << 8) | reader.read_u8().await? as usize;
             (fixed.0.clone(), fixed.1, size)
         }
-        Protocol::Shadowsocks => return Err(Error::Unsupported),
+        Protocol::Shadowsocks
+        | Protocol::Vmess
+        | Protocol::AnyTls
+        | Protocol::Hysteria2
+        | Protocol::Tuic => return Err(Error::Unsupported),
         Protocol::Trojan => {
             let address = protocol::address(reader, first, 3, 4).await?;
             let port = reader.read_u16().await?;
@@ -65,20 +64,6 @@ async fn packet<R: AsyncRead + Unpin>(
         port,
         payload,
     }))
-}
-
-fn canonical(address: SocketAddr) -> SocketAddr {
-    if let IpAddr::V6(ip) = address.ip()
-        && let Some(ip) = ip.to_ipv4_mapped()
-    {
-        return SocketAddr::new(ip.into(), address.port());
-    }
-    address
-}
-
-pub(crate) struct RouteContext<'a> {
-    pub network: &'a crate::network::Network,
-    pub source: SocketAddr,
 }
 
 fn header(protocol: Protocol, source: SocketAddr, size: usize) -> Vec<u8> {
@@ -126,83 +111,36 @@ pub(crate) async fn relay<S: AsyncRead + AsyncWrite + Unpin>(
     inbound: S,
     request: Request,
     protocol: Protocol,
-    lease: &Lease,
-    users: &Users,
+    datagram: Arc<dyn node_session::Datagram>,
     counter: Option<Arc<Counter>>,
-    routing: RouteContext<'_>,
 ) -> Result<(), Error> {
-    let socket4 = UdpSocket::bind("0.0.0.0:0").await?;
-    let socket6 = UdpSocket::bind("[::]:0").await.ok();
     let fixed = (request.address, request.port);
-    let destination = if protocol == Protocol::Vless {
-        Some(
-            routing
-                .network
-                .udp_destination(&fixed.0, fixed.1, routing.source)
-                .await?,
-        )
-    } else {
-        None
-    };
-    let peers = Mutex::new(HashSet::new());
     let last = Mutex::new(Instant::now());
     let (mut reader, mut writer) = tokio::io::split(inbound);
     let send = async {
-        // This parser is polled continuously; recv selection cannot cancel a
-        // partially consumed stream header or datagram body.
+        // Poll continuously: cancelling a partially parsed inbound frame would
+        // lose its boundary. The enclosing select only ends the whole session.
         while let Some(packet) = packet(&mut reader, protocol, &fixed).await? {
-            let destination = match destination {
-                Some(destination) => destination,
-                None => {
-                    routing
-                        .network
-                        .udp_destination(&packet.address, packet.port, routing.source)
-                        .await?
-                }
+            let host = match packet.address {
+                Address::Ip(ip) => ip.to_string(),
+                Address::Domain(name) => name,
             };
-            let socket = if destination.is_ipv4() {
-                &socket4
-            } else {
-                socket6.as_ref().ok_or(Error::Unsupported)?
-            };
-            {
-                let mut peers = peers.lock().unwrap_or_else(|e| e.into_inner());
-                if !peers.contains(&destination) && peers.len() >= MAX_PEERS {
-                    return Err(Error::Limited);
-                }
-                peers.insert(destination);
-            }
-            lease.charge(packet.payload.len(), users).await;
-            let size = socket.send_to(&packet.payload, destination).await?;
-            if size != packet.payload.len() {
-                return Err(Error::Protocol);
-            }
-            if let Some(counter) = &counter {
-                counter.add(0, size);
-            }
+            let target = node_session::Destination::new(host, packet.port)?;
+            datagram.send(&packet.payload, &target).await?;
             *last.lock().unwrap_or_else(|e| e.into_inner()) = Instant::now();
         }
         Ok::<_, Error>(())
     };
     let receive = async {
-        let mut buffer4 = vec![0; 65536];
-        let mut buffer6 = vec![0; if socket6.is_some() { 65536 } else { 0 }];
+        let mut buffer = vec![0; 65536];
         loop {
-            let (size, source, body) = tokio::select! {
-                result=socket4.recv_from(&mut buffer4) => { let (size, source)=result?; (size,canonical(source),&buffer4[..size]) },
-                result=async { socket6.as_ref().expect("enabled IPv6 socket").recv_from(&mut buffer6).await }, if socket6.is_some() => { let(size, source)=result?; (size,canonical(source),&buffer6[..size]) },
-            };
-            if size > MAX_DATAGRAM
-                || !peers
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .contains(&source)
-            {
-                continue;
-            }
-            lease.charge(size, users).await;
+            let (size, source) = datagram.receive(&mut buffer).await?;
+            let source = SocketAddr::new(
+                source.host.parse().map_err(|_| Error::Protocol)?,
+                source.port,
+            );
             writer.write_all(&header(protocol, source, size)).await?;
-            write_payload(&mut writer, body, counter.as_ref()).await?;
+            write_payload(&mut writer, &buffer[..size], counter.as_ref()).await?;
             writer.flush().await?;
             *last.lock().unwrap_or_else(|e| e.into_inner()) = Instant::now();
         }
@@ -216,16 +154,16 @@ pub(crate) async fn relay<S: AsyncRead + AsyncWrite + Unpin>(
             }
         }
     };
-    // Stream close, failure, idle timeout or enclosing task cancellation drops
-    // both sockets and all futures; there are no orphan packet worker tasks.
-    tokio::select! { result=send=>result, result=receive=>result, result=idle=>result }
+    tokio::select! {result=send=>result,result=receive=>result,result=idle=>result}
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::Users;
     use crate::{auth, config, limits, traffic};
     use arc_swap::ArcSwap;
+    use tokio::net::UdpSocket;
     const UUID: &str = "00000000-0000-4000-8000-000000000007";
 
     fn users(protocol: Protocol) -> Users {
@@ -285,7 +223,11 @@ mod tests {
                 bytes.extend([1, 127, 0, 0, 1]);
                 bytes
             }
-            Protocol::Shadowsocks => unreachable!("SS uses native datagrams"),
+            Protocol::Shadowsocks
+            | Protocol::Vmess
+            | Protocol::AnyTls
+            | Protocol::Hysteria2
+            | Protocol::Tuic => unreachable!("other protocols use their own codec"),
             Protocol::Trojan => {
                 let mut bytes = auth::trojan_key(UUID).to_vec();
                 bytes.extend([13, 10, 3, 1, 0, 0, 0, 0, 0, 0, 13, 10]);

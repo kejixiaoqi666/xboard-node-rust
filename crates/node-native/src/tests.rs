@@ -97,7 +97,7 @@ fn entire_candidate_rejects_duplicates_and_unsupported_fields() {
         assert!(config::decode(config(users).to_string().as_bytes()).is_err());
     }
     let mut value = config(json!([]));
-    value["inbounds"][0]["transport"] = json!({"type":"ws"});
+    value["inbounds"][0]["transport"] = json!({"type":"quic-unsupported"});
     assert!(config::decode(value.to_string().as_bytes()).is_err());
     let mut value = config(json!([]));
     value["outbounds"][0]["type"] = json!("socks");
@@ -172,7 +172,7 @@ async fn fragmented_vless_preserves_coalesced_payload() {
 #[tokio::test]
 async fn invalid_vless_version_command_and_addons_never_pass() {
     let users = snapshot("100", UUID_A);
-    for (offset, value) in [(0, 1), (17, 1), (18, 3)] {
+    for (offset, value) in [(0, 1), (17, 1), (18, 4)] {
         let mut header = vless(443);
         header[offset] = value;
         assert!(
@@ -394,7 +394,7 @@ async fn tcp_half_close_retains_reverse_payload() {
 }
 
 #[tokio::test]
-async fn vision_addons_match_authenticated_user_and_tcp_only_policy() {
+async fn vision_addons_match_authenticated_user_for_tcp_udp_and_mux() {
     let users = Arc::new(ArcSwap::from_pointee(
         auth::Snapshot::new(
             config::Protocol::Vless,
@@ -419,7 +419,7 @@ async fn vision_addons_match_authenticated_user_and_tcp_only_policy() {
         (
             [vec![10, 16], b"xtls-rprx-vision".to_vec()].concat(),
             2,
-            false,
+            true,
         ),
         (
             [vec![10, 16], b"xtls-rprx-vision".to_vec(), vec![16, 1]].concat(),

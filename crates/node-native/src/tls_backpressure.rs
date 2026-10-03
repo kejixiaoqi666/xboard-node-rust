@@ -239,7 +239,7 @@ async fn vision_tls_backpressure_preserves_payload_and_half_close() {
             let users = Arc::clone(&users);
             let traffic = Arc::clone(&traffic);
             tokio::spawn(async move {
-                let network = crate::network::Network::direct();
+                let network = Arc::new(crate::network::Network::direct());
                 let slots = Arc::new(tokio::sync::Semaphore::new(1));
                 crate::connection_tls(
                     server,
@@ -251,6 +251,9 @@ async fn vision_tls_backpressure_preserves_payload_and_half_close() {
                         limits: &registry,
                         udp_slots: &slots,
                         network: &network,
+                        extended: node_extended::Config::default(),
+                        stop: None,
+                        tag: Arc::from("vless-in"),
                     },
                 )
                 .await
@@ -320,7 +323,7 @@ async fn vision_partial_tls_tail_and_close_notify_without_tcp_fin_are_forwarded(
             let traffic = Arc::new(traffic::Traffic::new("d".repeat(32)));
             let limits = Arc::new(limits::Registry::new(Arc::clone(&users)));
             let slots = Arc::new(tokio::sync::Semaphore::new(1));
-            let network = crate::network::Network::direct();
+            let network = Arc::new(crate::network::Network::direct());
             crate::connection_tls(
                 server,
                 Protocol::Vless,
@@ -331,6 +334,9 @@ async fn vision_partial_tls_tail_and_close_notify_without_tcp_fin_are_forwarded(
                     limits: &limits,
                     udp_slots: &slots,
                     network: &network,
+                    extended: node_extended::Config::default(),
+                    stop: None,
+                    tag: Arc::from("vless-in"),
                 },
             )
             .await

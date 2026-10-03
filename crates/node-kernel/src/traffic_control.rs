@@ -12,6 +12,8 @@ struct Reply {
     snapshot: Option<TrafficSnapshot>,
     #[serde(default)]
     quiesced: Option<bool>,
+    #[serde(default)]
+    activity: Option<node_core::ActivitySnapshot>,
 }
 
 #[cfg(unix)]
@@ -71,7 +73,7 @@ fn call(path: &Path, request: serde_json::Value) -> Result<Reply, crate::KernelE
     let mut size = [0; 4];
     read(&mut size)?;
     let size = u32::from_be_bytes(size) as usize;
-    if size == 0 || size > 256 * 1024 {
+    if size == 0 || size > 4 * 1024 * 1024 {
         return Err(failure());
     }
     let mut payload = vec![0; size];
@@ -83,6 +85,10 @@ fn call(path: &Path, request: serde_json::Value) -> Result<Reply, crate::KernelE
             .snapshot
             .as_ref()
             .is_some_and(|snapshot| !snapshot.validate())
+        || reply
+            .activity
+            .as_ref()
+            .is_some_and(|activity| !activity.validate())
     {
         return Err(failure());
     }
@@ -98,6 +104,11 @@ fn call(_: &Path, _: serde_json::Value) -> Result<Reply, crate::KernelError> {
 
 pub(crate) fn snapshot(path: &Path) -> Result<Option<TrafficSnapshot>, crate::KernelError> {
     Ok(call(path, serde_json::json!({"operation":"traffic_snapshot"}))?.snapshot)
+}
+pub(crate) fn activity(path: &Path) -> Result<node_core::ActivitySnapshot, crate::KernelError> {
+    call(path, serde_json::json!({"operation":"activity"}))?
+        .activity
+        .ok_or_else(|| crate::KernelError::Activate("native activity snapshot missing".into()))
 }
 pub(crate) fn ack(path: &Path, snapshot: &TrafficSnapshot) -> Result<(), crate::KernelError> {
     let reply = call(

@@ -1,0 +1,51 @@
+{
+  "repository": "https://github.com/cfal/shoes",
+  "commit": "60ed3838b346268615c81e4eace4e15e717da23e",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2021-2023 Alex Lau <github@alau.ca>",
+  "project_license": "MPL-2.0",
+  "license_file": "LICENSE-SHOES",
+  "license_git_blob_sha256": "1fb83b583e8604eff99cf01dfece917bb0ad56c3101d627516c7b59655375e19",
+  "source_role": "Reference-assisted wire reimplementation and narrow QUIC stream adapter; no upstream whole-file or runtime import",
+  "hash_basis": "sha256 is over the original Git blob at the fixed commit, before Windows CRLF conversion",
+  "files": [
+    {
+      "upstream_path": "src/hysteria2_server.rs",
+      "sha256": "a95d9ac53bd84973e4dcf4438c016efc0b1012d04e4cf3df6ad9f3b3e0aa1db3",
+      "local_paths": ["src/lib.rs", "src/wire.rs"],
+      "reference_scope": [
+        "HTTP/3 authentication request/response, status 233 and Hysteria headers",
+        "QUIC varint, TCP request 0x401 and UDP fragment field order"
+      ]
+    },
+    {
+      "upstream_path": "src/tuic_server.rs",
+      "sha256": "de663c4b0a3f3e4f022884c4c89c23ac70947366a76b358c652c533a8dba204e",
+      "local_paths": ["src/lib.rs", "src/wire.rs"],
+      "reference_scope": [
+        "TUIC v5 command/address framing for streams and datagrams",
+        "TLS exporter authentication using UUID label and password context"
+      ]
+    },
+    {
+      "upstream_path": "src/quic_stream.rs",
+      "sha256": "f5badc30295827a5453b2d6a8f39d24f34b481a7c8712b85404795e7627fe56d",
+      "local_paths": ["src/lib.rs"],
+      "reference_scope": ["Small Tokio AsyncRead/AsyncWrite SendStream/RecvStream delegation"]
+    }
+  ],
+  "adaptations": [
+    "Use node-session live multi-user Host and UUID/password profiles instead of upstream single static credentials and routing",
+    "Constant-time credential/token comparison without logging supplied secrets",
+    "Ten-second total handshake/authentication deadline and bounded unauthenticated pending streams",
+    "Fresh per-connection exporter authentication before admitting resumed or early TUIC payload; disable Hysteria early data",
+    "Listener-owned cancellation/join tree, bounded connections/streams/UDP sessions/targets/reassembly and packet buffers",
+    "Decode framing and padding before Host payload accounting; outgoing destination/source validation and cancellation-safe session ownership",
+    "QuicStream forwards Quinn flush/shutdown directly and omits shoes AsyncPing/AsyncStream abstractions",
+    "src/udp.rs session/reassembly queues and src/obfs.rs Salamander packet wrapper are locally implemented, not imported shoes files"
+  ],
+  "protocol_references": [
+    "https://v2.hysteria.network/docs/developers/Protocol/",
+    "https://github.com/EAimTY/tuic/blob/master/SPEC.md"
+  ]
+}

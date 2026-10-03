@@ -28,6 +28,13 @@
     "Strict Finished content type and length, outer record header/size checks",
     "Bound ciphertext/plaintext buffers; unsupported post-handshake messages fail closed",
     "Bounded peer TLS1.3 KeyUpdate and requested response; independent secrets/sequence reset, output ordering, async response flush/backpressure",
-    "preview.9: configurable bounded write-record budget; server-initiated TLS 1.3 KeyUpdate (not requested), batch-boundary splitting, close-notify budget, shared peer-response rotation, independent receive keys, all-suite/partial-output/backpressure regressions. No timers or new runtime dependencies."
-  ]
+    "preview.9: configurable bounded write-record budget; server-initiated TLS 1.3 KeyUpdate (not requested), batch-boundary splitting, close-notify budget, shared peer-response rotation, independent receive keys, all-suite/partial-output/backpressure regressions. No timers or new runtime dependencies.",
+    "Native migration: exact pinned Xray v26.3.27 compatibility audit; strict bounded hello parser; final ML-KEM768 hybrid exchange and optional ML-DSA65 extra certificate signature; one authenticated group-changing HRR including Ring P-256, transcript replacement and CH2 identity checks; pinned uTLS public ServerHello HRR-slot compatibility verified with official client; shared in-task mirror exchange. See tests/REALITY_FIXTURE.md and hashed evidence."
+  ],
+  "compatibility_reference": {
+    "xray": "v26.3.27",
+    "reality": "9234c772ba8f",
+    "utls": "aa6edf4b11af",
+    "hashes": "tests/evidence/upstream.json"
+  }
 }

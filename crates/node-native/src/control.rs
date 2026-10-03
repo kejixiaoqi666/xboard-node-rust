@@ -75,6 +75,8 @@ struct TrafficReply {
 pub(crate) struct Quiesce {
     pub request: tokio::sync::watch::Sender<bool>,
     pub done: tokio::sync::watch::Receiver<u8>,
+    pub limits: Arc<crate::limits::Registry>,
+    pub extended: node_extended::Config,
 }
 #[derive(Serialize)]
 struct Reply<'a> {
@@ -135,6 +137,16 @@ async fn handle(
     let mut payload = vec![0; length];
     socket.read_exact(&mut payload).await?;
     let request: Request = serde_json::from_slice(&payload).map_err(|_| Error::Protocol)?;
+    if request.operation == "activity" {
+        let activity = quiesce.limits.activity();
+        let payload = serde_json::to_vec(&serde_json::json!({"capability":"xbord-native-traffic-v1","code":"ok","snapshot":null,"activity":activity})).map_err(|_|Error::Protocol)?;
+        if payload.len() > 4 * 1024 * 1024 {
+            return Err(Error::Protocol);
+        }
+        socket.write_u32(payload.len() as u32).await?;
+        socket.write_all(&payload).await?;
+        return Ok(());
+    }
     if matches!(
         request.operation.as_str(),
         "traffic_snapshot" | "traffic_ack" | "traffic_quiesce"
@@ -190,11 +202,19 @@ async fn handle(
         socket.write_all(&payload).await?;
         return Ok(());
     }
+    let replacing = request.operation == "replace";
     let code = match request.operation.as_str() {
         "status" => "ok",
         "replace" => apply(request, state, users, directory, traffic).await,
         _ => "rejected",
     };
+    if replacing && code == "ok" {
+        quiesce.limits.notify_users_changed();
+        quiesce
+            .extended
+            .xudp_sessions
+            .prune_users(&users.load().profiles());
+    }
     let payload = serde_json::to_vec(&Reply {
         capability: CAPABILITY,
         code,
@@ -356,7 +376,12 @@ mod tests {
                     &users,
                     &directory.0,
                     &Arc::new(crate::traffic::Traffic::new("a".repeat(32))),
-                    &Quiesce { request, done },
+                    &Quiesce {
+                        request,
+                        done,
+                        limits: Arc::new(crate::limits::Registry::default()),
+                        extended: node_extended::Config::default(),
+                    },
                 )
                 .await
             });

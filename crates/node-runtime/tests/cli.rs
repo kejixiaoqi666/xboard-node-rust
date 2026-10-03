@@ -55,7 +55,7 @@ fn check_validates_settings_without_a_token_or_external_side_effects() {
         .output()
         .unwrap();
     assert!(output.status.success());
-    assert!(String::from_utf8_lossy(&output.stdout).contains("compatibility not tested"));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("data plane have not been tested"));
     assert!(!dir.0.join("not-created-state").exists());
 }
 

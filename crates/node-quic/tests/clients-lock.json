@@ -1,0 +1,34 @@
+{
+  "project": "SagerNet/sing-box",
+  "version": "1.14.2",
+  "tag": "v1.14.2",
+  "release": "https://github.com/SagerNet/sing-box/releases/tag/v1.14.2",
+  "release_published_at": "2026-09-24T11:47:08Z",
+  "checksum_source": "https://api.github.com/repos/SagerNet/sing-box/releases/tags/v1.14.2",
+  "assets": [
+    {
+      "platform": "windows-amd64",
+      "name": "sing-box-1.14.2-windows-amd64.zip",
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-windows-amd64.zip",
+      "sha256": "c2d8bfff918755808781dfdeeb8581b6c91eb3a243d9a7b55483cfc0c0684d32",
+      "executable": "sing-box-1.14.2-windows-amd64/sing-box.exe",
+      "executable_sha256": "7bbef1dea9189ee12799ae834ea4b4658355da25c47a21ad8804904c0ccd9410"
+    },
+    {
+      "platform": "linux-amd64",
+      "name": "sing-box-1.14.2-linux-amd64.tar.gz",
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-linux-amd64.tar.gz",
+      "sha256": "a684484d7477d1437282ee411f4d131d0340aaad60a7868841ebd5d87dd8a0c6",
+      "executable": "sing-box-1.14.2-linux-amd64/sing-box",
+      "executable_sha256": "fc9c6e6ab345f045b16a0ed10d1ff28d68e8e56e7749fca30738d1406e98d7b8"
+    },
+    {
+      "platform": "linux-arm64",
+      "name": "sing-box-1.14.2-linux-arm64.tar.gz",
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-linux-arm64.tar.gz",
+      "sha256": "b43a1fb1bda131c6653576741ce527eb2bdeab7c9308ca90ee8b972abb7e4a7f",
+      "executable": "sing-box-1.14.2-linux-arm64/sing-box",
+      "executable_sha256": "b8610f45abb7e967e195264383f5cbd20fba7821a3c37e3a8c4c5ab6cad28eac"
+    }
+  ]
+}

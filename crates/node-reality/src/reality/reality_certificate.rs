@@ -1,9 +1,13 @@
 // Derived from cfal/shoes 60ed3838b346268615c81e4eace4e15e717da23e.
 // Copyright (c) 2021-2023 Alex Lau; MIT license retained in this crate.
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use ml_dsa::{KeyExport, Keypair, MlDsa65, Signer, SigningKey};
+use rand::{TryRngCore, rngs::OsRng};
 use rcgen::SignatureAlgorithm;
 use ring::hmac;
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use std::io::{Error, ErrorKind, Result};
+use zeroize::{Zeroize, Zeroizing};
 
 /// A signing key that computes HMAC-SHA512(auth_key, public_key) as the "signature".
 ///
@@ -52,6 +56,58 @@ pub fn generate_hmac_certificate(
     auth_key: &[u8; 32],
     hostname: &str,
 ) -> Result<(rcgen::Certificate, Ed25519KeyPair)> {
+    generate_certificate(auth_key, hostname, None, &[], &[])
+}
+
+pub(crate) fn decode_mldsa65_seed(seed: &str) -> Result<SigningKey<MlDsa65>> {
+    if seed.len() != 43 {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "invalid ML-DSA-65 seed",
+        ));
+    }
+    let raw = Zeroizing::new(
+        URL_SAFE_NO_PAD
+            .decode(seed)
+            .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid ML-DSA-65 seed"))?,
+    );
+    let mut bytes: [u8; 32] = raw
+        .as_slice()
+        .try_into()
+        .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid ML-DSA-65 seed"))?;
+    let mut seed = ml_dsa::Seed::from(bytes);
+    let key = SigningKey::from_seed(&seed);
+    seed.as_mut_slice().zeroize();
+    bytes.zeroize();
+    Ok(key)
+}
+
+/// Derive the Xray-compatible public verification key from a 32-byte encoded seed.
+/// The result contains only the public key; neither key material nor input is logged.
+pub fn mldsa65_verify_key(seed: &str) -> Result<String> {
+    Ok(URL_SAFE_NO_PAD.encode(decode_mldsa65_seed(seed)?.verifying_key().to_bytes()))
+}
+
+/// Generate an independent ML-DSA-65 seed and its Xray-compatible public key.
+/// The first tuple element is secret and must only be shown or stored when requested.
+/// No existing REALITY/X25519 key is used as the random source.
+pub fn generate_mldsa65_keypair() -> Result<(String, String)> {
+    let mut bytes = Zeroizing::new([0u8; 32]);
+    OsRng
+        .try_fill_bytes(bytes.as_mut())
+        .map_err(|_| Error::other("ML-DSA-65 seed generation failed"))?;
+    let seed = Zeroizing::new(URL_SAFE_NO_PAD.encode(bytes.as_slice()));
+    let verify_key = mldsa65_verify_key(&seed)?;
+    Ok((seed.to_string(), verify_key))
+}
+
+pub(crate) fn generate_certificate(
+    auth_key: &[u8; 32],
+    hostname: &str,
+    mldsa: Option<&SigningKey<MlDsa65>>,
+    client_hello: &[u8],
+    server_hello: &[u8],
+) -> Result<(rcgen::Certificate, Ed25519KeyPair)> {
     // Keypair is needed for CertificateVerify signing
     let pkcs8 = Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new())
         .map_err(|_| Error::other("Failed to generate Ed25519 keypair"))?;
@@ -79,6 +135,23 @@ pub fn generate_hmac_certificate(
     params.distinguished_name = rcgen::DistinguishedName::new();
     params.serial_number = Some(rcgen::SerialNumber::from(vec![0u8]));
 
+    if let Some(key) = mldsa {
+        // Pinned Xray checks the first extension. Its ML-DSA certificate has
+        // only the 0.0 extension, so do not insert a preceding SAN extension.
+        params.subject_alt_names.clear();
+        let mut transcript = hmac::Context::with_key(&hmac::Key::new(hmac::HMAC_SHA512, auth_key));
+        transcript.update(&public_key);
+        transcript.update(client_hello);
+        transcript.update(server_hello);
+        let signature = key
+            .try_sign(transcript.sign().as_ref())
+            .map_err(|_| Error::other("ML-DSA-65 certificate signing failed"))?;
+        params.custom_extensions = vec![rcgen::CustomExtension::from_oid_content(
+            &[0, 0],
+            signature.encode().to_vec(),
+        )];
+    }
+
     let cert = params
         .self_signed(&hmac_key)
         .map_err(|e| Error::other(format!("Failed to create certificate: {e}")))?;
@@ -90,6 +163,18 @@ pub fn generate_hmac_certificate(
 mod tests {
     use super::*;
     use ring::signature::KeyPair;
+
+    #[test]
+    fn generated_mldsa65_pair_is_independent_and_matches_derivation() {
+        let (seed, verify_key) = generate_mldsa65_keypair().unwrap();
+        let (other_seed, other_verify_key) = generate_mldsa65_keypair().unwrap();
+        assert_eq!(seed.len(), 43);
+        assert_eq!(URL_SAFE_NO_PAD.decode(&seed).unwrap().len(), 32);
+        assert_eq!(URL_SAFE_NO_PAD.decode(&verify_key).unwrap().len(), 1952);
+        assert_eq!(verify_key, mldsa65_verify_key(&seed).unwrap());
+        assert!(seed != other_seed);
+        assert!(verify_key != other_verify_key);
+    }
 
     /// Find the signature bytes in a DER-encoded certificate.
     /// Returns the offset where the 64-byte Ed25519 signature starts.

@@ -19,6 +19,19 @@
       "path": "src/relay/tcprelay/proxy_stream/protocol/v2.rs",
       "original_sha256": "c7b642e4c00eaba978c9ba1157c2d139b5ed223889aba76d14e13963addfafeb",
       "reason": "Initialize request serializer padding before publishing bytes through BufMut."
+    },
+    {
+      "path": "Cargo.toml",
+      "original_sha256": "566f472001f655e0c5d496561868f33fc881e5260a7f427eae4146bf7cf0ed82",
+      "reason": "Use pinned local shadowsocks-crypto 0.6.2 fork, which adds the original panel AES192GCM and XChaCha20 methods. Original crypto sources and license are in crypto/UPSTREAM.json and crypto/LICENSE. Remove tcp/tcp_tfo/udp test target registrations whose upstream test files are absent from this narrow vendor package; the upstream test suite is not claimed as run."
     }
-  ]
+  ],
+  "crypto_dependency": {
+    "path": "crypto",
+    "upstream_record": "crypto/UPSTREAM.json",
+    "license_file": "crypto/LICENSE",
+    "version": "0.6.2",
+    "crate_archive_sha256": "3d038a3d17586f1c1ab3c1c3b9e4d5ef8fba98fb3890ad740c8487038b2e2ca5",
+    "scope": "Crypto helpers only; fork adds AES192GCM and XChaCha20 legacy stream. No TLS/listener/resolver/TUN/FFI runtime."
+  }
 }

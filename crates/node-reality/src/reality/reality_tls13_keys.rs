@@ -176,11 +176,11 @@ pub fn derive_handshake_keys(
     let digest_algorithm = cipher_suite.digest_algorithm();
 
     // Validate input lengths
-    if shared_secret.len() != 32 {
+    if !matches!(shared_secret.len(), 32 | 64) {
         return Err(Error::new(
             ErrorKind::InvalidInput,
             format!(
-                "Invalid shared_secret length: {} (expected 32)",
+                "Invalid shared_secret length: {} (expected 32 or hybrid 64)",
                 shared_secret.len()
             ),
         ));

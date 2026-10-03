@@ -16,8 +16,10 @@ for arch in ['amd64', 'arm64']:
     assert expected == digest + '  ' + archive.name
     shutil.copy2(archive, destination / archive.name)
     checksums.append(expected)
-    for prefix in ['installer-tests-', 'systemd-tests-']:
+    for prefix in ['installer-tests-', 'systemd-tests-', 'native-protocol-tests-']:
         path = directory / (prefix + arch + '.json')
+        shutil.copy2(path, destination / path.name)
+    for path in sorted(directory.glob('official-*-' + arch + '.log')):
         shutil.copy2(path, destination / path.name)
 root = Path(__file__).resolve().parents[1]
 shutil.copy2(root / 'install.sh', destination / 'install.sh')

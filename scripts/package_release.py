@@ -68,7 +68,16 @@ def dependency_notices(target):
     files['vendored/node-vision/UPSTREAM.json'] = (ROOT / 'crates/node-vision/UPSTREAM.json').read_bytes()
     files['vendored/node-reality/LICENSE'] = (ROOT / 'crates/node-reality/LICENSE').read_bytes()
     files['vendored/node-reality/UPSTREAM.json'] = (ROOT / 'crates/node-reality/UPSTREAM.json').read_bytes()
+    files['vendored/node-extended/LICENSE-shoes-MIT'] = (ROOT / 'crates/node-extended/LICENSE-shoes-MIT').read_bytes()
+    files['vendored/node-extended/UPSTREAM.json'] = (ROOT / 'crates/node-extended/UPSTREAM.json').read_bytes()
+    files['vendored/node-outbound/LICENSE'] = (ROOT / 'crates/node-outbound/LICENSE').read_bytes()
+    files['vendored/node-outbound/NOTICE.md'] = (ROOT / 'crates/node-outbound/NOTICE.md').read_bytes()
+    for name in ['LICENSE', 'LICENSE-SHOES', 'UPSTREAM.json', 'NOTICE.md']:
+        files['vendored/node-quic/' + name] = (ROOT / 'crates/node-quic' / name).read_bytes()
+    files['vendored/shadowsocks/LICENSE'] = (ROOT / 'vendor/shadowsocks/LICENSE').read_bytes()
     files['vendored/shadowsocks/UPSTREAM.json'] = (ROOT / 'vendor/shadowsocks/UPSTREAM.json').read_bytes()
+    files['vendored/shadowsocks/crypto/LICENSE'] = (ROOT / 'vendor/shadowsocks/crypto/LICENSE').read_bytes()
+    files['vendored/shadowsocks/crypto/UPSTREAM.json'] = (ROOT / 'vendor/shadowsocks/crypto/UPSTREAM.json').read_bytes()
     files['NOTICE_MANIFEST.json'] = (json.dumps({'target': target, 'dependencies': entries,
         'files': [{'path': name, 'sha256': sha(body)} for name, body in sorted(files.items())]}, indent=2) + '\n').encode()
     output = io.BytesIO()

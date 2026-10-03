@@ -1,0 +1,898 @@
+{
+  "schema": 2,
+  "recorded_utc": "2026-10-03T16:38:59.351655+00:00",
+  "status": "PASS_SCOPED_WINDOWS_STAGE2",
+  "scope": "Owned native protocol codecs and Shadowsocks helpers tested in independent Windows workspaces. Not whole-workspace, Unix runtime, production billing or third-party external SIP003 plugin acceptance.",
+  "source_snapshot_comparison": {
+    "extended_product_and_executed_tests_mismatches": [],
+    "shadowsocks_product_and_vendor_mismatches": []
+  },
+  "test_runs": [
+    {
+      "crate": "node-extended",
+      "command": "cargo test -p node-extended -j 2",
+      "passed": 132,
+      "unit": 112,
+      "payload_session": 12,
+      "transport": 2,
+      "global_id": 5,
+      "multiplex_policy": 1,
+      "ignored": 3,
+      "failed": 0,
+      "log": "extended-tests.log"
+    },
+    {
+      "crate": "node-extended",
+      "command": "cargo clippy -p node-extended --all-targets -j 2 -- -D warnings",
+      "status": "PASS",
+      "log": "extended-clippy.log"
+    },
+    {
+      "crate": "node-native",
+      "command": "cargo test -p node-native shadowsocks:: -j 2 -- --nocapture",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 1,
+      "log": "ss-tests.log"
+    },
+    {
+      "crate": "node-native",
+      "command": "cargo clippy -p node-native --all-targets -j 2 -- -D warnings",
+      "status": "PASS_WINDOWS",
+      "log": "ss-clippy.log"
+    }
+  ],
+  "official_client_runs": [
+    {
+      "command": "SING_BOX_TEST_CLIENT=<pinned> XRAY_TEST_CLIENT=<pinned> cargo test -p node-extended --test official_clients -j 2 -- --ignored --nocapture",
+      "client": "sing-box 1.14.2",
+      "platform": "windows-amd64",
+      "cases": 37,
+      "rust_tests": 1,
+      "failed": 0,
+      "ordinary_cases": 35,
+      "ordinary_payload_each_direction": 66019,
+      "flow_control_cases": 2,
+      "flow_control_payload_each_direction": 1572883,
+      "host_active_after_cancel": 0,
+      "returned_listener_payload_permits": 8388608,
+      "returned_listener_session_permits": 1024,
+      "log": "official-extended.log"
+    },
+    {
+      "command": "same official_clients command",
+      "client": "Xray 26.3.27 d2758a0",
+      "platform": "windows-amd64",
+      "cases": 1,
+      "rust_tests": 1,
+      "failed": 0,
+      "physical_connections": 2,
+      "host_udp_channels": 1,
+      "payload_each_direction": 35,
+      "log": "official-extended.log"
+    },
+    {
+      "command": "SING_BOX_TEST_CLIENT=<pinned> cargo test -p node-native shadowsocks::official:: -j 2 -- --ignored --nocapture",
+      "client": "sing-box 1.14.2",
+      "platform": "windows-amd64",
+      "cases": 20,
+      "rust_tests": 1,
+      "failed": 0,
+      "original_methods": 18,
+      "native_direct_ws_plugin_mux_cases": [
+        1,
+        0
+      ],
+      "payload_each_direction": 66019,
+      "workers_joined": true,
+      "udp_transport": "Raw Shadowsocks UDP socket, including both WS cases; not UDP over WebSocket",
+      "log": "official-shadowsocks.log"
+    }
+  ],
+  "client_assets": [
+    {
+      "client": "sing-box",
+      "version": "1.14.2",
+      "platform": "linux-amd64",
+      "archive": "sing-box-1.14.2-linux-amd64.tar.gz",
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-linux-amd64.tar.gz",
+      "archive_sha256": "a684484d7477d1437282ee411f4d131d0340aaad60a7868841ebd5d87dd8a0c6",
+      "member": "sing-box-1.14.2-linux-amd64/sing-box",
+      "binary_sha256": "fc9c6e6ab345f045b16a0ed10d1ff28d68e8e56e7749fca30738d1406e98d7b8",
+      "checksum_source": "https://api.github.com/repos/SagerNet/sing-box/releases/tags/v1.14.2"
+    },
+    {
+      "client": "sing-box",
+      "version": "1.14.2",
+      "platform": "linux-arm64",
+      "archive": "sing-box-1.14.2-linux-arm64.tar.gz",
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-linux-arm64.tar.gz",
+      "archive_sha256": "b43a1fb1bda131c6653576741ce527eb2bdeab7c9308ca90ee8b972abb7e4a7f",
+      "member": "sing-box-1.14.2-linux-arm64/sing-box",
+      "binary_sha256": "b8610f45abb7e967e195264383f5cbd20fba7821a3c37e3a8c4c5ab6cad28eac",
+      "checksum_source": "https://api.github.com/repos/SagerNet/sing-box/releases/tags/v1.14.2"
+    },
+    {
+      "client": "sing-box",
+      "version": "1.14.2",
+      "platform": "windows-amd64",
+      "archive": "sing-box-1.14.2-windows-amd64.zip",
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-windows-amd64.zip",
+      "archive_sha256": "c2d8bfff918755808781dfdeeb8581b6c91eb3a243d9a7b55483cfc0c0684d32",
+      "member": "sing-box-1.14.2-windows-amd64/sing-box.exe",
+      "binary_sha256": "7bbef1dea9189ee12799ae834ea4b4658355da25c47a21ad8804904c0ccd9410",
+      "checksum_source": "https://api.github.com/repos/SagerNet/sing-box/releases/tags/v1.14.2"
+    },
+    {
+      "client": "xray",
+      "version": "26.3.27",
+      "platform": "linux-amd64",
+      "archive": "Xray-linux-64.zip",
+      "url": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-64.zip",
+      "archive_sha256": "23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae",
+      "member": "xray",
+      "binary_sha256": "8255dd939c34cf966cc91517b6324dd3c8d0bcf49ffac8beca049a38c46845ed",
+      "checksum_source": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-64.zip.dgst"
+    },
+    {
+      "client": "xray",
+      "version": "26.3.27",
+      "platform": "linux-arm64",
+      "archive": "Xray-linux-arm64-v8a.zip",
+      "url": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-arm64-v8a.zip",
+      "archive_sha256": "4d30283ae614e3057f730f67cd088a42be6fdf91f8639d82cb69e48cde80413c",
+      "member": "xray",
+      "binary_sha256": "c2d20a7045250497083afea0d79db0672f6c89a25aaaf37c92de034d6b764b04",
+      "checksum_source": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-arm64-v8a.zip.dgst"
+    },
+    {
+      "client": "xray",
+      "version": "26.3.27",
+      "platform": "windows-amd64",
+      "archive": "Xray-windows-64.zip",
+      "url": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-windows-64.zip",
+      "archive_sha256": "d004c39288ce9ada487c6f398c7c545f7d749e44bdfdd59dbc9f865afba4e1ad",
+      "member": "xray.exe",
+      "binary_sha256": "15c2d007954ac53ba69b80ec91242786b3c0b71d52649165b4ca1d5cc96ef8f1",
+      "checksum_source": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-windows-64.zip.dgst"
+    }
+  ],
+  "client_fetch_verification": {
+    "upstream_checksum_sources_verified": 6,
+    "log": "upstream-checksums.log",
+    "fresh_helper_download": "sing-box linux-arm64",
+    "fresh_archive_and_binary_sha_verified": true,
+    "helper_log": "client-fetch.log"
+  },
+  "limits": {
+    "vmess_users": 256,
+    "anytls_users": 65536,
+    "max_password_bytes": 4096,
+    "handshake_seconds": 10,
+    "max_frame_bytes": 65535,
+    "listener_shared_payload_bytes": 8388608,
+    "listener_shared_logical_sessions": 1024,
+    "vmess_aead_chunks_per_direction": 65536,
+    "ss_aes2022_eih_users": 65536,
+    "ss_legacy_aead_users": 256,
+    "ss_no_user_identity_methods_users": 1
+  },
+  "pending_gates": [
+    {
+      "gate": "Unix actual SIP003 env/readiness/private process group/exit/stop cleanup",
+      "source": "crates/node-native/tests/plugin_process.rs",
+      "business_tests": 3,
+      "helper_child_utility_tests": 1,
+      "status": "NOT_RUN_HERE_CFG_UNIX",
+      "windows_tests_executed": 0
+    },
+    {
+      "gate": "Unix config::decode -> run_embedded actual official v2ray-plugin plain/TLS default mux1/mux0",
+      "source": "crates/node-native/tests/native_plugin_transport.rs",
+      "official_cases": 4,
+      "status": "NOT_RUN_HERE_CFG_UNIX",
+      "windows_tests_executed": 0
+    },
+    {
+      "gate": "Linux amd64/arm64 and musl ignored official client matrices",
+      "status": "PINNED_CLIENTS_READY_EXECUTION_BY_ROOT_PENDING"
+    },
+    {
+      "gate": "Independent third-party SIP003 external plugin binary interoperability",
+      "status": "UNVERIFIED"
+    },
+    {
+      "gate": "Production native config assembly, routing and durable real-node billing",
+      "status": "ROOT_OWNED_SEPARATE_ACCEPTANCE"
+    }
+  ],
+  "preserved_failure_history": [
+    "history-ss-plugin-auth-failure.log",
+    "history-native-missing-test-module.log",
+    "history-native-clippy-before-format.log"
+  ],
+  "source_sha256": [
+    {
+      "path": "crates/node-core/src/shadowsocks.rs",
+      "sha256": "e610b0ca49cadc4ef449037fd8e47febf88b4e85ae239b4a6aa4b7543a370150"
+    },
+    {
+      "path": "crates/node-extended/Cargo.toml",
+      "sha256": "eb9978fb3073e69d5151a048a14aa32176de2b42ee3aaf0373dc62f2e2f72d3d"
+    },
+    {
+      "path": "crates/node-extended/LICENSE-shoes-MIT",
+      "sha256": "542bd8c0bfc8a19543dc2473312588fdba9badd029f9122e3f48da8c434ee92e"
+    },
+    {
+      "path": "crates/node-extended/QA.md",
+      "sha256": "1fb3d3c1c2bb796d5117b2ff569f7b75d6a55688cbb494828a8b3cbf2416a5de"
+    },
+    {
+      "path": "crates/node-extended/src/address.rs",
+      "sha256": "15bb61f6bb743866e272f48a6ed3ec7159a6fecb63cc31fbd180ffdd5967d1ee"
+    },
+    {
+      "path": "crates/node-extended/src/anytls/anytls_padding.rs",
+      "sha256": "af2d82c6b6bb4b49756db1c54d7998b39afa4490fba015315430564815c1bcc3"
+    },
+    {
+      "path": "crates/node-extended/src/anytls/anytls_types.rs",
+      "sha256": "93b8d86c4f57c50f1d007aee96290e9ea0b21e32b02a2491e1802a28b9d3aa69"
+    },
+    {
+      "path": "crates/node-extended/src/anytls/mod.rs",
+      "sha256": "1227c6f5443c3f83fdcb11fd53c375425aba832c584d49b37ba04ab693d857a6"
+    },
+    {
+      "path": "crates/node-extended/src/async_stream.rs",
+      "sha256": "04f61bb0b13793dbba545c30f94e26247c0403b579e4562f3abc164f22de13de"
+    },
+    {
+      "path": "crates/node-extended/src/auth.rs",
+      "sha256": "8a1e9521345370c6c2d4453739892413ee202cb149ef969fcfcb132a18184af2"
+    },
+    {
+      "path": "crates/node-extended/src/budget.rs",
+      "sha256": "68b2271317633b85172194ebb47b68c74c153fcc0f4a9e731c106ed7248919e0"
+    },
+    {
+      "path": "crates/node-extended/src/channel.rs",
+      "sha256": "32df50d0ccf4692e91858415d2a853bd086c1afa11115de8e9bb3407bd6e1fec"
+    },
+    {
+      "path": "crates/node-extended/src/grpc.rs",
+      "sha256": "eaed7d8b9cd168427e5acb1d6664eeb9d540d8aa8d1cc400c45667c83af659bd"
+    },
+    {
+      "path": "crates/node-extended/src/http2.rs",
+      "sha256": "e7cc669d32f17de1f7f259b1f9c8e8599a6f3fcd498a3139015ee4b2be4f799d"
+    },
+    {
+      "path": "crates/node-extended/src/httpupgrade.rs",
+      "sha256": "9cfb956a61a602a22aa10a12e78a9da964280618c6b6fa806fc5827d1b84fe21"
+    },
+    {
+      "path": "crates/node-extended/src/io_adapter.rs",
+      "sha256": "89461beaaea0a73622b58a73980c2ba816e8ade862f6b4280f13d84dec6a4321"
+    },
+    {
+      "path": "crates/node-extended/src/lib.rs",
+      "sha256": "23438d0ba4be316b0a510f24a75d8cf7072d61307f52e758ce1e0d99b7f46138"
+    },
+    {
+      "path": "crates/node-extended/src/mux/h2mux/h2mux_padding.rs",
+      "sha256": "155a052a8d54e96f2efd10e3641a0cbb14ba946e22fee1ca2ca71d4fd5f98839"
+    },
+    {
+      "path": "crates/node-extended/src/mux/h2mux/h2mux_protocol.rs",
+      "sha256": "4b44641202b171051b4df6d0d68121251e5444ed87708dbe91e4e922038c8043"
+    },
+    {
+      "path": "crates/node-extended/src/mux/h2mux/h2mux_stream.rs",
+      "sha256": "7f1a3aa7fe6843f3d338f10bc7e6bc0fd6a31be2d70200d704930b6542852665"
+    },
+    {
+      "path": "crates/node-extended/src/mux/h2mux/mod.rs",
+      "sha256": "80bfef6a1624f1f5c94c530705b39074f7325c429f922aff2021a5851b7f9cd9"
+    },
+    {
+      "path": "crates/node-extended/src/mux/mod.rs",
+      "sha256": "d5448d2e0afc0fdd7135a8fec3317f471f796f9e451a96a3ee94d427a621b95e"
+    },
+    {
+      "path": "crates/node-extended/src/mux/stream_mux.rs",
+      "sha256": "6dcc5e04dec656fef0ddd309001894223ae9fac26a31085a40d863be02971dfa"
+    },
+    {
+      "path": "crates/node-extended/src/mux/uot.rs",
+      "sha256": "baf9dd6d533c4a38548ba5e2e0b2debc9dd115492b010d52d355c593ee9de5ed"
+    },
+    {
+      "path": "crates/node-extended/src/mux/xudp/frame.rs",
+      "sha256": "1c33d558034b3a4e8a59f9524c6fcde164b4ae5ccae4979970cb7d08a656a273"
+    },
+    {
+      "path": "crates/node-extended/src/mux/xudp/global.rs",
+      "sha256": "b033d0ae72d9db9d77e0d5eda789da3c87bea8e2cc23050290cc715d95404292"
+    },
+    {
+      "path": "crates/node-extended/src/mux/xudp/mod.rs",
+      "sha256": "da4ff9d06098636af75275b003fe9253c12a63b2a85f227de315270e4131a61a"
+    },
+    {
+      "path": "crates/node-extended/src/sip003.rs",
+      "sha256": "a33b59eba07b2486ef16c320155c8d003e00e61752c352e04e498cb6feebf5ed"
+    },
+    {
+      "path": "crates/node-extended/src/util.rs",
+      "sha256": "de070b25a9d1cb705c36467efcae00bc8b2bb486f8a7de322ee88c3387a2874b"
+    },
+    {
+      "path": "crates/node-extended/src/vmess/crc32.rs",
+      "sha256": "a37aba1fcc36d8c8f4b8173d8340a53de57a6aa39f832c7de0a01be8f0602069"
+    },
+    {
+      "path": "crates/node-extended/src/vmess/fnv1a.rs",
+      "sha256": "d74cca97eaa1d78c8fde0bdda8a5a939f53a116cdfa986dc5cd39b569556f6b5"
+    },
+    {
+      "path": "crates/node-extended/src/vmess/md5.rs",
+      "sha256": "bef84f07a225b2ebac20da3173e6d444805a8426d1ff78e26a17cec6aa49061c"
+    },
+    {
+      "path": "crates/node-extended/src/vmess/mod.rs",
+      "sha256": "d9da9080d3b3674ac063ca24fa28e7230507bbc8ecdfadde78ca535c7d335cb0"
+    },
+    {
+      "path": "crates/node-extended/src/vmess/sha2.rs",
+      "sha256": "fd0639a3769d1e25ec538a40978303c4338c5ae12af185068acb310188cee6de"
+    },
+    {
+      "path": "crates/node-extended/src/vmess/typed.rs",
+      "sha256": "dfd427dffd24df7cf6a91aebecf8611d25c98256c664df7bb371d358f3a5b57d"
+    },
+    {
+      "path": "crates/node-extended/src/vmess/wire.rs",
+      "sha256": "9eeb30f8f799e72a37ceb98ca27d3e8758e272abb5d271eaea34e58c44286cd5"
+    },
+    {
+      "path": "crates/node-extended/src/websocket.rs",
+      "sha256": "2e9ef8d1167dab57c8775f5a3925ef2bb57150d791b98b3cfa1a1aac7af4184e"
+    },
+    {
+      "path": "crates/node-extended/tests/clients-lock.json",
+      "sha256": "aade6b7755ee76e092af2d51a86f5d51a785e52bf1a861eadf9c73b1b98e7dbc"
+    },
+    {
+      "path": "crates/node-extended/tests/fetch_clients.py",
+      "sha256": "a77f0028a84d1c967eb3ff55fab5fd520aeea1d5563e72f4259b23da257642a3"
+    },
+    {
+      "path": "crates/node-extended/tests/multiplex_policy.rs",
+      "sha256": "be7abe3b8defd390fa659ade7ba38334f6661ed999a6d2de06ebaa397e9d472b"
+    },
+    {
+      "path": "crates/node-extended/tests/official_clients.rs",
+      "sha256": "92bc8626b3e5c2a2e6b2823a9ac71768771ed186184d5539334bb5e02c04ea56"
+    },
+    {
+      "path": "crates/node-extended/tests/payload_sessions.rs",
+      "sha256": "b88193ede620b9978958631bd866a20c646b8197348cc3d276b4d02662a5d854"
+    },
+    {
+      "path": "crates/node-extended/tests/support/clients.rs",
+      "sha256": "4c32284b83e285ae97f2c0587136f265bb1e348a8304ef3e6a07021596ef02ed"
+    },
+    {
+      "path": "crates/node-extended/tests/support/mod.rs",
+      "sha256": "84892d98003bc3be50d9c006f5572087516d64b887642c0dff34541adf77514d"
+    },
+    {
+      "path": "crates/node-extended/tests/transport_boundaries.rs",
+      "sha256": "f0f4802bd7b7cdf44451791d4c3e2d5156b2c86aa2e945175fea95564c6b7804"
+    },
+    {
+      "path": "crates/node-extended/tests/xudp_global.rs",
+      "sha256": "772d3680acfac7860fdb9b5f851a3d7bb46848e2ded916c0213c9941472af00a"
+    },
+    {
+      "path": "crates/node-extended/UPSTREAM.json",
+      "sha256": "e942e3e5b255771cfa8d8dfd3630fc81df8de31745827a5d0b609bc8f59537f2"
+    },
+    {
+      "path": "crates/node-native/src/shadowsocks/official.rs",
+      "sha256": "75a010185a687e6b1fa0afcc081439c475d2479c2aab8852292539ab247b0e45"
+    },
+    {
+      "path": "crates/node-native/src/shadowsocks/udp.rs",
+      "sha256": "298d3fa1f2216a27bd9b08f7a6f81c0ad7850ebffc7907301b45a255ee2f2e8c"
+    },
+    {
+      "path": "crates/node-native/src/shadowsocks.rs",
+      "sha256": "4d4f49aec67c6fdb01c80bda704ddac6b1069660688a3cd32273d5ff778e3d4f"
+    },
+    {
+      "path": "crates/node-native/tests/native_plugin_transport.rs",
+      "sha256": "940989b1170447ced2e2068d95644c120ba102750830d9a74755c7ba46ea2efb"
+    },
+    {
+      "path": "crates/node-native/tests/plugin_process.rs",
+      "sha256": "c85ae7ef956d438765c6090dfe3bd02684b071ef3dc41484514958ae693b8020"
+    },
+    {
+      "path": "crates/node-native/tests/support/native_fixture.rs",
+      "sha256": "82383f55d23bc38f9173270a62180a5f125e69d539c9a9edd18dfbac1ada6f25"
+    },
+    {
+      "path": "vendor/shadowsocks/Cargo.toml",
+      "sha256": "8e5346a3efc2523208f3b5b6951212b8ea7f2cfc6330dcb32536671c898582b0"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/Cargo.toml",
+      "sha256": "b5f9035a7adf8b91d2e6a06fa71dae3ad547b636fc5c956e3034386a81fe66a7"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/LICENSE",
+      "sha256": "fbceed46c12ff19e132ca7a8bb8fd5ed92d0baea3f2ef7db67aee774c01b3849"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/README.md",
+      "sha256": "570c9d649e52c2c68cf4f6ddbfdd118b66e02ef68827e771621ce4c05b342e37"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/kind.rs",
+      "sha256": "5778e55dfcc6c0e339141bca05bd37b8a5d5bd5847fc0d72118cb2061e609336"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/lib.rs",
+      "sha256": "d94522adfaf6ed0c5f035c10dcd33845ca386fec9cf6dff86db978772ab1f811"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/utils.rs",
+      "sha256": "8611d2bfa98f091f0034b3aca0b9362dbd36f2d70195b30efe511844cfb6477e"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/aeadcipher/aes_192_gcm.rs",
+      "sha256": "9ff02b36f226de9549e9aba543937b9ede40c526a279c4284c44e46af3281399"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/aeadcipher/aes_ccm.rs",
+      "sha256": "a645d8bf55d0d3259491864b74e0ddf504e73f3911f15d3d457887d0dc369819"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/aeadcipher/aes_gcm.rs",
+      "sha256": "cf55b41c77164a8a1ad0c936a7c4ccefde06700b619b8ed380a81e95ce0420c4"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/aeadcipher/aes_gcm_siv.rs",
+      "sha256": "fd7af99818895e3e1efb8c8353449a886e137893c756f7fe25c713a3d94ac9dd"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/aeadcipher/chacha20_poly1305.rs",
+      "sha256": "fcd6a513aa58e68d9fed5145f37030440a23b622625b50a204703784a9bc6dbb"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/aeadcipher/mod.rs",
+      "sha256": "15bc1e4cec4cafe5f610bec122802c79e9cb4c7f14ca71f05f810f59c5cb894b"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/aeadcipher/sm4_ccm.rs",
+      "sha256": "44c404e720affe18edc8ac3a0afeb965f71c9bdd913f5fdf21a1b3679fe36fca"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/aeadcipher/sm4_gcm.rs",
+      "sha256": "79452898b3987f8a0719178eac1604db477fdf7075a250f962d99954cd0b4615"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/aeadcipher/sm4_gcm_cipher.rs",
+      "sha256": "e6927f8eeec6c0e349993f8203eb7e40e81a242be93791d532d26f22e35d82ac"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/aeadcipher/xchacha20_poly1305.rs",
+      "sha256": "c3ecdfcc66bcaf6bd9e3343eecfa41b096d62371489c8f18760c36b102aceede"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/cipher.rs",
+      "sha256": "7b600ed47c5e218721d39433ebde233c351963d20a71679c9f3b9e3db071ccaf"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/dummy.rs",
+      "sha256": "547410ce02a72462245ee97480269a1983125764f6c76c5db9e53930e1b51c2f"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/mod.rs",
+      "sha256": "c2e64e2b0de4861c6a5a4b6ab210e7373662dd4238b11edd325fedcdd64d5515"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/cfb.rs",
+      "sha256": "99af9ebabd808005a84a8138182d7aa3ac20f1e4d9c4864a6e68a5c6144f76b7"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/chacha20.rs",
+      "sha256": "f38d35243b2aabc91b7529f969d5a8fb7145d48f83cd86791b54d38f08fb6fe8"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/crypto/aes.rs",
+      "sha256": "510b1748ceac1861fee794ca380701bfac09498a29597da38fa9223ccf36da0d"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/crypto/camellia.rs",
+      "sha256": "51d65c6706cd45f5498b536adfd901634ed293b8ca4b16a9a0817c2c15a0b4a1"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/crypto/mod.rs",
+      "sha256": "859e5ac00e13c2d1604c8f06e3c9c721610a5ee5c8f1f016003b553ca7ed9a4b"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/crypto/rc4.rs",
+      "sha256": "dbccea0647fbdfa5c946f922246c72b2f573dbd505fd5cead181fb9e092e468e"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/ctr.rs",
+      "sha256": "715d29a2287fda96ed1c3d2a347dfdc82e20257dc14133e73c3f74d31c5560b9"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/mod.rs",
+      "sha256": "ea13943e75f86097abaeab1989e901839ccb2aec42b4b80720c8e9d86115a8a5"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/ofb.rs",
+      "sha256": "ed5a5e5dd414cedcdfa06767dd8fc42cd60cc9f0b777315c47528c186bcf0ead"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/rc4.rs",
+      "sha256": "dcc719a84047728fcb8f52542f1243f1966f94d015fa80e5d91b9be0a7ef1f85"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/rc4_md5.rs",
+      "sha256": "1417a42a3c125801dea37e03938cbe8757d5121d2eb36e57ec8711ef60c4c8bc"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v1/streamcipher/table.rs",
+      "sha256": "ff75d7f53a76f512ba1399d62928fc222a7aad8b67295817337823d9d5e17999"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/crypto/aes_gcm.rs",
+      "sha256": "3bb435c2ab3916da13f0043aab1e98b6c1d828f57ada2f813421b725f8ed336c"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/crypto/chacha20_poly1305.rs",
+      "sha256": "3663a1d6b904add965102c4232c0deb65d4bf8fcdf1eb60b7658b91d82694b66"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/crypto/chacha8_poly1305.rs",
+      "sha256": "f6a6586d4f534893317f03ad29d8c5ef3cdb3d437525b8c284805ec097f70867"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/crypto/mod.rs",
+      "sha256": "dc54a0ff9c94e9470993bd099e03169bd832907c66506fddf94c5d96a7f59c3d"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/crypto/xchacha20_poly1305.rs",
+      "sha256": "d8e28b45fb816864546c7e99b08ef09f6b06e74d9d093892dcb55ea01415765c"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/crypto/xchacha8_poly1305.rs",
+      "sha256": "b32e96af4e4c5807789b08dcfe53fc6753a6c3028de28a42acfb6048e3e1a0a0"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/mod.rs",
+      "sha256": "a3fca0cd503de535c08e87321d51cc8d904dec7400dc0bc1d70bcabad4477aa6"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/tcp/mod.rs",
+      "sha256": "c89b8dca6be3d03bc8fad5a8c2dc5da86f1bb173abe021518b1d5e74a97af03d"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/udp/aes_gcm.rs",
+      "sha256": "8990b3e7169174ce2a6d8df52718a1b2c2c29811850f475d8da32a2fbf8c472b"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/udp/chacha20_poly1305.rs",
+      "sha256": "010251a447e86a0dd6a957b26a19262b5726ec115bbff30e4dd412518842a83b"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/udp/chacha8_poly1305.rs",
+      "sha256": "356268052e133ff2bd23c9cbed0031d714cce4ad87c65c571155e3f8421fb8e8"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/src/v2/udp/mod.rs",
+      "sha256": "27d395defc7b1c8f0e852be8aaa37d1cf4226f93057e3175444a03e1a108760e"
+    },
+    {
+      "path": "vendor/shadowsocks/crypto/UPSTREAM.json",
+      "sha256": "ac3e0b77dd135672fbf884113a1101f6c46d67f6e3bd50f6c96ea6643e807aa5"
+    },
+    {
+      "path": "vendor/shadowsocks/LICENSE",
+      "sha256": "b453481258ecf6dbe1ec0fb2efa621de6035fcddbee0868cb71b8ffc4c0c4782"
+    },
+    {
+      "path": "vendor/shadowsocks/src/config.rs",
+      "sha256": "45f88514512827c89e4501d1595e7224a39a1232d819b05076e6417e1f985276"
+    },
+    {
+      "path": "vendor/shadowsocks/src/context.rs",
+      "sha256": "0d316cf17f98d8d061db41f3a11e02644c41ca954de28f0b90f0733040dea621"
+    },
+    {
+      "path": "vendor/shadowsocks/src/dns_resolver/hickory_dns_resolver.rs",
+      "sha256": "11d345e1a28cb4b63acf5afc7f8f09111030a58d7df9d28fcebca0e503704888"
+    },
+    {
+      "path": "vendor/shadowsocks/src/dns_resolver/mod.rs",
+      "sha256": "5c463a5adfdca7910f409549b393e614c3c78e808c428a4f5e71614d0c9ebdf2"
+    },
+    {
+      "path": "vendor/shadowsocks/src/dns_resolver/resolver.rs",
+      "sha256": "de68f54d76dbdd65abc46eba11f8ad46ab3fa826be36741c784bca50a89302b4"
+    },
+    {
+      "path": "vendor/shadowsocks/src/lib.rs",
+      "sha256": "0c02fe660dfccd9db37d30f6b64d0d1d629276fea53008d08e41ee3f6288081c"
+    },
+    {
+      "path": "vendor/shadowsocks/src/manager/client.rs",
+      "sha256": "641a6eb5f97306f1ee75551dae8d1bead5ac72ff36cc7206785d976ca40db5cb"
+    },
+    {
+      "path": "vendor/shadowsocks/src/manager/datagram.rs",
+      "sha256": "93bdbf245a5b6309314b5decf21806ff29815ce0855ea9d35e0ec2b77e91aedc"
+    },
+    {
+      "path": "vendor/shadowsocks/src/manager/error.rs",
+      "sha256": "41937a9bd9c0ec8ffc1c5a835eced4675f627662271cfe8d2714972c0ab86c81"
+    },
+    {
+      "path": "vendor/shadowsocks/src/manager/listener.rs",
+      "sha256": "c831a9fcfe830fea3a5d950c7dc6a7f955aa84adc0e81f363fe6ce8891890380"
+    },
+    {
+      "path": "vendor/shadowsocks/src/manager/mod.rs",
+      "sha256": "f65eb3a230d0580f7ae16132145e7ff6b102442e2414144029b30ad6db5df011"
+    },
+    {
+      "path": "vendor/shadowsocks/src/manager/protocol.rs",
+      "sha256": "b28df02f74d2d71eb5ca6a5015b32dba057decfc036cea72460e3c7ffa46403e"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/mod.rs",
+      "sha256": "ee6ad0e215356dc3d6810b5c4010623caa8892fed3d0fdca07388a8de053750e"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/option.rs",
+      "sha256": "6778de9b4cbfec5410b8e8bd2085b5c593e356968dd77f58249d24e2546a245d"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/sys/mod.rs",
+      "sha256": "c97fc82b5abbc611f48c4b76d8ab8ddbc7ed01436f629e624ec308cd5d887b97"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/sys/unix/bsd/freebsd.rs",
+      "sha256": "463d8011900e1fe9d99f20baef47ac6cc49b00e9557002664d86c7819713a34d"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/sys/unix/bsd/macos.rs",
+      "sha256": "b53803953d255fa5d1172a5dc64aeea0ebb43c574b224005a962bea962972477"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/sys/unix/bsd/mod.rs",
+      "sha256": "5d6795e2abdd8faffaab2ee410eabfa50ba2b17867c42195616bf84b55074d87"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/sys/unix/bsd/others.rs",
+      "sha256": "688efce928e9fb940c15fd334de00f10ae58e45ecdabe0354b7826a25f78d104"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/sys/unix/linux/mod.rs",
+      "sha256": "72a18e0b70e2d032df2bc6926dee60cc1d5c342e09343e372935b68dc31e3dcb"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/sys/unix/mod.rs",
+      "sha256": "6a42234f572d4f8b61aa0d55c8d677dcaa4611996cc4615f875dd082332c6a7f"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/sys/unix/others.rs",
+      "sha256": "ba85ca4e91929d1cca270806b8f44712bb5c33f5fcc84cf8f5ce6c81d0aa1f37"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/sys/unix/uds.rs",
+      "sha256": "c159adf4d088eb68d7a8cfb33d0f12ba4ff75321bd9b8a83cd976d5c1a3851b4"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/sys/windows/mod.rs",
+      "sha256": "e17d21a0eb89753cc19e097dec3a4197c2149aa32c110c7967fed30398316e43"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/tcp.rs",
+      "sha256": "0e3ab72c96a4e4fe9b3d15924e241bee82414ce1b53b8d84eaa6149948edfb87"
+    },
+    {
+      "path": "vendor/shadowsocks/src/net/udp.rs",
+      "sha256": "8c203b7eda028326d20a228c4d08351f3a2dfb56671707351504b576ba80aced"
+    },
+    {
+      "path": "vendor/shadowsocks/src/plugin/mod.rs",
+      "sha256": "95f2f27f063500e411cafc174d0808d8c89c495ff84701ab0a2ba2052a5dd4eb"
+    },
+    {
+      "path": "vendor/shadowsocks/src/plugin/obfs_proxy.rs",
+      "sha256": "dd96ab11b96d6b23779d4ede868124d56f058399a0e014f50f1911dc3787cfe4"
+    },
+    {
+      "path": "vendor/shadowsocks/src/plugin/ss_plugin.rs",
+      "sha256": "a257e68000e59d1a84d0145938405b1e418c2d669efc73e98a82ecf9f8739481"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/mod.rs",
+      "sha256": "4bc616972fa32fb3067847955dfe0e910fe7dddf0f3e39c8e0052aa3be2dc91a"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/socks5.rs",
+      "sha256": "ab160e6dee96b06eb5eefc269fb8ec418b56a277ad5c35a3ca0be5fc06f1a60b"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/aead.rs",
+      "sha256": "6cce7e0f2bb70a8eaddb67cea976f8344e7d4ab2f92ec1b164965322b5337231"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/aead_2022.rs",
+      "sha256": "15eb80a82631900ce440f3a8025a57b43f247208c5844063955e681b332480be"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/crypto_io.rs",
+      "sha256": "c8d5e81f785d1ca89d74a4cdaf61f27f653763bc1e3bd90765b202be834805ff"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/mod.rs",
+      "sha256": "fabbf0537742c5d6e1390290ca118f729fca75d26e5bfe5639cbed8131897acd"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/proxy_listener.rs",
+      "sha256": "27be294f4b8a84b949275d9bea59b5f140c0e0646472bc3556639ac4051096c9"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/proxy_stream/client.rs",
+      "sha256": "7793b2598694e60017993942204c110bf030214fa0b5359e8ae315cfe1e5f692"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/proxy_stream/mod.rs",
+      "sha256": "862d829aab36b6dbbadb132b5ab8c9b1c3b9558e96bea8aca2a1d928f597b496"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/proxy_stream/protocol/mod.rs",
+      "sha256": "0327515106b59387425625b80fd6009f23ddffb4222df86b9f568969bbc642fd"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/proxy_stream/protocol/v1.rs",
+      "sha256": "b0b4411e927a7fe0ea822d084b4208b32b0d2b4b6cc159d5bfb34f2f98487f71"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/proxy_stream/protocol/v2.rs",
+      "sha256": "584724a75687726a60eca3d7719890ea8ca77d4df658b147c5cb28f70565ee16"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/proxy_stream/server.rs",
+      "sha256": "cf66d4323b2bff16a988e7e8c5aaaac522a9f5ca140f3d8e0e36cb5721d4675f"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/stream.rs",
+      "sha256": "18d8cfbd0190610157f9b4184406d58e8ca9b84491eeca8aa1f292d06904dd67"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/tcprelay/utils.rs",
+      "sha256": "6dd679b2c9baca129b8b265299d2318cdacd69b09d9903ebf25f7d61c25bf62b"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/udprelay/aead.rs",
+      "sha256": "d95039ad83395d9abe729a27c56e6a72884fc27a8b27fbbe51ce41a938febfba"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/udprelay/aead_2022.rs",
+      "sha256": "77f15d72e51af9172ee122567456bd461339b9a758c6df57d269c33bcfb7c7f4"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/udprelay/compat.rs",
+      "sha256": "698f9da4f43fcecd10c228f6f62bae7c5bba799b6eb8711a383969682cb0458e"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/udprelay/crypto_io.rs",
+      "sha256": "28c536cf6ee42ec44889e5911814af27f4b0cc7567a9759bfb54faeda0c85a6e"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/udprelay/mod.rs",
+      "sha256": "a3cd95f9ace3c31b2e772b4f03f993f7cc069caccfab89b8935dac6b0355bc3c"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/udprelay/options.rs",
+      "sha256": "7350d56e4d0041f8710ced4bd05d75b849f5392930daf46f2bb91daf08c1a5d5"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/udprelay/proxy_socket.rs",
+      "sha256": "5e16e7ef5f086c934af8fc741449d570060cccb71cefd2350155e87f7f4fbea4"
+    },
+    {
+      "path": "vendor/shadowsocks/src/relay/udprelay/stream.rs",
+      "sha256": "fe8cb0b671708b5a947d6265053c4e678547a3acda0a5cf9e221582a31325e89"
+    },
+    {
+      "path": "vendor/shadowsocks/src/security/mod.rs",
+      "sha256": "352a830684a0f222688d4b65ccfc218cf91328a753ede52c8f55432ed4d461be"
+    },
+    {
+      "path": "vendor/shadowsocks/src/security/replay/mod.rs",
+      "sha256": "2e5f2f685ff68670e89b4a609b331e9f36c03d208e621ec8e28ddf5025fbcf99"
+    },
+    {
+      "path": "vendor/shadowsocks/src/security/replay/ppbloom.rs",
+      "sha256": "a92506bbe7b1119431fe5de9b037624049d05e1e5d80d5dd92fc1eab63cec841"
+    },
+    {
+      "path": "vendor/shadowsocks/UPSTREAM.json",
+      "sha256": "f600f2b68a3b96d512fc16eaae81444e96d42867702cf54035a4dc023a936e9b"
+    }
+  ],
+  "evidence_sha256": [
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/client-fetch.log",
+      "sha256": "8356dceb11183c5cb0a0b3d270e7465dd65f59901e0f3cbead3dbb885488b93a"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/extended-clippy.log",
+      "sha256": "f4a97683dba3dc5023b8536bb19cc9bb6db34d23b170a52e3a0bd0d23ef3b59e"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/extended-tests.log",
+      "sha256": "27a888c8ef37e83d836e2a0e0ea1455a6b28a1287a6760ecff231b9fc760a1c6"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/extended-workspace.Cargo.lock",
+      "sha256": "e5a180d3cc211333029117d5f31a0d8759f6cec021fb958587a618cf1136343b"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/history-native-clippy-before-format.log",
+      "sha256": "38f04c7e6a1f2949059f28d578a0b45df5e6cdd8364a7840fe47dacec96adcdb"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/history-native-missing-test-module.log",
+      "sha256": "a91e6fa11a2dc3e1a7983dca29d9c2ff69b0e9170a7bfbf18dfc6570c13d06bc"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/history-ss-plugin-auth-failure.log",
+      "sha256": "f672bdae7cc21a3035aabb539b963b274abec6eaa10cae494479f8126288d8d5"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/official-extended.log",
+      "sha256": "77659b0459d6c3c26a2ad38535a04ded50a6c2122872fb4ed50c5606d8d54e59"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/official-shadowsocks.log",
+      "sha256": "dd98458fed65924ab33e85c9df3c0cd7c31bac99bfb9b2db109dd72b462d23d0"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/ss-clippy.log",
+      "sha256": "4867949286f3b9c98624fa33ed493204df12d67006a63cc73d05d6eba91675e4"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/ss-tests.log",
+      "sha256": "7c8f00228878df09ddb53b0d3f52fcec60de6154c7024f1f148ea82fe4d05021"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/ss-workspace.Cargo.lock",
+      "sha256": "c1b7cbebdd0d4a1154d20d634851dcfcd1ba0df675520ad7c566493917e8c398"
+    },
+    {
+      "path": "crates/node-extended/tests/evidence/stage2/upstream-checksums.log",
+      "sha256": "790205a330bf4f0ce018973e21b33cd211f3f90e100d07d526fe808203bf92b3"
+    }
+  ],
+  "runtime_attribution_files": [
+    "crates/node-extended/LICENSE-shoes-MIT",
+    "crates/node-extended/UPSTREAM.json",
+    "vendor/shadowsocks/LICENSE",
+    "vendor/shadowsocks/UPSTREAM.json",
+    "vendor/shadowsocks/crypto/LICENSE",
+    "vendor/shadowsocks/crypto/UPSTREAM.json"
+  ]
+}

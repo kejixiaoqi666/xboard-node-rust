@@ -1,4 +1,5 @@
 use crate::user_control::{Replacement, UserControl, file_digest};
+use crate::{EmbeddedLauncher, EmbeddedWorker};
 use crate::{KernelAdapter, KernelError, KernelStatus};
 use node_core::{NodeSpec, UserSpec};
 use serde::Serialize;
@@ -27,11 +28,12 @@ pub struct ProcessKernel {
     inner: Arc<Mutex<ProcessState>>,
     environment_remove: Vec<String>,
     native_user_updates: bool,
+    embedded: Option<Arc<dyn EmbeddedLauncher>>,
 }
 
 #[derive(Default)]
 struct ProcessState {
-    child: Option<Child>,
+    child: Option<KernelChild>,
     active: Option<ProcessCandidate>,
     control: Option<UserControl>,
 }
@@ -105,7 +107,41 @@ mod writer_tests {
     }
 }
 
-fn terminate(child: &mut Child) -> Result<(), KernelError> {
+enum KernelChild {
+    Process(Child),
+    Embedded(Box<dyn EmbeddedWorker>),
+}
+struct Exit(bool);
+impl Exit {
+    fn success(&self) -> bool {
+        self.0
+    }
+}
+impl KernelChild {
+    fn try_wait(&mut self) -> io::Result<Option<Exit>> {
+        match self {
+            Self::Process(child) => child
+                .try_wait()
+                .map(|exit| exit.map(|status| Exit(status.success()))),
+            Self::Embedded(worker) => worker
+                .running()
+                .map(|running| if running { None } else { Some(Exit(false)) }),
+        }
+    }
+    fn kill(&mut self) -> io::Result<()> {
+        match self {
+            Self::Process(child) => child.kill(),
+            Self::Embedded(worker) => worker.stop(),
+        }
+    }
+    fn wait(&mut self) -> io::Result<Exit> {
+        match self {
+            Self::Process(child) => child.wait().map(|exit| Exit(exit.success())),
+            Self::Embedded(worker) => worker.stop().map(|()| Exit(true)),
+        }
+    }
+}
+fn terminate(child: &mut KernelChild) -> Result<(), KernelError> {
     if child
         .try_wait()
         .map_err(|_| KernelError::Activate("child status unavailable".into()))?
@@ -155,6 +191,7 @@ impl ProcessKernel {
             inner: Arc::new(Mutex::new(ProcessState::default())),
             environment_remove: Vec::new(),
             native_user_updates: false,
+            embedded: None,
         }
     }
 
@@ -171,6 +208,17 @@ impl ProcessKernel {
         state.control = None;
         state.active = None;
         Ok(())
+    }
+    pub fn activity(&self) -> Result<node_core::ActivitySnapshot, KernelError> {
+        let state = self
+            .inner
+            .lock()
+            .map_err(|_| KernelError::Activate("lock poisoned".into()))?;
+        let control = state
+            .control
+            .as_ref()
+            .ok_or_else(|| KernelError::Activate("activity control unavailable".into()))?;
+        crate::traffic_control::activity(&control.path)
     }
     pub fn traffic_snapshot(&self) -> Result<Option<node_core::TrafficSnapshot>, KernelError> {
         let state = self
@@ -222,6 +270,10 @@ impl ProcessKernel {
     }
     pub fn without_environment(mut self, keys: impl IntoIterator<Item = String>) -> Self {
         self.environment_remove = keys.into_iter().collect();
+        self
+    }
+    pub fn with_embedded(mut self, launcher: Arc<dyn EmbeddedLauncher>) -> Self {
+        self.embedded = Some(launcher);
         self
     }
     pub(crate) fn with_native_user_updates(mut self) -> Result<Self, KernelError> {
@@ -344,6 +396,9 @@ impl ProcessKernel {
     }
 
     pub(crate) fn check_candidate(&self, candidate: &ProcessCandidate) -> Result<(), KernelError> {
+        if let Some(launcher) = &self.embedded {
+            return launcher.check(&self.config.args, &candidate.config_path);
+        }
         let mut args = self.config.args.clone();
         if args.first().is_some_and(|arg| arg == "run") {
             args[0] = "check".into();
@@ -352,15 +407,16 @@ impl ProcessKernel {
                 "sing-box command must start with run".into(),
             ));
         }
-        let mut child = self
-            .command()
-            .args(args)
-            .arg(&candidate.config_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|_| KernelError::Prepare("could not start config check".into()))?;
+        let mut child = KernelChild::Process(
+            self.command()
+                .args(args)
+                .arg(&candidate.config_path)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .map_err(|_| KernelError::Prepare("could not start config check".into()))?,
+        );
         let deadline = Instant::now() + self.config.readiness_timeout;
         loop {
             match child.try_wait() {
@@ -387,7 +443,7 @@ impl ProcessKernel {
     fn launch(
         &self,
         candidate: &ProcessCandidate,
-    ) -> Result<(Child, Option<UserControl>), KernelError> {
+    ) -> Result<(KernelChild, Option<UserControl>), KernelError> {
         // A listener from another process must not make this child look ready.
         if candidate.readiness_addr.is_some_and(|addr| {
             TcpStream::connect_timeout(&addr, Duration::from_millis(50)).is_ok()
@@ -424,12 +480,22 @@ impl ProcessKernel {
         } else {
             None
         };
-        let mut child = command
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|_| KernelError::Activate("could not spawn kernel".into()))?;
+        let mut child = if let Some(launcher) = &self.embedded {
+            KernelChild::Embedded(launcher.start(
+                &self.config.args,
+                &candidate.config_path,
+                control.as_ref().map(|c| c.path.as_path()),
+            )?)
+        } else {
+            KernelChild::Process(
+                command
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .map_err(|_| KernelError::Activate("could not spawn kernel".into()))?,
+            )
+        };
         let started = Instant::now();
         let deadline = started + self.config.readiness_timeout;
         loop {
@@ -447,6 +513,7 @@ impl ProcessKernel {
             }
             let listener_ready = match candidate.readiness_addr {
                 Some(addr) => TcpStream::connect_timeout(&addr, Duration::from_millis(50)).is_ok(),
+                None if control.is_some() => true,
                 None => Instant::now() >= deadline,
             };
             let control_ready = match (&control, &digest) {
@@ -610,7 +677,7 @@ impl KernelAdapter for ProcessKernel {
 
     fn status(&self) -> KernelStatus {
         match self.inner.lock() {
-            Ok(mut state) => match state.child.as_mut().map(Child::try_wait) {
+            Ok(mut state) => match state.child.as_mut().map(KernelChild::try_wait) {
                 Some(Ok(None)) => KernelStatus::Ready,
                 _ => KernelStatus::Stopped,
             },

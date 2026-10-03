@@ -1,0 +1,104 @@
+{
+  "recorded_utc": "2026-10-03T17:00:21.331396+00:00",
+  "status": "STATIC_REMEDIATION_REVIEWED_UNIX_EXECUTION_PENDING",
+  "base_windows_verification": {
+    "path": "crates/node-extended/tests/evidence/stage2/verification.json",
+    "sha256": "e9ef7cd3349b8081cb4b6b4e345758f652507ad0b77c62b2552777d0c7febb71"
+  },
+  "scope": "No new cargo run. Windows cfg(unix) exclusions are not PASS. This addendum pins the amended Unix fixture sources and reviewed root lifecycle implementation.",
+  "p1_remediation_review": [
+    {
+      "finding": "P1-01 startup cancellation and UDP rollback",
+      "status": "ORIGINAL_STATIC_TRIGGER_REMOVED",
+      "evidence": "Shutdown future passed into Process::start, internal cancel stops/waits child and returns None; raw UDP starts only after readiness; UDP bind failure stops/waits plugin."
+    },
+    {
+      "finding": "P1-02 outer abort before nested worker join",
+      "status": "ORIGINAL_STATIC_TRIGGER_REMOVED",
+      "evidence": "Protocol stop allows bounded grace join. Residual outer tasks are aborted/joined; leases and shared payload/session permits must all return before quiet ACK/final checkpoint. MUX auth watch signals internal cancellation rather than dropping nested future."
+    }
+  ],
+  "unix_fixture_expectations": {
+    "plugin_process": {
+      "business_tests": 4,
+      "child_harness_utility_tests": 1,
+      "new_mode": "never-ready",
+      "stop_limit_seconds": 3,
+      "checks": [
+        "actual child PID and private process group",
+        "public UDP not bound before plugin readiness",
+        "stop waits child",
+        "private/public TCP, UDP and control released"
+      ],
+      "status": "PENDING_ROOT_LINUX_A4"
+    },
+    "native_plugin_transport": {
+      "official_cases": 4,
+      "cases": [
+        "plain/default-mux1",
+        "plain/mux0",
+        "TLS/default-mux1",
+        "TLS/mux0"
+      ],
+      "delivered_tcp_bytes_each_direction": 66000,
+      "delivered_raw_udp_bytes_each_direction": 19,
+      "final_durable_counter_each_direction": 66019,
+      "checks": [
+        "third default-mux1 TCP stream remains open through native stop",
+        "official client process remains alive until native stop returns",
+        "held stream then reaches EOF/reset",
+        "native-traffic.json final counters exact",
+        "TCP, raw UDP and control released"
+      ],
+      "status": "PENDING_ROOT_LINUX_A4"
+    }
+  },
+  "amended_owned_source_sha256": [
+    {
+      "path": "crates/node-native/tests/plugin_process.rs",
+      "sha256": "2f959743292f8d074f6d314e8890bd08021403501fdb72cdb4fef59c9756ef64"
+    },
+    {
+      "path": "crates/node-native/tests/native_plugin_transport.rs",
+      "sha256": "883f16fcda06cc93a1cf29afaecab1958c339f69829c614c454ee5348585eb85"
+    },
+    {
+      "path": "crates/node-native/tests/support/native_fixture.rs",
+      "sha256": "20a4cda7c04abdd02abf216a7354c779d6b8415541decd3c77726f5a33ac74cc"
+    },
+    {
+      "path": "crates/node-extended/QA.md",
+      "sha256": "55d684d8e27975d19c285a3abf64d6c616cc791e52e65bd8da3ffe62b878fb85"
+    }
+  ],
+  "reviewed_root_source_sha256": [
+    {
+      "path": "crates/node-native/src/plugin.rs",
+      "sha256": "189f9fe8d32a34ada5203decde30e4d16dfd7c3366ae1a3c4b0913743102230b"
+    },
+    {
+      "path": "crates/node-native/src/lib.rs",
+      "sha256": "85324e056815307f4a6ef8e609010c9b494520ff37263001afcc11b5f7f6ec01"
+    },
+    {
+      "path": "crates/node-native/src/config.rs",
+      "sha256": "adc165ec4bdcf285501e91842132ccaef5366f6257f0d3670f2977b60143c444"
+    },
+    {
+      "path": "crates/node-native/src/limits.rs",
+      "sha256": "3b7219e28d29e7104aa508218ad9c752b9591e72a48a26d50a668e094aa3dee0"
+    },
+    {
+      "path": "crates/node-native/src/control.rs",
+      "sha256": "88ce98458ab0978972f5a2fe9e90f3471a7df59a791154de58f5df07e413fb34"
+    },
+    {
+      "path": "crates/node-native/src/traffic_store.rs",
+      "sha256": "79bfbc79383628ab37c55f62ee8141bee2ef444487cbd81eed9b17e3b4d0e04b"
+    }
+  ],
+  "preserved_initial_review": {
+    "path": "crates/node-extended/tests/evidence/reviews/native-plugin-20261003.md",
+    "sha256": "39eb619ba2bf36688bc0991bdc040dde911a873f3919bc97abe859fbb12fe854"
+  }
+}

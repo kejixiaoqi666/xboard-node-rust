@@ -1,0 +1,70 @@
+{
+  "verified_at": "2026-10-03T21:17:53.5249414+08:00",
+  "scope": "node-admin",
+  "workspace": "C:\\Users\\AUAS\\AppData\\Local\\Temp\\xboard-node-admin-verify-20261003",
+  "unit_exit": 0,
+  "ordinary_tests_passed": 18,
+  "clippy_exit": 0,
+  "pebble_exit": 0,
+  "pebble_tests_passed": 1,
+  "pebble_release": "v2.10.1",
+  "pebble_sha256": "2539f3903302d75f897522b23b1b52b3300f5f992245f13d3bdf3967cf23af6d",
+  "pebble_real_challenge_validation": true,
+  "production_ca_or_cloudflare_writes": false,
+  "unix_permission_tests_run": false,
+  "historical_failures": [
+    "Windows fs2 contention error mapped to Busy",
+    "Pebble localhost IPv6 fixture listener corrected",
+    "ACME notBefore now validated at issuance completion"
+  ],
+  "source_hashes": [
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/tests/PEBBLE_FIXTURE.md",
+      "sha256": "2e45ee66fe8ac80fd6690b0493edea9d0c3f532afd23f5b5d7d942e17d7006c6"
+    },
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/tests/pebble.rs",
+      "sha256": "c4f1f7f50bebb79137503f169e9193877bdaed6e12ee92ff725ed7531148aec4"
+    },
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/tests/import.rs",
+      "sha256": "6aac68096424264e8344d8ffea2fbd923696f1000b70fb2e2fec5d240392f419"
+    },
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/tests/dns.rs",
+      "sha256": "5625ba10470d08045a9ef3552c509ae29a1cf3265e83863f28ce7419ffab8059"
+    },
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/tests/certificate.rs",
+      "sha256": "1182d82a772048279c62ff010532c2d1e178dc3cead10f34c9884a7026cb788e"
+    },
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/src/storage.rs",
+      "sha256": "38f814961c1e596272dd46e1ec789faecd7bcc26e943cc2494be9a8c7375f79b"
+    },
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/src/secrets.rs",
+      "sha256": "70fb6f3568969a991fee3e4b355a8794eac43b331660200fb5956f45ba4dad78"
+    },
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/src/lib.rs",
+      "sha256": "dd145a036bf9f1904a4c5332f61077595fd299e6db58382e027e4cf5605d8151"
+    },
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/src/import.rs",
+      "sha256": "d45c021a6825d55559898491c2a7d4c333ef2143128b47d05a4b6b74df571c2e"
+    },
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/src/dns.rs",
+      "sha256": "559e6a036d9f06edc76a06b3b0bf368bf4c64fdd3704c4b1f0e186c706936a18"
+    },
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/src/certificate.rs",
+      "sha256": "cc41544d2642953b127dbfe1306eb527f4381bfc503437ba12a2571fd4cb2bdf"
+    },
+    {
+      "path": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust/crates/node-admin/Cargo.toml",
+      "sha256": "40dd28f6150a12ef1abefea4d449bbf50a49e2ae7dbbf9ae2d5f5e01dbed91c6"
+    }
+  ]
+}

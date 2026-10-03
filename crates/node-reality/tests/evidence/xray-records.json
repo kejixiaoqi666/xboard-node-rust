@@ -1,0 +1,1037 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-03T14:51:06.295Z",
+  "official_key_matches": {
+    "mldsa65_public_key_matches_official": true,
+    "public_key_sha256": "47378fee3ed5ab1c83418050b4aee30b8c362ee7f0fb4ead37e7cfe7b5f32584"
+  },
+  "cases": [
+    {
+      "client_to_node": [
+        {
+          "length": 1783,
+          "sha256": "508c9f63ec20d7f56e3db9ba2dd534a092b46b0d2008439bcc4d31aad93ba0c2",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 74,
+          "sha256": "f9887a629cd9a8b1894d731736b35d89c9b72d81a8eef3ea98ec77cea720dc57",
+          "type": 23
+        },
+        {
+          "length": 94,
+          "sha256": "679ca85c024dbb187bb5aa9d08fbeb8411c6f284e072b3bdf3c867f118d2ba99",
+          "type": 23
+        }
+      ],
+      "error": null,
+      "fragmented_retry_records": 0,
+      "group": "X25519",
+      "mirror": {
+        "group": "X25519",
+        "mirror": [
+          "127.0.0.1",
+          53837
+        ],
+        "openssl": "OpenSSL 3.5.8 25 Aug 2026",
+        "real_tls": true
+      },
+      "mirror_to_node": [
+        {
+          "key_share_extension_length": 36,
+          "key_share_group": 29,
+          "length": 127,
+          "retry": false,
+          "sha256": "5fac6549ebecd46c3c3fa9823201ff99c764f0744ed68a1716de8bafee45daf9",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 28,
+          "sha256": "ed2ce9004eab2d9ae1142272161ff0bd9e0d7b1ed8d0ddd62ead063f886bc521",
+          "type": 23
+        },
+        {
+          "length": 388,
+          "sha256": "0d7b030ee64bef0537a2813c24b4f7c0f7b2059b9ae7bbe4c9ad97713d038008",
+          "type": 23
+        },
+        {
+          "length": 100,
+          "sha256": "3b9b6556f09d37cdbaa40112c8d7734032d1e7fc00897d15686580bf07bdfa7a",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "4227e86db74a7285e7307365dfa6820c90728b1fadc11acf45de28d394a6b795",
+          "type": 23
+        }
+      ],
+      "mldsa": false,
+      "node_to_client": [
+        {
+          "key_share_extension_length": 36,
+          "key_share_group": 29,
+          "length": 127,
+          "retry": false,
+          "sha256": "a5ed88dfb6d25db63dfb401748c263fca95560590eb587b7fb9815cf2d10d705",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 28,
+          "sha256": "375465649a0874ff499871473bb08ba226aaf070235d3c6085861f26f0effcaa",
+          "type": 23
+        },
+        {
+          "length": 388,
+          "sha256": "842ec2dc32c36a71de66bc7e789ed5d83ac79202debd6645b8aacf1821947b89",
+          "type": 23
+        },
+        {
+          "length": 100,
+          "sha256": "246e655383c99fec1eaa3c4f585a0b37a859db36b522971c98a60c464f5619a9",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "a4cfea0a7c66d846852a4ed5610f090066e110c6530b035cb9af3bf3ea9c91d2",
+          "type": 23
+        },
+        {
+          "length": 24,
+          "sha256": "2dcf98430d2fd30dd267facfc069bcb3c2cd4aee4970ec01b7b24fdb1dc3df7b",
+          "type": 23
+        },
+        {
+          "length": 68,
+          "sha256": "11829bcf677b069d4c9cf959df020433b71f2c68a1fc3963bbf1fb75ad1eea18",
+          "type": 23
+        }
+      ],
+      "node_to_mirror": [
+        {
+          "length": 1783,
+          "sha256": "508c9f63ec20d7f56e3db9ba2dd534a092b46b0d2008439bcc4d31aad93ba0c2",
+          "type": 22
+        }
+      ],
+      "payload_bytes": 46,
+      "real_client": "Xray v26.3.27",
+      "success": true,
+      "wrong_verify": false
+    },
+    {
+      "client_to_node": [
+        {
+          "length": 1783,
+          "sha256": "ce58508790e76605b9f3efcaa212ef7b6e77d8f10ae7d6a1b1b566dd2c42baac",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 74,
+          "sha256": "daa28dae1b50c5b73d482a9b6fbceff40f0b17e2614021526664bb19f82cc633",
+          "type": 23
+        },
+        {
+          "length": 94,
+          "sha256": "0b0fbe119512be5ffb5362d7edc9b7e1cd970e0d4900c147cccf54d9554dcc74",
+          "type": 23
+        }
+      ],
+      "error": null,
+      "fragmented_retry_records": 0,
+      "group": "X25519MLKEM768",
+      "mirror": {
+        "group": "X25519MLKEM768",
+        "mirror": [
+          "127.0.0.1",
+          53844
+        ],
+        "openssl": "OpenSSL 3.5.8 25 Aug 2026",
+        "real_tls": true
+      },
+      "mirror_to_node": [
+        {
+          "key_share_extension_length": 1124,
+          "key_share_group": 4588,
+          "length": 1215,
+          "retry": false,
+          "sha256": "19b37c8a19102d9bcc13f8e68d5e73a5d2a9b677fe87ba3631b76f4161d7ec61",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 28,
+          "sha256": "7bc8595f6bd74eb1e35cfd91c2086ec25c5c3fac3f837217b7173afe51fce997",
+          "type": 23
+        },
+        {
+          "length": 389,
+          "sha256": "2ef934294f52b5245f7d5fb1da5d6f24529dc567270d5cba19ba356985e0fa07",
+          "type": 23
+        },
+        {
+          "length": 102,
+          "sha256": "b7d1e8e3a39c4d16aadae7a155d7b07d3c7e43df30f0a3edb3d94f79ed0a4b9c",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "f3083d741ebdef383933453dc788c7809876ded6881b6d08cd1c196f5f2e4e3f",
+          "type": 23
+        }
+      ],
+      "mldsa": false,
+      "node_to_client": [
+        {
+          "key_share_extension_length": 1124,
+          "key_share_group": 4588,
+          "length": 1215,
+          "retry": false,
+          "sha256": "95a9d8477a574d30170ab8671f87fc8a7e98d0e979fb2ce9ddbe0382dfe365b5",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 28,
+          "sha256": "c51ce1763ffee42a16c314bf8d2131bda4ad4e78d817494cea4e82127de3d590",
+          "type": 23
+        },
+        {
+          "length": 389,
+          "sha256": "31331f1457eff945805d176cd92750c57f3f0172ecd6583463f5079dbf730dda",
+          "type": 23
+        },
+        {
+          "length": 102,
+          "sha256": "bdd40bacb32d8dc740036f7f41c420144750207272a6540957c0af2a8a035cdb",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "0a87c0e2d7a665389f7382059b6ad8315373ba2e53a1367b8b03918cac7b386a",
+          "type": 23
+        },
+        {
+          "length": 24,
+          "sha256": "1838fae7fd2ede83b6ada50449c31f27d5c8202596441a6df86fa61d8c29e1a8",
+          "type": 23
+        },
+        {
+          "length": 68,
+          "sha256": "a0e9d2035e9589e06ef3f211bd81cbb3de45127cf93e4881d2cb5f764d9a2f4d",
+          "type": 23
+        }
+      ],
+      "node_to_mirror": [
+        {
+          "length": 1783,
+          "sha256": "ce58508790e76605b9f3efcaa212ef7b6e77d8f10ae7d6a1b1b566dd2c42baac",
+          "type": 22
+        }
+      ],
+      "payload_bytes": 46,
+      "real_client": "Xray v26.3.27",
+      "success": true,
+      "wrong_verify": false
+    },
+    {
+      "client_to_node": [
+        {
+          "length": 1783,
+          "sha256": "884c0e5a5d83546eb5acd4c2aebb1997dd4c0e9d5553567f888bd5220e17c765",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 74,
+          "sha256": "bed5f7617049b2ab92fa1a71a2fd7d1251bcf61199dda3aef8f09545c2e9ce1c",
+          "type": 23
+        },
+        {
+          "length": 94,
+          "sha256": "e5bef96b7338f693f8e9a1475cd6b3bf99740529a66eb82faecbf7490226ff3b",
+          "type": 23
+        }
+      ],
+      "error": null,
+      "fragmented_retry_records": 0,
+      "group": "X25519MLKEM768",
+      "mirror": {
+        "group": "X25519MLKEM768",
+        "mirror": [
+          "127.0.0.1",
+          53852
+        ],
+        "openssl": "OpenSSL 3.5.8 25 Aug 2026",
+        "real_tls": true
+      },
+      "mirror_to_node": [
+        {
+          "key_share_extension_length": 1124,
+          "key_share_group": 4588,
+          "length": 1215,
+          "retry": false,
+          "sha256": "f16fcc96717b5c9ddb08d7abb81b7dc89b933bfeb27cca9ca234d9538c0304e5",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 28,
+          "sha256": "5d5db163648664afec832edb055cca750156a7f9ca0216aa6a00575f3d866a7c",
+          "type": 23
+        },
+        {
+          "length": 388,
+          "sha256": "26f4a15061b6ca0679eeabd9fc0720d141f19b754624ec4c2963d417202ddea6",
+          "type": 23
+        },
+        {
+          "length": 102,
+          "sha256": "0e3934cdb8f08c3306b31862fa76f889a1ee9cf323b9d0894ba571c8cdc6034a",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "b5784f81777ff982155cfc129916f92dd7f875838394e855443bda1804bbadf3",
+          "type": 23
+        }
+      ],
+      "mldsa": true,
+      "node_to_client": [
+        {
+          "key_share_extension_length": 1124,
+          "key_share_group": 4588,
+          "length": 1215,
+          "retry": false,
+          "sha256": "f96a19ec7e75ab1736413c7984e3bace797cec98f38e24beb90b948b10d822a2",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 28,
+          "sha256": "8cad8c688d24c8893c5799de999105d603061fcd4de732db115f10a18d7d8d00",
+          "type": 23
+        },
+        {
+          "length": 3542,
+          "sha256": "135032aeeacbbbdae48a0c8a417cd824bace5cb3ef5e9c61dccf39bfe1785941",
+          "type": 23
+        },
+        {
+          "length": 102,
+          "sha256": "d7cfb3264a5f7b401437f7c1903f3809374eb92bd72f547c54e026cae8868767",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "c1bd50518cace4a18ede69568e1bd8f533a74c9b92fe8baf6b4eb637ef53640b",
+          "type": 23
+        },
+        {
+          "length": 24,
+          "sha256": "b36db13aa1ecb737b315e8f4e7c88032a3c1a037d5a2dadea231d93dd2a9d838",
+          "type": 23
+        },
+        {
+          "length": 68,
+          "sha256": "98df1c0b16ee4d80c5b498ef821828839f3b8abbdf6a927a279c9ffda7fa792e",
+          "type": 23
+        }
+      ],
+      "node_to_mirror": [
+        {
+          "length": 1783,
+          "sha256": "884c0e5a5d83546eb5acd4c2aebb1997dd4c0e9d5553567f888bd5220e17c765",
+          "type": 22
+        }
+      ],
+      "payload_bytes": 46,
+      "real_client": "Xray v26.3.27",
+      "success": true,
+      "wrong_verify": false
+    },
+    {
+      "client_to_node": [
+        {
+          "length": 1751,
+          "sha256": "789f02cbc3f5718983a6a4cc36e5409e55476bde85f6ae6bc452a57a32979afe",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 24,
+          "sha256": "8502955f0cc5b6d5248d24ea4cb622a433a3c06510226ac5fda49138aff60d34",
+          "type": 23
+        }
+      ],
+      "error": "expected TLS handshake content type",
+      "fragmented_retry_records": 0,
+      "group": "X25519MLKEM768",
+      "mirror": {
+        "group": "X25519MLKEM768",
+        "mirror": [
+          "127.0.0.1",
+          53864
+        ],
+        "openssl": "OpenSSL 3.5.8 25 Aug 2026",
+        "real_tls": true
+      },
+      "mirror_to_node": [
+        {
+          "key_share_extension_length": 1124,
+          "key_share_group": 4588,
+          "length": 1215,
+          "retry": false,
+          "sha256": "ee07314b7bfef184ed9dd55bef21034cfc480c1e59dc56f73b2813aca514984c",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 28,
+          "sha256": "14eb355bfe6889f6476ab3d18a6bdc04fe5e3ed410b3836ed0d72e0e50ca71a8",
+          "type": 23
+        },
+        {
+          "length": 389,
+          "sha256": "10ca40f97e0ed2021d732686feac9cbf1b7b7c6e17fa4350bdbcb8d497a12dd2",
+          "type": 23
+        },
+        {
+          "length": 101,
+          "sha256": "e1435ee4c4d04a4c5aa5f44cf7dab4e1bebdef3db94bd2a3e7eea1a6d9bf734a",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "6c04b88705c41c8cb874983b3e498415cd230298060d7d8dc5eb56a71eb84213",
+          "type": 23
+        }
+      ],
+      "mldsa": true,
+      "node_to_client": [
+        {
+          "key_share_extension_length": 1124,
+          "key_share_group": 4588,
+          "length": 1215,
+          "retry": false,
+          "sha256": "bee2d205bb251c4d656ec8e517e8c4706e5441d0e3178ab6e8de649087605e35",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 28,
+          "sha256": "d77e3b223f104e2d35c972a8ed7bd230dac7c6f193f7a8f133c40f29cb9bde80",
+          "type": 23
+        },
+        {
+          "length": 3542,
+          "sha256": "cafac6577d28f787c1405e157ad30705aca1a46a7ec72c82c1f4117f2f7fc316",
+          "type": 23
+        },
+        {
+          "length": 101,
+          "sha256": "16c4d8862664cc8407cbd5bc84883ceeed31def31874cb46d41d0680f0655c48",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "771de8cdda05a5dde61c744143deaadd4ee252643ae2ab869b73965b5ff9bccd",
+          "type": 23
+        }
+      ],
+      "node_to_mirror": [
+        {
+          "length": 1751,
+          "sha256": "789f02cbc3f5718983a6a4cc36e5409e55476bde85f6ae6bc452a57a32979afe",
+          "type": 22
+        }
+      ],
+      "payload_bytes": 46,
+      "real_client": "Xray v26.3.27",
+      "success": false,
+      "wrong_verify": true
+    },
+    {
+      "client_to_node": [
+        {
+          "length": 1815,
+          "sha256": "4da9e2ac927169eca063575aedbe8e3a4082df3160eb58f3657235124dff31b3",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 623,
+          "sha256": "c96e0dec8bf06e46173ea5b9c7897f3125c1331b3120e9faf9ba24761b12c257",
+          "type": 22
+        },
+        {
+          "length": 74,
+          "sha256": "37367cb6ee81afd8f1226368cefab0b3561361b34d688d57a6598fb03462edba",
+          "type": 23
+        },
+        {
+          "length": 94,
+          "sha256": "a4e5dd6a50e2a87dd1616d61ded553b88084c49b96b57a6a1c90fbd58177a40d",
+          "type": 23
+        }
+      ],
+      "error": null,
+      "fragmented_retry_records": 0,
+      "group": "prime256v1",
+      "mirror": {
+        "group": "prime256v1",
+        "mirror": [
+          "127.0.0.1",
+          53874
+        ],
+        "openssl": "OpenSSL 3.5.8 25 Aug 2026",
+        "real_tls": true
+      },
+      "mirror_to_node": [
+        {
+          "key_share_extension_length": 2,
+          "key_share_group": 23,
+          "length": 93,
+          "retry": true,
+          "sha256": "dccfe1223ee1fdd9fcecb036f96042e8f9d3e66af4eb580279b1b0b2ffd9a671",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "key_share_extension_length": 69,
+          "key_share_group": 23,
+          "length": 160,
+          "retry": false,
+          "sha256": "6b9ce1a9d1aa446e9d380061b761951daa27741aa06a13b577f7d5a09c354a84",
+          "type": 22
+        },
+        {
+          "length": 28,
+          "sha256": "8aa1880ff0ab46d28278b681735b58022457e050419868c870e8c727a2a0bbe9",
+          "type": 23
+        },
+        {
+          "length": 390,
+          "sha256": "2789908c94add70c52392653f825c310b77b9d43b28191e3b90d9adb4a7bfd2b",
+          "type": 23
+        },
+        {
+          "length": 100,
+          "sha256": "66c9457ce6b261a161dc62a69e63d4f02acdd2c5cb1c048e1c71603f31e8752d",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "8e23fa5a30b178263572d3229777bf5dab0586ac26dcd5886f7351276d374b45",
+          "type": 23
+        }
+      ],
+      "mldsa": false,
+      "node_to_client": [
+        {
+          "key_share_extension_length": 2,
+          "key_share_group": 23,
+          "length": 93,
+          "retry": true,
+          "sha256": "dccfe1223ee1fdd9fcecb036f96042e8f9d3e66af4eb580279b1b0b2ffd9a671",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "key_share_extension_length": 69,
+          "key_share_group": 23,
+          "length": 160,
+          "retry": false,
+          "sha256": "3067a782ec4fc0e2747bd3bcbba3a0352f07b6bf24f5e8434366e4264f8b83c9",
+          "type": 22
+        },
+        {
+          "length": 28,
+          "sha256": "b5ab880e5ebc87517084a7cfdd1dbf7366a13cc4ed2ecce4832011da43e01469",
+          "type": 23
+        },
+        {
+          "length": 390,
+          "sha256": "228aa77e08c30dfd303dba441c495c6997d9eb93a1ee9aec993e6835c39b5602",
+          "type": 23
+        },
+        {
+          "length": 100,
+          "sha256": "c929d0acf09e1bf093afbf1c1534bd64a18af067179cb7c308fe2619eab7124f",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "16d86de1cb111a36e03f72903e58b4defe596ec60c32d2ca96507cc0d3d74358",
+          "type": 23
+        },
+        {
+          "length": 24,
+          "sha256": "eb3dddd2f5ac90a5663972aff045cfb80801b73af76674a26e6a7ace7b4760f3",
+          "type": 23
+        },
+        {
+          "length": 68,
+          "sha256": "b68ab7819e260afb7374b5b976f5542be8adaa8117d4758daca3a7a9fe405f14",
+          "type": 23
+        }
+      ],
+      "node_to_mirror": [
+        {
+          "length": 1815,
+          "sha256": "4da9e2ac927169eca063575aedbe8e3a4082df3160eb58f3657235124dff31b3",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 623,
+          "sha256": "c96e0dec8bf06e46173ea5b9c7897f3125c1331b3120e9faf9ba24761b12c257",
+          "type": 22
+        }
+      ],
+      "payload_bytes": 46,
+      "real_client": "Xray v26.3.27",
+      "success": true,
+      "wrong_verify": false
+    },
+    {
+      "client_to_node": [
+        {
+          "length": 1783,
+          "sha256": "246f6712ac455e32ef8261a9f6d2512a5f592da8962db06586041f53267f594b",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 591,
+          "sha256": "afdbe9d81afd89fce53bc35f2dbd36f425d295d53c2873c8be38a7d9cd8d1e17",
+          "type": 22
+        },
+        {
+          "length": 74,
+          "sha256": "916f568c54c2cf3cbea6b751b0e57a288bbfc88d423d2f9ab5b238b78f3b50b6",
+          "type": 23
+        },
+        {
+          "length": 94,
+          "sha256": "87f43b7a0f32b7466fdc8e146c5b418bf77b76c8207bb1ed47bf0c9e6da23678",
+          "type": 23
+        }
+      ],
+      "error": null,
+      "fragmented_retry_records": 0,
+      "group": "prime256v1",
+      "mirror": {
+        "group": "prime256v1",
+        "mirror": [
+          "127.0.0.1",
+          53880
+        ],
+        "openssl": "OpenSSL 3.5.8 25 Aug 2026",
+        "real_tls": true
+      },
+      "mirror_to_node": [
+        {
+          "key_share_extension_length": 2,
+          "key_share_group": 23,
+          "length": 93,
+          "retry": true,
+          "sha256": "0990f4214505033dbfba44520764697e12b62d167da56b50458f290666cbd7a2",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "key_share_extension_length": 69,
+          "key_share_group": 23,
+          "length": 160,
+          "retry": false,
+          "sha256": "4f2998ddfdcaecae4bf3eab1156ae010124d5ac7393ebff9df2d082900255e28",
+          "type": 22
+        },
+        {
+          "length": 28,
+          "sha256": "8a51234450e589b8e24e152fcb25e07e6db5a984bb88952127aa139700ba2f88",
+          "type": 23
+        },
+        {
+          "length": 387,
+          "sha256": "9782b2687e8b6644cec188f419cf4bf37b25b7e9634aac2860b520f2622c0718",
+          "type": 23
+        },
+        {
+          "length": 102,
+          "sha256": "dda1a567395a3151dd64f85b450ca084273035cb099bf30ea79359fc79377f86",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "87a640640c8dfd74db8481e75be887464964abc660c252c4d0bf0d2998b1a1e4",
+          "type": 23
+        }
+      ],
+      "mldsa": true,
+      "node_to_client": [
+        {
+          "key_share_extension_length": 2,
+          "key_share_group": 23,
+          "length": 93,
+          "retry": true,
+          "sha256": "0990f4214505033dbfba44520764697e12b62d167da56b50458f290666cbd7a2",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "key_share_extension_length": 69,
+          "key_share_group": 23,
+          "length": 160,
+          "retry": false,
+          "sha256": "92fef0aae2e9618f46f18c2ddbf2b1bafa9ca1d8a97f61141d865faa26c66904",
+          "type": 22
+        },
+        {
+          "length": 28,
+          "sha256": "2a7dfaacd6a715ac3783bfb9f176dbb540e957e840b20c1a83d5e955bbbf8720",
+          "type": 23
+        },
+        {
+          "length": 3542,
+          "sha256": "aafc469a5b22a304cfa9eecd848b7eec6130d887af5869d3ef26fe61daf77b62",
+          "type": 23
+        },
+        {
+          "length": 102,
+          "sha256": "05a274cd03299f34450df1be0c9e0b093ca739bd3b39213f0c9050567fd1c17a",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "85647800da4cea92917376632756fc687f0460408910e6ab4f017debf6ed8285",
+          "type": 23
+        },
+        {
+          "length": 24,
+          "sha256": "a9c9c04ea155364e09286b3073bebd76ec05c4e60caeb3e7a4c269d67e61a374",
+          "type": 23
+        },
+        {
+          "length": 68,
+          "sha256": "fe3639aa897989015c385c4229bdec7e691a702f24f8f86cb12aba83b349fca2",
+          "type": 23
+        }
+      ],
+      "node_to_mirror": [
+        {
+          "length": 1783,
+          "sha256": "246f6712ac455e32ef8261a9f6d2512a5f592da8962db06586041f53267f594b",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 591,
+          "sha256": "afdbe9d81afd89fce53bc35f2dbd36f425d295d53c2873c8be38a7d9cd8d1e17",
+          "type": 22
+        }
+      ],
+      "payload_bytes": 46,
+      "real_client": "Xray v26.3.27",
+      "success": true,
+      "wrong_verify": false
+    },
+    {
+      "client_to_node": [
+        {
+          "length": 1783,
+          "sha256": "044cb922e958e46e2d0cbd0611b5fe8996f0885239458d2c7b43173fb9a0d47e",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 6,
+          "sha256": "a01cbf73d76f4229547629e388cb669e1c4d453998e36a2d82a6b2eb1676d3ca",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "0240d631f0eee867772bbe2d2d68a6c0d23f3502f6d265fc270e0d1bfa6af975",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d054d4a2283095509e755bd216465b1aecdc40075f28e8f87410d56b3f8abea7",
+          "type": 22
+        },
+        {
+          "length": 41,
+          "sha256": "39b0915a7acc6742673579be2f264ce34545d898a26c2fca1adc9f39a8b969b8",
+          "type": 22
+        },
+        {
+          "length": 21,
+          "sha256": "31b95a983cbe7d2aac57b5a55888b77c5745fa7407f0503b4faf8956c11609ef",
+          "type": 22
+        },
+        {
+          "length": 536,
+          "sha256": "2ee151b31a9efce10bda74ee64e1362f0af370f73940f951179a842441b1d38d",
+          "type": 22
+        },
+        {
+          "length": 74,
+          "sha256": "0d9ead8c8f131ed969676ff83282103fe72767d510dce33cfbd7b33e4b0f3ba6",
+          "type": 23
+        },
+        {
+          "length": 94,
+          "sha256": "0bbc38d1bca46e77bb1524df27e0d902f3a11e02ed93d439b251c9f1dce7a995",
+          "type": 23
+        }
+      ],
+      "error": null,
+      "fragmented_retry_records": 6,
+      "group": "prime256v1",
+      "mirror": {
+        "group": "prime256v1",
+        "mirror": [
+          "127.0.0.1",
+          53892
+        ],
+        "openssl": "OpenSSL 3.5.8 25 Aug 2026",
+        "real_tls": true
+      },
+      "mirror_to_node": [
+        {
+          "key_share_extension_length": 2,
+          "key_share_group": 23,
+          "length": 93,
+          "retry": true,
+          "sha256": "7d7d80c51b7e9c3c380f64b9958e703897e45985c8f972ffcc6ffa1462fc2485",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "key_share_extension_length": 69,
+          "key_share_group": 23,
+          "length": 160,
+          "retry": false,
+          "sha256": "ec42747d0870eae0d8632df0b00b842e7d490bd9b64cda001ab4e83da68ea57b",
+          "type": 22
+        },
+        {
+          "length": 28,
+          "sha256": "745b117c2c19bc25c4c82acabbcdee04d64690cd4e397208f44ed182e6bf8125",
+          "type": 23
+        },
+        {
+          "length": 390,
+          "sha256": "3c05f59050e1e76c2cb3906d639119b8eb9732123220c47d8693b8ed6a506c7c",
+          "type": 23
+        },
+        {
+          "length": 100,
+          "sha256": "8e8c489bd70c65cefe02527671824d338707ec23e99f0be791d5849675650ee8",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "e002d8c4408c40b56ca284f74dd9a9bb3b179afd4ad2fd45c4b908d134ee6bf8",
+          "type": 23
+        }
+      ],
+      "mldsa": true,
+      "node_to_client": [
+        {
+          "key_share_extension_length": 2,
+          "key_share_group": 23,
+          "length": 93,
+          "retry": true,
+          "sha256": "7d7d80c51b7e9c3c380f64b9958e703897e45985c8f972ffcc6ffa1462fc2485",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "key_share_extension_length": 69,
+          "key_share_group": 23,
+          "length": 160,
+          "retry": false,
+          "sha256": "6196a5eba6a8d582e3fcfe785c8aea5f671aa61395ed935ae5064f2475164321",
+          "type": 22
+        },
+        {
+          "length": 28,
+          "sha256": "c80ebf9dc7aa8eb0260c0a282141de78cb428f3e53e8ab95d1d0c95144d1c39a",
+          "type": 23
+        },
+        {
+          "length": 3542,
+          "sha256": "b5be44bd6316bd039010129307e772b1694a343f5c9ec082a69cb7a2b2eab325",
+          "type": 23
+        },
+        {
+          "length": 100,
+          "sha256": "6496f15e4bb2f265c96ef3d6056b8996fd8699526c699b6f94575a8265de46f4",
+          "type": 23
+        },
+        {
+          "length": 74,
+          "sha256": "176b663d3adaade8b2a229071efe87b5f968b1686c8596084deaa96ef267de11",
+          "type": 23
+        },
+        {
+          "length": 24,
+          "sha256": "2c4215fee7f820e8d2f78b289760d2f5ef303958732f987bcf62d28589c10cd2",
+          "type": 23
+        },
+        {
+          "length": 68,
+          "sha256": "96b7ad6a2bb8eff37136fa752ac129f652e27eecbc4cb575c82e26b912898fec",
+          "type": 23
+        }
+      ],
+      "node_to_mirror": [
+        {
+          "length": 1783,
+          "sha256": "044cb922e958e46e2d0cbd0611b5fe8996f0885239458d2c7b43173fb9a0d47e",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d1774c31f81e6a3d13089a34305b3663334ac79cbf358c7572a5fe5f47e36c1c",
+          "type": 20
+        },
+        {
+          "length": 6,
+          "sha256": "a01cbf73d76f4229547629e388cb669e1c4d453998e36a2d82a6b2eb1676d3ca",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "0240d631f0eee867772bbe2d2d68a6c0d23f3502f6d265fc270e0d1bfa6af975",
+          "type": 22
+        },
+        {
+          "length": 6,
+          "sha256": "d054d4a2283095509e755bd216465b1aecdc40075f28e8f87410d56b3f8abea7",
+          "type": 22
+        },
+        {
+          "length": 41,
+          "sha256": "39b0915a7acc6742673579be2f264ce34545d898a26c2fca1adc9f39a8b969b8",
+          "type": 22
+        },
+        {
+          "length": 21,
+          "sha256": "31b95a983cbe7d2aac57b5a55888b77c5745fa7407f0503b4faf8956c11609ef",
+          "type": 22
+        },
+        {
+          "length": 536,
+          "sha256": "2ee151b31a9efce10bda74ee64e1362f0af370f73940f951179a842441b1d38d",
+          "type": 22
+        }
+      ],
+      "payload_bytes": 46,
+      "real_client": "Xray v26.3.27",
+      "success": true,
+      "wrong_verify": false
+    }
+  ],
+  "positive_cases": 6,
+  "negative_cases": 1,
+  "scope": "Loopback-only exported REALITY engine API, authentic official Xray and real OpenSSL 3.5 TLS mirror; not installed controller/server acceptance."
+}

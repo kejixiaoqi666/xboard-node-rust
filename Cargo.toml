@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-exclude = ["vendor/shadowsocks"]
-members = ["crates/node-core", "crates/node-panel", "crates/node-kernel", "crates/node-native", "crates/node-vision", "crates/node-reality", "crates/node-runtime"]
+exclude = ["vendor/shadowsocks", "vendor/shadowsocks/crypto"]
+members = ["crates/node-core", "crates/node-panel", "crates/node-kernel", "crates/node-native", "crates/node-vision", "crates/node-reality", "crates/node-runtime", "crates/node-session", "crates/node-quic", "crates/node-admin", "crates/node-extended", "crates/node-outbound"]
 
 [profile.release]
 lto = "thin"

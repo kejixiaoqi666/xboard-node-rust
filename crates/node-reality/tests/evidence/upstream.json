@@ -1,0 +1,45 @@
+{
+  "openssl_library_sha256": "ac4d1375550da1ea038d3e1babbbd9a8f58971034f0fce1f26f90d7575af3730",
+  "archive_sha256": "d004c39288ce9ada487c6f398c7c545f7d749e44bdfdd59dbc9f865afba4e1ad",
+  "xray_version": "v26.3.27",
+  "python_version": "3.12.14",
+  "binary_sha256": "15c2d007954ac53ba69b80ec91242786b3c0b71d52649165b4ca1d5cc96ef8f1",
+  "xray_build_commit": "d2758a0",
+  "utls_commit": "aa6edf4b11af",
+  "xtls_reality_commit": "9234c772ba8f",
+  "sources": [
+    {
+      "sha256": "59b6bcc54671552945b07780021177a137a1e85d4c32b374e9a49a68ae018749",
+      "url": "https://raw.githubusercontent.com/XTLS/Xray-core/v26.3.27/go.mod"
+    },
+    {
+      "sha256": "533b8145b241b7298cc89b85fe53e9f034774c4e983627594017b1a32b6ab120",
+      "url": "https://raw.githubusercontent.com/XTLS/Xray-core/v26.3.27/transport/internet/reality/reality.go"
+    },
+    {
+      "sha256": "0efcd11ca2f7de247b8797447b2b076f29eeaafa14686b9667db6154c7d7cd0d",
+      "url": "https://raw.githubusercontent.com/XTLS/Xray-core/v26.3.27/main/commands/all/mldsa65.go"
+    },
+    {
+      "sha256": "d12b6740c17de3c1ce446a2b0eb49ba3c29da9abcdf472031a4d7977a535f596",
+      "url": "https://raw.githubusercontent.com/XTLS/REALITY/9234c772ba8f/tls.go"
+    },
+    {
+      "sha256": "42ead546474f55291b6d07470b5c93ff2d8c4d71e9a02b1aebbf2f9e92642dfe",
+      "url": "https://raw.githubusercontent.com/XTLS/REALITY/9234c772ba8f/handshake_server_tls13.go"
+    },
+    {
+      "sha256": "e0e606972937e5d010816ba0280b87e5d78ee11a6db3f94f63ab2db973b8aeb5",
+      "url": "https://raw.githubusercontent.com/XTLS/REALITY/9234c772ba8f/common.go"
+    },
+    {
+      "sha256": "539e821a53eda1ab6acbfd1661d2ba0a9f8c87a27938709a85b7b69788971648",
+      "url": "https://raw.githubusercontent.com/refraction-networking/utls/aa6edf4b11af/u_parrots.go"
+    },
+    {
+      "sha256": "3fed39a7d5ce8758063a5011243026ea6300575d896a7b5a97ec5b2efb781722",
+      "url": "https://raw.githubusercontent.com/refraction-networking/utls/aa6edf4b11af/handshake_client_tls13.go"
+    }
+  ],
+  "openssl_version": "3.5.8"
+}

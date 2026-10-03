@@ -77,18 +77,6 @@ trust-dns = ["hickory-dns"]
 name = "shadowsocks"
 path = "src/lib.rs"
 
-[[test]]
-name = "tcp"
-path = "tests/tcp.rs"
-
-[[test]]
-name = "tcp_tfo"
-path = "tests/tcp_tfo.rs"
-
-[[test]]
-name = "udp"
-path = "tests/udp.rs"
-
 [dependencies.aes]
 version = "0.8"
 optional = true
@@ -164,7 +152,8 @@ version = "1.0"
 version = "0.7"
 
 [dependencies.shadowsocks-crypto]
-version = "0.6.0"
+version = "0.6.2"
+path = "crypto"
 default-features = false
 
 [dependencies.socket2]

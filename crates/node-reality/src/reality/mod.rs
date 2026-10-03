@@ -1,4 +1,8 @@
 mod common;
+mod hello;
+#[cfg(test)]
+mod hello_tests;
+mod mirror;
 mod reality_aead;
 mod reality_auth;
 mod reality_certificate;
@@ -10,6 +14,9 @@ mod reality_server_connection;
 mod reality_tls13_keys;
 mod reality_tls13_messages;
 mod reality_util;
+pub use hello::{MirrorHello, classify_server_hello};
+pub use mirror::{MirrorFlight, mirror_handshake};
+pub use reality_certificate::{generate_mldsa65_keypair, mldsa65_verify_key};
 pub use reality_cipher_suite::{CipherSuite, DEFAULT_CIPHER_SUITES};
 pub use reality_server_connection::{
     MAX_KEY_UPDATE_RECORDS, MIN_KEY_UPDATE_RECORDS, RealityServerConfig, RealityServerConnection,

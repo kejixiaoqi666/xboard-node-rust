@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "status": "PASS_LOCAL_SCOPED",
+  "frozen_at_utc": "2026-10-03T14:53:18.047Z",
+  "workspace": "C:/Users/AUAS/Documents/CodeProjects/xboard-node-rust",
+  "ownership": [
+    "crates/node-reality/",
+    "crates/node-core/src/reality.rs",
+    "crates/node-native/src/reality.rs"
+  ],
+  "environment": {
+    "os": "Windows amd64",
+    "rustc": "1.97.1 (8bab26f4f 2026-07-14)",
+    "python": "3.12.14",
+    "openssl": "3.5.8",
+    "isolated_workspace": "C:/Users/AUAS/AppData/Local/Temp/xboard-node-reality-verify-20261003",
+    "native_core_isolated_workspace": "C:/Users/AUAS/AppData/Local/Temp/xboard-node-reality-native-verify-20261003",
+    "isolated_cargo_lock_sha256": "3c44d2d7b243cb3807a841468a385cdb2dc6482c028f1afae9dbace04d3e2220",
+    "native_core_cargo_lock_sha256": "c084d334501db5c377b382667bf11fd4f94f6e3a5e5b7848d40b9fd2c9b3dbe0",
+    "final_real_client_test_executable_sha256": "bc8cb72505a5f303c8d86619dead1329591b969ddb3b1043159300127560f79c"
+  },
+  "checks": [
+    {
+      "name": "node-reality unit and all targets",
+      "command": "cargo test -p node-reality --all-targets",
+      "exit_code": 0,
+      "unit_passed": 135,
+      "unit_failed": 0,
+      "ordinary_real_fixture_ignored": 1,
+      "log": "tests/evidence/unit.log"
+    },
+    {
+      "name": "node-reality Clippy all targets",
+      "command": "cargo clippy -p node-reality --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": "tests/evidence/clippy.log"
+    },
+    {
+      "name": "native scoped REALITY regression",
+      "command": "cargo test -p node-native --lib reality::tests",
+      "exit_code": 0,
+      "passed": 8,
+      "failed": 0,
+      "source_matches_checked_snapshot": true,
+      "unrelated_root_module_warnings": 2,
+      "log": "tests/evidence/native-scoped.log"
+    },
+    {
+      "name": "core strict ML-DSA seed and Debug redaction",
+      "command": "cargo test -p node-core --lib reality::tests",
+      "exit_code": 0,
+      "passed": 1,
+      "failed": 0,
+      "source_matches_checked_snapshot": true,
+      "log": "tests/evidence/core-seed.log"
+    },
+    {
+      "name": "actual pinned official Xray TLS/VLESS round trip",
+      "command": "cargo test -p node-reality --test xray -- --ignored --nocapture",
+      "exit_code": 0,
+      "test_functions_passed": 1,
+      "positive_cases": 6,
+      "negative_cases": 1,
+      "payload_bytes_per_positive_case": 46,
+      "actual_fragmented_retry_tls_records": 6,
+      "public_key_matches_official_mldsa65": true,
+      "client_version": "Xray v26.3.27 d2758a0 Go1.26.1 Windows amd64",
+      "client_binary_sha256": "15c2d007954ac53ba69b80ec91242786b3c0b71d52649165b4ca1d5cc96ef8f1",
+      "scope": "127.0.0.1 ephemeral ports; authentic client and real OpenSSL TLS mirror; exported engine API shared with native. Controller, installed runtime, billing and WAN are not exercised.",
+      "records": "tests/evidence/xray-records.json",
+      "log": "tests/evidence/xray-records.log"
+    },
+    {
+      "name": "owned diff whitespace",
+      "command": "git diff --check -- crates/node-reality crates/node-core/src/reality.rs crates/node-native/src/reality.rs",
+      "exit_code": 0
+    },
+    {
+      "name": "owned fixture shutdown readback",
+      "owned_fixture_processes": 0,
+      "scope": "Exact final test executable and node-reality OpenSSL Python helper; does not inspect/terminate other agents Xray helpers."
+    }
+  ],
+  "final_source_matches_tested_engine_snapshot": true,
+  "required_parent_gates": {
+    "linux_whole_workspace_test": false,
+    "linux_whole_workspace_clippy": false,
+    "installed_native_server_acceptance": false,
+    "production_deployment": false
+  },
+  "production_actions": {
+    "ca_requests": false,
+    "dns_writes": false,
+    "ssh": false,
+    "external_messages": false,
+    "commit": false,
+    "push": false
+  },
+  "known_limits": [
+    "One group-changing HRR for X25519, final X25519MLKEM768, P-256; no cookie-only or repeated HRR.",
+    "No accepted ECH, PSK/resumption, 0-RTT, draft Kyber, other groups or fragmented mirror ServerHello.",
+    "Fixed Xray/uTLS HRR public ServerHello slot compatibility: extra ML-DSA signature uses CH2+HRR while TLS transcript correctly includes message_hash(CH1)+HRR+CH2+SH2.",
+    "RustCrypto ML-KEM/ML-DSA are not independently audited; interoperability and bounded parsing tests are not an independent cryptographic audit."
+  ],
+  "resolved_observations": [
+    {
+      "issue": "Original TLS key schedule only accepted 32-byte shared secrets",
+      "resolution": "Accepts 32-byte classical or 64-byte ML-KEM+ECDH input; authentic hybrid exchange passes."
+    },
+    {
+      "issue": "Pinned uTLS public ServerHello remains HRR during certificate verification",
+      "resolution": "Pinned public-slot binding verified with actual HRR+ML-DSA client, including six-record CH2."
+    }
+  ],
+  "retained_failure": {
+    "runner": "Direct compiled test executable with a minimal child environment",
+    "exit_code": 101,
+    "observed": "Xray HTTP listener startup timeout before any TLS exchange",
+    "cause": "Not conclusively established; normal inherited-environment final replay passed all seven cases.",
+    "log": "tests/evidence/xray-startup-timeout.log"
+  },
+  "sources": [
+    {
+      "path": "crates/node-core/src/reality.rs",
+      "sha256": "eea10afe74028ffe4c4e39b332693b655fef69f4122e7635ef1ee890af4f501a",
+      "bytes": 5445
+    },
+    {
+      "path": "crates/node-native/src/reality.rs",
+      "sha256": "1217975b075c26564ce43dcc5ea5dfe548e2ef12ecfc33c1ce368c88a9ccb461",
+      "bytes": 19160
+    },
+    {
+      "path": "crates/node-reality/Cargo.toml",
+      "sha256": "497280158995a6242b73f4b3f3b4749370ab9e4048c89b659d790848f4a0947a",
+      "bytes": 712
+    },
+    {
+      "path": "crates/node-reality/LICENSE",
+      "sha256": "542bd8c0bfc8a19543dc2473312588fdba9badd029f9122e3f48da8c434ee92e",
+      "bytes": 1094
+    },
+    {
+      "path": "crates/node-reality/UPSTREAM.json",
+      "sha256": "5a9530c82e1bfd33aa0d36f6c30656eac2b4b50c3b45a00676b1171638a1c473",
+      "bytes": 3374
+    },
+    {
+      "path": "crates/node-reality/src/buf_reader.rs",
+      "sha256": "e5eeba6b34bc71d350bedfbf904b3e2ecdabae61c9c98d5b0dc906799e0cc44e",
+      "bytes": 2987
+    },
+    {
+      "path": "crates/node-reality/src/lib.rs",
+      "sha256": "18ae9d794dea35e458a2b6cb76469793990ca19453d3c05d97a7300d1848fbcf",
+      "bytes": 326
+    },
+    {
+      "path": "crates/node-reality/src/reality/common.rs",
+      "sha256": "b2eba26c3d6839c0369df51bcdcbe75325beee442859d51454a2a4107244c698",
+      "bytes": 9326
+    },
+    {
+      "path": "crates/node-reality/src/reality/hello.rs",
+      "sha256": "89e45538a1dd6f6809a5f472ea9fba94e51d5138f72a328b54a9a8ca24e0e75a",
+      "bytes": 7683
+    },
+    {
+      "path": "crates/node-reality/src/reality/hello_tests.rs",
+      "sha256": "f33131237d2fd4bf21319f8fc974eb5bd0596619bfa7687d02f408ebede704ef",
+      "bytes": 13571
+    },
+    {
+      "path": "crates/node-reality/src/reality/key_update_tests.rs",
+      "sha256": "a3277a2a3204887baf3dd872eff1ce5cc110f4ab9f9b5882b543a51636c2f105",
+      "bytes": 21795
+    },
+    {
+      "path": "crates/node-reality/src/reality/mirror.rs",
+      "sha256": "a7991cc61c42e68bbacde1fac7e206eb238c3e62b6a3c0c2a7c91d68f0bdbbfe",
+      "bytes": 5141
+    },
+    {
+      "path": "crates/node-reality/src/reality/mod.rs",
+      "sha256": "305d117036187a5eb5559606f2ec6102008b26de3849908df1db549256537955",
+      "bytes": 1053
+    },
+    {
+      "path": "crates/node-reality/src/reality/reality_aead.rs",
+      "sha256": "321a44f968d6aad214b352772e058a7dd4154a766a6f0dad8071e81c4090baed",
+      "bytes": 14696
+    },
+    {
+      "path": "crates/node-reality/src/reality/reality_auth.rs",
+      "sha256": "4b2b6ea359eb15260c789d5df3367b2edf0cf07d197b92eeb742f9a378c48817",
+      "bytes": 17315
+    },
+    {
+      "path": "crates/node-reality/src/reality/reality_certificate.rs",
+      "sha256": "7e82e1de467260079737a92b4e40df9e7a1e9084fab93e6c49005ef1a9e0d08e",
+      "bytes": 11875
+    },
+    {
+      "path": "crates/node-reality/src/reality/reality_cipher_suite.rs",
+      "sha256": "8d51ab74d27aa035b089486d50e82b6b38fe5145de405db905da45f55d3ec6ee",
+      "bytes": 4862
+    },
+    {
+      "path": "crates/node-reality/src/reality/reality_io_state.rs",
+      "sha256": "a78ba114271a602de81c3347a9f126381685e39b34841b7f5a933d93413e0573",
+      "bytes": 729
+    },
+    {
+      "path": "crates/node-reality/src/reality/reality_reader_writer.rs",
+      "sha256": "2dc6cceb3f511a0a824fb82f98fb32aabb9d5294e711d78c2b8c8d8555eb5624",
+      "bytes": 5693
+    },
+    {
+      "path": "crates/node-reality/src/reality/reality_records.rs",
+      "sha256": "8a73a2c77590f3391ce2d77530214f4c9f25e06eddc0a5e8e524ddceb95ff811",
+      "bytes": 34774
+    },
+    {
+      "path": "crates/node-reality/src/reality/reality_server_connection.rs",
+      "sha256": "0fcb547a1bcd56876251a3c1dfb77248dc3f043fdfbbfa6ea1dbc14c162d24c5",
+      "bytes": 65893
+    },
+    {
+      "path": "crates/node-reality/src/reality/reality_tls13_keys.rs",
+      "sha256": "0096fe43371cea8fd849babb6a00c0a22a4fbe9b6cd04f57616007a53bdf124e",
+      "bytes": 14821
+    },
+    {
+      "path": "crates/node-reality/src/reality/reality_tls13_messages.rs",
+      "sha256": "75a318dfacef4f9b23c9d9e9fdca4940f488a42502b821c33807cd0cc7010b7e",
+      "bytes": 20196
+    },
+    {
+      "path": "crates/node-reality/src/reality/reality_util.rs",
+      "sha256": "7aff4e5d08036eed6f72c48a00cdb09becd83137ba241f68e7e39fca2594873b",
+      "bytes": 17227
+    },
+    {
+      "path": "crates/node-reality/src/slide_buffer.rs",
+      "sha256": "b624169b1156785d2627a5764f752ccc2f7312dedd90e08fde6a3fa6e34c9304",
+      "bytes": 14066
+    },
+    {
+      "path": "crates/node-reality/src/stream.rs",
+      "sha256": "605eff7a5059b136a346605aae71f6ec49325ef6017a2cddaf63f2f253cbc2d5",
+      "bytes": 23092
+    },
+    {
+      "path": "crates/node-reality/src/sync_adapter.rs",
+      "sha256": "401fb859e370ad73cf1fa222b9c7f072636af4e8c8212dd90161fc86a3adff78",
+      "bytes": 2345
+    },
+    {
+      "path": "crates/node-reality/tests/REALITY_FIXTURE.md",
+      "sha256": "11efd3bfaff0974cbf0fb5f1f322f202a7d3b888ea3c220ecbda78c741cc9a20",
+      "bytes": 5903
+    },
+    {
+      "path": "crates/node-reality/tests/openssl_mirror.py",
+      "sha256": "147bbc5e4b78897a032501088f9ec82594e1935a0634b8d2fbcae12b56ab5581",
+      "bytes": 2296
+    },
+    {
+      "path": "crates/node-reality/tests/xray.rs",
+      "sha256": "cc996bf88660bd1ff4de6246b842e890f94e747b63be79e231c3f31b02830a27",
+      "bytes": 17199
+    }
+  ],
+  "evidence": [
+    {
+      "path": "crates/node-reality/tests/evidence/unit.log",
+      "sha256": "2862130f33d973e3a3bdf73cbed33a583c08decda2f1a47448e0b62e4804e536",
+      "bytes": 15421
+    },
+    {
+      "path": "crates/node-reality/tests/evidence/clippy.log",
+      "sha256": "c75042805f50bb46327dd31838e8f596ccf0f17bec8628e14c5737cdb18e9ea5",
+      "bytes": 3052
+    },
+    {
+      "path": "crates/node-reality/tests/evidence/native-scoped.log",
+      "sha256": "0b8e7881e374bc5a879b2bfd053b65650e1641317ffc452ddf357743f8b73bac",
+      "bytes": 3370
+    },
+    {
+      "path": "crates/node-reality/tests/evidence/core-seed.log",
+      "sha256": "836d1b84fe4d1bb89dcf988fc5a74f121e329febd066b705da8d668d396d6cc8",
+      "bytes": 1060
+    },
+    {
+      "path": "crates/node-reality/tests/evidence/xray-records.log",
+      "sha256": "0602bbd9b648fec5bd6002a8c8042685651c6d259ed46ed1bb02491c6ecdede1",
+      "bytes": 19908
+    },
+    {
+      "path": "crates/node-reality/tests/evidence/xray-startup-timeout.log",
+      "sha256": "646935274a70f099a2b148881e67438b713e09e0221e72186afd2634e80ad990",
+      "bytes": 702
+    },
+    {
+      "path": "crates/node-reality/tests/evidence/upstream.json",
+      "sha256": "dbe6945e402199374a1f6fff6b6c92f3ca892263e9fa12809a129169e0c5d2a5",
+      "bytes": 2091
+    },
+    {
+      "path": "crates/node-reality/tests/evidence/xray-records.json",
+      "sha256": "b0371b9f5b9919e83b6152136a58ad09ee0d77268200410bb3f1e2968c7486cb",
+      "bytes": 30538
+    }
+  ]
+}

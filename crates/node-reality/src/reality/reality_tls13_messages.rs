@@ -25,6 +25,16 @@ pub fn construct_server_hello(
     cipher_suite: u16,
     key_share_data: &[u8],
 ) -> Result<Vec<u8>> {
+    construct_server_hello_for_group(server_random, session_id, cipher_suite, 29, key_share_data)
+}
+
+pub(crate) fn construct_server_hello_for_group(
+    server_random: &[u8; 32],
+    session_id: &[u8],
+    cipher_suite: u16,
+    group: u16,
+    key_share_data: &[u8],
+) -> Result<Vec<u8>> {
     let mut server_hello = Vec::new();
 
     // ServerHello structure:
@@ -69,7 +79,7 @@ pub fn construct_server_hello(
     let key_share_length = 2 + 2 + key_share_data.len(); // group + length + data
     extensions.extend_from_slice(&[0x00, 0x33]); // type = 51
     extensions.extend_from_slice(&(key_share_length as u16).to_be_bytes());
-    extensions.extend_from_slice(&[0x00, 0x1d]); // group = X25519 (0x001d)
+    extensions.extend_from_slice(&group.to_be_bytes());
     extensions.extend_from_slice(&(key_share_data.len() as u16).to_be_bytes());
     extensions.extend_from_slice(key_share_data);
 

@@ -1,0 +1,119 @@
+{
+  "recorded_utc": "2026-10-03T12:59:22.1332027Z",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+  "scope": "crates/node-quic only; native Hysteria2 and TUIC v5; no deployment",
+  "reference_commit": "shoes 60ed3838b346268615c81e4eace4e15e717da23e (read-only MIT wire implementation reference)",
+  "protocol_specs": [
+    "https://v2.hysteria.network/docs/developers/Protocol/",
+    "https://raw.githubusercontent.com/EAimTY/tuic/master/SPEC.md"
+  ],
+  "module_command": "cargo test --manifest-path crates/node-quic/tests/isolated/Cargo.toml -- --include-ignored --nocapture (SING_BOX_BIN points to SHA-verified pinned official v1.14.2)",
+  "result": "PASS",
+  "unit_tests": 6,
+  "network_tests": 7,
+  "clippy": "cargo clippy --manifest-path crates/node-quic/tests/isolated/Cargo.toml --all-targets -- -D warnings: PASS",
+  "format": "cargo fmt --manifest-path crates/node-quic/tests/isolated/Cargo.toml --package node-quic: completed",
+  "network_cases": [
+    "H3 authentication plus Hysteria2 TCP/5000-byte fragmented UDP; two-user counters and wrong-password denial",
+    "TUIC TCP/native UDP/unidirectional-stream UDP; cross-stream and out-of-order fragments; two-user counters; cross-connection exporter replay rejected",
+    "Salamander actual QUIC plus live identity revocation",
+    "Listener shutdown joins stalled handshake and application tasks",
+    "TUIC actual TLS ticket resumption accepts 0RTT but buffers payload until fresh exporter authentication; replayed early exporter token rejected",
+    "Unauthenticated TCP and UDP close within 10-second total handshake/auth deadline",
+    "Official sing-box v1.14.2 Hysteria2/Hysteria2-Salamander/TUIC-native/TUIC-quic: TCP plus 3000-byte fragmented UDP; alice 3027/3027 and bob 11/11 payload counters; wrong-password payload denied"
+  ],
+  "official_client_limit": "Pinned sing-quic Hysteria2 internal protocol.MaxUDPSize=4096; official cross-implementation test uses 3000 bytes, module loopback uses 5000 bytes",
+  "bounded_resources": {
+    "connections": 128,
+    "streams_per_connection": 64,
+    "udp_sessions": 1024,
+    "udp_targets_per_session": 64,
+    "fragment_entries_global": 256,
+    "udp_queue_reassembly_bytes": 6291456,
+    "udp_receive_buffer_pool_bytes": 2097152,
+    "udp_receive_buffer_bytes": 65535,
+    "incoming_quic_buffer_total_bytes": 8388608
+  },
+  "platform": "Windows x86_64 official fixture executed after pinned-checker update; Linux x86_64/aarch64 SHA pinned, official interoperability not executed by this agent",
+  "remaining": [
+    "Linux x86_64/aarch64 ignored official interoperability in CI",
+    "Root final workspace/parity/release acceptance"
+  ],
+  "hashes": {
+    "Cargo.toml": "cc61fedce1180b80fc53f9e0e2c674cc83e1442346f9e7222c783c70feb308b2",
+    "src/lib.rs": "8941a4420f691332f6202430661eda02683e9f0af8b955bcc0685729841dd73e",
+    "src/wire.rs": "a7b61a24990b30ec37d6636eb39d674c3cd1fe4b4eb2ebf4325b5c82a5104f3d",
+    "src/udp.rs": "46d81ab322a19aba9e11aa35c131c240dd20e6a8b88725a0988118b58defcf02",
+    "src/obfs.rs": "8e0bdf4d96c0a6ad503d4cdc72b5d4dd1fcff7f82770a2de9501bccce421a7be",
+    "tests/loopback.rs": "1f437507431e43407fca47fc382083afe380b256733e7b2ed3cbd2e6682164aa",
+    "tests/fetch_clients.ps1": "bbfb13796f855df0c6629ad53c77ac7130de73c04c672e44589531739b440834",
+    "tests/clients-lock.json": "ff3bb98ca79e8988d4cadcc9fb2812f2b4ddb9955b7e9d4d5c551bb748afe3ca",
+    "tests/isolated/Cargo.toml": "e3bbf394c9cd35b9e26868355d9acbd8886384dd59cb5352eca43dfda74ae50d",
+    "tests/support/pinned_client.rs": "ecb8355d4f4ec11abe5484149f553c0c72ac83db345683de274a6564ddf4def3",
+    "LICENSE": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+    "LICENSE-SHOES": "1fb83b583e8604eff99cf01dfece917bb0ad56c3101d627516c7b59655375e19",
+    "NOTICE.md": "933c8fe101ae87975d42edac3c9efe6154bbdfdbc80a882a425e7c42d3d1d97b",
+    "UPSTREAM.json": "a6b020089523c1c3765aaf8cee80aa5e4d1fa5c2015e41b175ff039cca699812"
+  },
+  "prior_fixture_source_bindings": {
+    "tests/loopback.rs": "b534b585520bdd47e5652cb0d8cd3fe68e3caf051ecb9a22e772607f9d2ac079",
+    "tests/fetch_clients.ps1": "1d0d56dcea71ec2a0412d47e9ee9e7d126bffdeea2eff4fd3ccaaf5e8bd17fc9",
+    "tests/clients-lock.json": "8d79ddbdab67973c56e46c43375fa4d292471c46bcd494ed358344080ce1f45f"
+  },
+  "source_frozen_utc": "2026-10-03T16:47:39.970477Z",
+  "post_freeze_official_fixture": {
+    "command": "cargo test -j 2 --manifest-path crates/node-quic/tests/isolated/Cargo.toml --test loopback official_sing_box_hysteria_salamander_tuic_native_and_quic_clients -- --include-ignored --nocapture",
+    "session_id": 60392,
+    "chunk_id": "8c4313",
+    "exit_code": 0,
+    "passed": 1,
+    "failed": 0,
+    "filtered": 6,
+    "seconds": 8.67,
+    "platform": "Windows x86_64",
+    "modes": [
+      "Hysteria2",
+      "Hysteria2 Salamander",
+      "TUIC native UDP",
+      "TUIC QUIC-stream UDP"
+    ],
+    "counter_evidence": "Each mode: alice 3027/3027 and bob 11/11 payload bytes; wrong-password payload denied",
+    "client_checker": "support/pinned_client.rs",
+    "retained_compile_failure": {
+      "session_id": 74228,
+      "chunk_id": "38f567",
+      "exit_code": 1,
+      "error": "E0624: method hash_provider is private",
+      "resolution": "Use public TLS13 cipher-suite common.hash_provider field; rerun session 60392 passed",
+      "evidence_kind": "Tool transcript chunk retained; this is a summary, not a fabricated full log"
+    }
+  },
+  "post_freeze_clippy": {
+    "command": "cargo clippy -j 2 --manifest-path crates/node-quic/tests/isolated/Cargo.toml --all-targets -- -D warnings",
+    "session_id": 53422,
+    "chunk_id": "9d7afa",
+    "exit_code": 0,
+    "result": "PASS"
+  },
+  "linux_pinned_client_support": {
+    "architectures": [
+      "x86_64",
+      "aarch64"
+    ],
+    "version": "1.14.2",
+    "archive_and_binary_hashes": "clients-lock.json",
+    "binary_checker": "support/pinned_client.rs",
+    "checker_policy": "Hash regular file with fixed OS/ARCH SHA before executing version/test; maximum 256MiB, streaming 16KiB hash buffer; no mutable environment hash",
+    "fetch_script": "fetch_clients.ps1 now accepts linux-amd64 and linux-arm64 and checks locked archive/executable SHA",
+    "official_interoperability": "NOT_RUN_BY_THIS_AGENT; CI must run ignored fixture on both architectures"
+  },
+  "license_provenance": {
+    "project_license": "../LICENSE",
+    "upstream_license": "../LICENSE-SHOES",
+    "upstream_record": "../UPSTREAM.json",
+    "notice": "../NOTICE.md",
+    "upstream_HEAD_checked": "60ed3838b346268615c81e4eace4e15e717da23e",
+    "Salamander": "Locally implemented from official wire specification, absent from pinned shoes source"
+  }
+}

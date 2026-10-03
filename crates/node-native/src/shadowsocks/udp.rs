@@ -7,7 +7,7 @@ use shadowsocks::relay::{
     udprelay::{crypto_io, options::UdpSocketControlData},
 };
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     net::{IpAddr, SocketAddr},
     sync::Arc,
     time::{Duration, Instant},
@@ -140,7 +140,12 @@ fn decrypt(
         return Err(Error::Protocol);
     }
     let ctx = context();
-    let (user, mut bytes, size, destination, control) = if credentials.method.is_aead_2022() {
+    let eih = matches!(
+        credentials.method,
+        shadowsocks::crypto::CipherKind::AEAD2022_BLAKE3_AES_128_GCM
+            | shadowsocks::crypto::CipherKind::AEAD2022_BLAKE3_AES_256_GCM
+    );
+    let (user, mut bytes, size, destination, control) = if eih {
         let mut bytes = body.to_vec();
         let (size, destination, control) = crypto_io::decrypt_client_payload(
             &ctx,
@@ -156,6 +161,21 @@ fn decrypt(
             .and_then(|u| credentials.identities.get(u.identity_hash()))
             .cloned()
             .ok_or(Error::Auth)?;
+        (user, bytes, size, destination, control)
+    } else if credentials.method.is_aead_2022()
+        || credentials.method.is_stream()
+        || credentials.method.is_none()
+    {
+        let user = credentials.users.first().cloned().ok_or(Error::Auth)?;
+        let mut bytes = body.to_vec();
+        let (size, destination, control) = crypto_io::decrypt_client_payload(
+            &ctx,
+            credentials.method,
+            &user.key,
+            &mut bytes,
+            None,
+        )
+        .map_err(|_| Error::Auth)?;
         (user, bytes, size, destination, control)
     } else {
         let mut found = None;
@@ -175,10 +195,15 @@ fn decrypt(
         found.ok_or(Error::Auth)?
     };
     let (address, port) = address(destination)?;
-    let salt = body
-        .get(..credentials.method.salt_len())
-        .ok_or(Error::Protocol)?;
-    replay.claim(&user, salt, control.as_ref())?;
+    let nonce_len = if credentials.method.is_stream() || credentials.method.is_none() {
+        credentials.method.iv_len()
+    } else {
+        credentials.method.salt_len()
+    };
+    let salt = body.get(..nonce_len).ok_or(Error::Protocol)?;
+    if !credentials.method.is_none() {
+        replay.claim(&user, salt, control.as_ref())?;
+    }
     bytes.truncate(size);
     Ok(Decoded {
         user,
@@ -212,6 +237,7 @@ pub(crate) struct Context {
     pub limits: Arc<limits::Registry>,
     pub traffic: Arc<Traffic>,
     pub network: Arc<Network>,
+    pub tag: Arc<str>,
 }
 
 /// Graceful stop joins all payload writers before the controller's checkpoint.
@@ -276,6 +302,7 @@ pub(crate) async fn serve(
                     if let Some(association)=associations.get(&key) {let _=association.sender.try_send(decoded.packet);continue;}
                     if associations.len()>=MAX_ASSOCIATIONS || workers.len()>=MAX_ASSOCIATIONS {continue;}
                     let Some(policy)=snapshot.policy(&decoded.user.name) else {continue;};
+                    let Some(profile)=snapshot.profile(&decoded.user.name) else {continue;};
                     let method=credentials.method;drop(snapshot);
                     let Ok(lease)=context.limits.acquire(decoded.user.name.clone(),source.ip(),policy) else {continue;};
                     let (sender,receiver)=mpsc::channel(8);
@@ -283,7 +310,7 @@ pub(crate) async fn serve(
                     generation=generation.checked_add(1).ok_or(Error::Task)?;
                     associations.insert(key.clone(),Association{generation,sender});
                     let socket=socket.clone();let context=context.clone();let user=decoded.user;
-                    workers.spawn(async move {let _=relay(socket,source,user,method,key.2,receiver,lease,context).await;(key,generation)});
+                    workers.spawn(async move {let _=relay(socket,source,user,profile,method,key.2,receiver,lease,context).await;(key,generation)});
                 }
             }
         };
@@ -302,15 +329,14 @@ async fn relay(
     inbound: Arc<UdpSocket>,
     source: SocketAddr,
     user: Arc<Credential>,
+    profile: node_session::User,
     method: shadowsocks::crypto::CipherKind,
     session: u64,
     mut packets: mpsc::Receiver<Packet>,
     lease: limits::Lease,
     context: Context,
 ) -> Result<(), Error> {
-    let socket4 = UdpSocket::bind("0.0.0.0:0").await?;
-    let socket6 = UdpSocket::bind("[::]:0").await.ok();
-    let mut peers = HashSet::new();
+    let lease = Arc::new(lease);
     let counter = if context.traffic.enabled() {
         let name = user.name.clone();
         Some(
@@ -323,6 +349,19 @@ async fn relay(
     } else {
         None
     };
+    let datagram = crate::session::routed_datagram(crate::session::DatagramContext {
+        peer: source,
+        lease: lease.clone(),
+        users: context.users.clone(),
+        network: context.network.clone(),
+        tag: context.tag.clone(),
+        user: user.name.clone(),
+        counter: counter.clone(),
+        slot: None,
+        count_down: false,
+        profile,
+        changes: context.limits.subscribe_auth(),
+    });
     let ctx = self::context();
     let mut random = [0u8; 8];
     ctx.generate_nonce(method, &mut random, false);
@@ -332,30 +371,24 @@ async fn relay(
     let mut encrypted = BytesMut::new();
     let mut last = tokio::time::Instant::now();
     loop {
-        let receive = tokio::select! {
+        let (size, peer) = tokio::select! {
             packet=packets.recv()=> {
                 let Some(packet)=packet else {return Ok(());};
-                let destination=match context.network.udp_destination(&packet.address,packet.port,source).await {Ok(value)=>value,Err(Error::Blocked|Error::Unsupported|Error::Dns)=>continue,Err(error)=>return Err(error)};
-                if !peers.contains(&destination) && peers.len()>=64 {continue;}
-                let socket=if destination.is_ipv4(){&socket4}else{socket6.as_ref().ok_or(Error::Unsupported)?};
-                lease.charge(packet.payload.len(),&context.users).await;
-                let size=socket.send_to(&packet.payload,destination).await?;
+                let host = match &packet.address {crate::protocol::Address::Ip(ip)=>ip.to_string(),crate::protocol::Address::Domain(host)=>host.clone()};
+                let destination=node_session::Destination::new(host,packet.port)?;
+                let size=match datagram.send(&packet.payload,&destination).await {
+                    Ok(size)=>size,
+                    Err(error) if matches!(error.kind(),std::io::ErrorKind::PermissionDenied|std::io::ErrorKind::Unsupported|std::io::ErrorKind::NotFound)=>continue,
+                    Err(error)=>return Err(error.into()),
+                };
                 if size!=packet.payload.len(){return Err(Error::Protocol);}
-                peers.insert(destination);
-                if let Some(counter)=&counter {counter.add(0,size);}
                 last=tokio::time::Instant::now();continue;
             },
-            ready=socket4.readable()=> {ready?;&socket4},
-            ready=async {socket6.as_ref().expect("enabled IPv6 socket").readable().await},if socket6.is_some()=> {ready?;socket6.as_ref().unwrap()},
+            result=datagram.receive(&mut buffer)=>result?,
             _=tokio::time::sleep_until(last+IDLE)=>return Ok(()),
         };
-        let (size, peer) = match receive.try_recv_from(&mut buffer) {
-            Ok(pair) => pair,
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => continue,
-            Err(error) => return Err(error.into()),
-        };
-        let peer = canonical(peer);
-        if !peers.contains(&peer) || size > MAX_PACKET {
+        let peer = SocketAddr::new(peer.host.parse().map_err(|_| Error::Protocol)?, peer.port);
+        if size > MAX_PACKET {
             continue;
         }
         let mut control = UdpSocketControlData::default();
@@ -376,7 +409,6 @@ async fn relay(
         if encrypted.len() > MAX_PACKET {
             continue;
         }
-        lease.charge(size, &context.users).await;
         let sent = inbound.send_to(&encrypted, source).await?;
         if sent != encrypted.len() {
             return Err(Error::Protocol);
@@ -422,7 +454,7 @@ mod tests {
         let mut control = UdpSocketControlData::default();
         control.client_session_id = 777;
         control.packet_id = packet_id;
-        let keys = if method.is_v2() {
+        let keys = if method.uses_identity_header() {
             vec![bytes::Bytes::copy_from_slice(server.key())]
         } else {
             vec![]
@@ -530,15 +562,13 @@ mod tests {
     }
     #[test]
     fn all_methods_udp_auth_replay_and_identity_survive_cache_key_reuse() {
-        for method in [
-            Cipher::Aes128,
-            Cipher::Aes256,
-            Cipher::Chacha20,
-            Cipher::Aes128V2,
-            Cipher::Aes256V2,
-        ] {
-            let snapshot =
-                candidate(method, &[("7", "user-first-key"), ("8", "user-second-key")]).auth;
+        for method in Cipher::ALL.into_iter().filter(|m| m.is_authenticated()) {
+            let passwords = if method.max_users() == 1 {
+                vec![("8", "user-second-key")]
+            } else {
+                vec![("7", "user-first-key"), ("8", "user-second-key")]
+            };
+            let snapshot = candidate(method, &passwords).auth;
             let credentials = snapshot.shadowsocks.as_ref().unwrap();
             let target = Address::SocketAddress("127.0.0.1:53".parse().unwrap());
             let body = encrypted(method, "user-second-key", target.clone(), 10);
@@ -582,13 +612,7 @@ mod tests {
     }
     #[tokio::test]
     async fn all_methods_datagram_relay_accounting_and_graceful_stop() {
-        for method in [
-            Cipher::Aes128,
-            Cipher::Aes256,
-            Cipher::Chacha20,
-            Cipher::Aes128V2,
-            Cipher::Aes256V2,
-        ] {
+        for method in Cipher::ALL {
             let origin = UdpSocket::bind("127.0.0.1:0").await.unwrap();
             let target = origin.local_addr().unwrap();
             let echo = tokio::spawn(async move {
@@ -612,6 +636,7 @@ mod tests {
                     users,
                     traffic: traffic.clone(),
                     network: Arc::new(Network::direct()),
+                    tag: Arc::from("shadowsocks-in"),
                 },
                 Arc::new(Service::new()),
             )
@@ -662,6 +687,83 @@ mod tests {
         }
     }
     #[tokio::test]
+    async fn idle_datagram_key_rotation_releases_old_lease_before_new_admission() {
+        for method in [Cipher::Aes128, Cipher::Aes128V2, Cipher::Chacha20V2] {
+            let origin = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            let target = origin.local_addr().unwrap();
+            let echo = tokio::spawn(async move {
+                let mut buffer = [0; 4096];
+                for _ in 0..2 {
+                    let (size, peer) = origin.recv_from(&mut buffer).await.unwrap();
+                    origin.send_to(&buffer[..size], peer).await.unwrap();
+                }
+            });
+            let listener = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+            let bind = listener.local_addr().unwrap();
+            drop(listener);
+            let users: Users = Arc::new(ArcSwap::from(
+                candidate(method, &[("7", "old-user-key")]).auth,
+            ));
+            let limits = Arc::new(limits::Registry::new(users.clone()));
+            let traffic = Arc::new(Traffic::new("ss-key-rotation".into()));
+            let handle = serve(
+                bind,
+                Context {
+                    users: users.clone(),
+                    traffic: traffic.clone(),
+                    limits: limits.clone(),
+                    network: Arc::new(Network::direct()),
+                    tag: Arc::from("shadowsocks-in"),
+                },
+                Arc::new(Service::new()),
+            )
+            .await
+            .unwrap();
+            let client = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            for (packet_id, password) in [(1, "old-user-key"), (2, "new-user-key")] {
+                if packet_id == 2 {
+                    assert_eq!(limits.activity().sessions, 1);
+                    users.store(candidate(method, &[("7", password)]).auth);
+                    limits.notify_users_changed();
+                    tokio::time::timeout(Duration::from_secs(1), async {
+                        while limits.activity().sessions != 0 {
+                            tokio::task::yield_now().await;
+                        }
+                    })
+                    .await
+                    .expect("idle UDP association retained a revoked credential lease");
+                }
+                let packet = encrypted(method, password, Address::SocketAddress(target), packet_id);
+                client.send_to(&packet, bind).await.unwrap();
+                let mut response = vec![0; 65536];
+                let (size, _) =
+                    tokio::time::timeout(Duration::from_secs(5), client.recv_from(&mut response))
+                        .await
+                        .unwrap()
+                        .unwrap();
+                let key = ServerConfig::new(
+                    ("127.0.0.1", 1),
+                    user_password(method, password).into_owned(),
+                    method.name().parse().unwrap(),
+                )
+                .unwrap();
+                let (size, from, _) = crypto_io::decrypt_server_payload(
+                    &context(),
+                    key.method(),
+                    key.key(),
+                    &mut response[..size],
+                )
+                .unwrap();
+                assert_eq!(from, Address::SocketAddress(target));
+                assert_eq!(&response[..size], b"datagram-roundtrip");
+            }
+            echo.await.unwrap();
+            handle.shutdown().await.unwrap();
+            assert_eq!(limits.activity().sessions, 0);
+            assert_eq!(traffic.snapshot().unwrap().unwrap().traffic["7"], [36, 36]);
+        }
+    }
+    #[tokio::test]
     async fn hot_reassigned_key_on_same_source_uses_new_user_counter() {
         for method in [Cipher::Aes128, Cipher::Aes128V2] {
             let origin = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -687,6 +789,7 @@ mod tests {
                     users: users.clone(),
                     traffic: traffic.clone(),
                     network: Arc::new(Network::direct()),
+                    tag: Arc::from("shadowsocks-in"),
                 },
                 Arc::new(Service::new()),
             )

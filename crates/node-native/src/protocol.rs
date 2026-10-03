@@ -13,6 +13,7 @@ pub enum Address {
 }
 pub struct Request {
     pub user: Arc<str>,
+    pub profile: Option<node_session::User>,
     pub vision_uuid: Option<[u8; 16]>,
     pub policy: crate::limits::Policy,
     pub address: Address,
@@ -24,6 +25,7 @@ pub struct Request {
 pub enum Command {
     Tcp,
     Udp,
+    Mux,
 }
 
 pub(crate) async fn address<R: AsyncRead + Unpin>(
@@ -79,6 +81,7 @@ pub async fn handshake<R: AsyncRead + Unpin>(
             let snapshot = users.load();
             let user = snapshot.vless(&key).ok_or(Error::Auth)?;
             let policy = snapshot.policy(&user).ok_or(Error::Auth)?;
+            let profile = snapshot.profile(&user);
             let vision = snapshot.vision(&user);
             drop(snapshot);
             let length = reader.read_u8().await? as usize;
@@ -100,33 +103,41 @@ pub async fn handshake<R: AsyncRead + Unpin>(
             let command = match reader.read_u8().await? {
                 1 => Command::Tcp,
                 2 => Command::Udp,
+                3 => Command::Mux,
                 _ => return Err(Error::Unsupported),
             };
-            if vision && command != Command::Tcp {
-                return Err(Error::Unsupported);
-            }
-            let port = reader.read_u16().await?;
-            let kind = reader.read_u8().await?;
-            let address = address(reader, kind, 2, 3).await?;
-            if port == 0 {
+            let (port, address) = if command == Command::Mux {
+                (0, Address::Domain("v1.mux.cool".into()))
+            } else {
+                let port = reader.read_u16().await?;
+                let kind = reader.read_u8().await?;
+                (port, address(reader, kind, 2, 3).await?)
+            };
+            if port == 0 && command != Command::Mux {
                 return Err(Error::Protocol);
             }
             Ok(Request {
                 vision_uuid: vision.then_some(key),
                 user,
+                profile,
                 policy,
                 address,
                 port,
                 command,
             })
         }
-        Protocol::Shadowsocks => Err(Error::Unsupported),
+        Protocol::Shadowsocks
+        | Protocol::Vmess
+        | Protocol::AnyTls
+        | Protocol::Hysteria2
+        | Protocol::Tuic => Err(Error::Unsupported),
         Protocol::Trojan => {
             let mut key = [0; 56];
             reader.read_exact(&mut key).await?;
             let snapshot = users.load();
             let user = snapshot.trojan(&key).ok_or(Error::Auth)?;
             let policy = snapshot.policy(&user).ok_or(Error::Auth)?;
+            let profile = snapshot.profile(&user);
             drop(snapshot);
             if reader.read_u16().await? != 0x0d0a {
                 return Err(Error::Unsupported);
@@ -145,6 +156,7 @@ pub async fn handshake<R: AsyncRead + Unpin>(
             Ok(Request {
                 vision_uuid: None,
                 user,
+                profile,
                 policy,
                 address,
                 port,

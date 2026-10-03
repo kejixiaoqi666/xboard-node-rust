@@ -5,20 +5,20 @@ use hickory_resolver::{
     config::{LookupIpStrategy, NameServerConfig, ResolveHosts, ResolverConfig},
     net::runtime::TokioRuntimeProvider,
 };
-use node_core::routing::{self, DnsConfig, IpStrategy, Outbound, Policy, Route};
+use node_core::routing::{self, DnsConfig, DnsTransport, IpStrategy, Outbound, Policy, Route};
 use std::{
     collections::BTreeMap,
     net::{IpAddr, SocketAddr},
     sync::{Arc, OnceLock},
     time::Duration,
 };
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
 
 pub(crate) struct Network {
     policy: Policy,
+    graph: node_outbound::Graph,
+    resolver: Arc<NetworkResolver>,
+}
+struct NetworkResolver {
     resolver: Option<TokioResolver>,
     dns: DnsConfig,
     hosts: BTreeMap<String, Vec<IpAddr>>,
@@ -33,10 +33,10 @@ impl Network {
     ) -> Result<Self, Error> {
         let dns = dns.cloned().unwrap_or_default();
         dns.validate().map_err(|_| Error::Config)?;
-        let resolver = if dns.servers.is_empty() {
+        let resolver = if dns.servers.is_empty() && dns.upstreams.is_empty() {
             None
         } else {
-            let servers = dns
+            let mut servers: Vec<_> = dns
                 .servers
                 .iter()
                 .map(|s| {
@@ -51,10 +51,53 @@ impl Network {
                     server
                 })
                 .collect();
+            for upstream in &dns.upstreams {
+                let name = upstream.server_name.as_deref().unwrap_or_default();
+                let mut server = match upstream.transport {
+                    DnsTransport::Udp => {
+                        if dns.tcp_only {
+                            NameServerConfig::tcp(upstream.address.ip())
+                        } else {
+                            NameServerConfig::udp(upstream.address.ip())
+                        }
+                    }
+                    DnsTransport::Tcp => NameServerConfig::tcp(upstream.address.ip()),
+                    DnsTransport::Tls => {
+                        NameServerConfig::tls(upstream.address.ip(), Arc::<str>::from(name))
+                    }
+                    DnsTransport::Https => NameServerConfig::https(
+                        upstream.address.ip(),
+                        Arc::<str>::from(name),
+                        upstream.path.as_deref().map(Arc::<str>::from),
+                    ),
+                    DnsTransport::Quic => {
+                        NameServerConfig::quic(upstream.address.ip(), Arc::<str>::from(name))
+                    }
+                };
+                for connection in &mut server.connections {
+                    connection.port = upstream.address.port();
+                }
+                servers.push(server);
+            }
             let mut builder = Resolver::builder_with_config(
                 ResolverConfig::from_name_servers(servers),
                 TokioRuntimeProvider::default(),
             );
+            if dns.upstreams.iter().any(|u| {
+                matches!(
+                    u.transport,
+                    DnsTransport::Tls | DnsTransport::Https | DnsTransport::Quic
+                )
+            }) {
+                let paths = dns
+                    .upstreams
+                    .iter()
+                    .filter_map(|u| u.ca_file.as_deref())
+                    .collect::<Vec<_>>();
+                builder = builder.with_tls_config(
+                    node_outbound::tls_client_config(&paths).map_err(|_| Error::Config)?,
+                );
+            }
             let opts = builder.options_mut();
             opts.timeout = Duration::from_millis(dns.timeout_ms);
             opts.attempts = 1;
@@ -75,13 +118,18 @@ impl Network {
             .iter()
             .map(|(name, ips)| (routing::normalize_domain(name), ips.clone()))
             .collect();
-        Ok(Self {
-            policy: Policy::new(route, outbounds).map_err(|_| Error::Config)?,
+        let resolver = Arc::new(NetworkResolver {
             resolver,
             dns,
             hosts,
             queries: Arc::new(tokio::sync::Semaphore::new(256)),
             os: OnceLock::new(),
+        });
+        Ok(Self {
+            policy: Policy::new(route, outbounds).map_err(|_| Error::Config)?,
+            graph: node_outbound::Graph::with_resolver(outbounds, resolver.clone())
+                .map_err(|_| Error::Config)?,
+            resolver,
         })
     }
     #[cfg(test)]
@@ -95,6 +143,202 @@ impl Network {
     }
 
     pub async fn resolve(&self, address: &Address) -> Result<(Option<String>, Vec<IpAddr>), Error> {
+        self.resolver.lookup(address).await
+    }
+
+    pub async fn connect_for(
+        &self,
+        address: &Address,
+        port: u16,
+        source: SocketAddr,
+        user: &str,
+        inbound_tag: &str,
+    ) -> Result<node_session::BoxStream, Error> {
+        self.connect_with(
+            address,
+            port,
+            source,
+            routing::MatchMeta {
+                user: Some(user),
+                inbound_tag: Some(inbound_tag),
+            },
+        )
+        .await
+    }
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub async fn udp_open_for(
+        &self,
+        address: &Address,
+        port: u16,
+        source: SocketAddr,
+        user: &str,
+        inbound_tag: &str,
+    ) -> Result<node_outbound::UdpRoute, Error> {
+        self.udp_with(
+            address,
+            port,
+            source,
+            routing::MatchMeta {
+                user: Some(user),
+                inbound_tag: Some(inbound_tag),
+            },
+        )
+        .await
+    }
+    pub async fn udp_plan_for(
+        &self,
+        address: &Address,
+        port: u16,
+        source: SocketAddr,
+        user: &str,
+        inbound_tag: &str,
+    ) -> Result<node_outbound::UdpPlan, Error> {
+        self.udp_plan(
+            address,
+            port,
+            source,
+            routing::MatchMeta {
+                user: Some(user),
+                inbound_tag: Some(inbound_tag),
+            },
+        )
+        .await
+    }
+    pub async fn udp_channel(
+        &self,
+        plan: &node_outbound::UdpPlan,
+    ) -> Result<Arc<dyn node_outbound::Datagram>, Error> {
+        self.graph
+            .udp_open(&plan.outbound_tag, plan.destination)
+            .await
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::Unsupported {
+                    Error::Unsupported
+                } else {
+                    Error::Io(e)
+                }
+            })
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub async fn connect(
+        &self,
+        address: &Address,
+        port: u16,
+        source: SocketAddr,
+    ) -> Result<node_session::BoxStream, Error> {
+        self.connect_with(address, port, source, routing::MatchMeta::default())
+            .await
+    }
+    async fn connect_with(
+        &self,
+        address: &Address,
+        port: u16,
+        source: SocketAddr,
+        meta: routing::MatchMeta<'_>,
+    ) -> Result<node_session::BoxStream, Error> {
+        let (domain, ips) = self.resolve(address).await?;
+        let mut error = Error::Blocked;
+        let mut admitted_tag = None;
+        for ip in ips {
+            let outbound =
+                self.policy
+                    .select_with(domain.as_deref(), ip, port, "tcp", source, meta);
+            let destination = SocketAddr::new(ip, port);
+            if outbound.kind == "block" {
+                continue;
+            }
+            if let Some(tag) = admitted_tag {
+                if tag != outbound.tag {
+                    continue;
+                }
+            } else {
+                admitted_tag = Some(outbound.tag.as_str());
+            }
+            let result = self
+                .graph
+                .connect(&outbound.tag, destination)
+                .await
+                .map_err(Error::Io);
+            match result {
+                Ok(stream) => return Ok(stream),
+                Err(e) => error = e,
+            }
+        }
+        Err(error)
+    }
+    async fn udp_with(
+        &self,
+        address: &Address,
+        port: u16,
+        source: SocketAddr,
+        meta: routing::MatchMeta<'_>,
+    ) -> Result<node_outbound::UdpRoute, Error> {
+        let plan = self.udp_plan(address, port, source, meta).await?;
+        let channel = self.udp_channel(&plan).await?;
+        Ok(node_outbound::UdpRoute {
+            destination: plan.destination,
+            outbound_tag: plan.outbound_tag,
+            channel,
+        })
+    }
+    async fn udp_plan(
+        &self,
+        address: &Address,
+        port: u16,
+        source: SocketAddr,
+        meta: routing::MatchMeta<'_>,
+    ) -> Result<node_outbound::UdpPlan, Error> {
+        let (domain, ips) = self.resolve(address).await?;
+        for ip in ips {
+            let outbound =
+                self.policy
+                    .select_with(domain.as_deref(), ip, port, "udp", source, meta);
+            if outbound.kind == "block" {
+                continue;
+            }
+            let destination = SocketAddr::new(ip, port);
+            return Ok(node_outbound::UdpPlan {
+                destination,
+                outbound_tag: outbound.tag.clone(),
+            });
+        }
+        Err(Error::Blocked)
+    }
+    #[cfg(test)]
+    pub async fn udp_destination(
+        &self,
+        address: &Address,
+        port: u16,
+        source: SocketAddr,
+    ) -> Result<SocketAddr, Error> {
+        let (domain, ips) = self.resolve(address).await?;
+        for ip in ips {
+            let outbound = self
+                .policy
+                .select(domain.as_deref(), ip, port, "udp", source);
+            match outbound.kind.as_str() {
+                "block" => continue,
+                "direct" if outbound.detour.is_none() => return Ok(SocketAddr::new(ip, port)),
+                _ => return Err(Error::Unsupported),
+            }
+        }
+        Err(Error::Blocked)
+    }
+}
+#[async_trait::async_trait]
+impl node_outbound::Resolver for NetworkResolver {
+    async fn resolve(&self, name: &str) -> std::io::Result<Vec<IpAddr>> {
+        self.lookup(&Address::Domain(name.to_owned()))
+            .await
+            .map(|(_, ips)| ips)
+            .map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::NotFound, "proxy DNS resolution failed")
+            })
+    }
+}
+impl NetworkResolver {
+    async fn lookup(&self, address: &Address) -> Result<(Option<String>, Vec<IpAddr>), Error> {
         let Address::Domain(name) = address else {
             let Address::Ip(ip) = address else {
                 unreachable!()
@@ -160,123 +404,4 @@ impl Network {
         }
         Ok((Some(name), unique))
     }
-
-    pub async fn connect(
-        &self,
-        address: &Address,
-        port: u16,
-        source: SocketAddr,
-    ) -> Result<TcpStream, Error> {
-        let (domain, ips) = self.resolve(address).await?;
-        let mut error = Error::Blocked;
-        for ip in ips {
-            let outbound = self
-                .policy
-                .select(domain.as_deref(), ip, port, "tcp", source);
-            let destination = SocketAddr::new(ip, port);
-            let result = match outbound.kind.as_str() {
-                "block" => continue,
-                "direct" => {
-                    tokio::time::timeout(Duration::from_secs(3), TcpStream::connect(destination))
-                        .await
-                        .map_err(|_| Error::Protocol)
-                        .and_then(|r| r.map_err(Error::Io))
-                }
-                "socks" => {
-                    tokio::time::timeout(Duration::from_secs(3), socks(outbound, destination))
-                        .await
-                        .map_err(|_| Error::Protocol)
-                        .and_then(|r| r)
-                }
-                _ => return Err(Error::Unsupported),
-            };
-            match result {
-                Ok(stream) => return Ok(stream),
-                Err(e) => error = e,
-            }
-        }
-        Err(error)
-    }
-
-    pub async fn udp_destination(
-        &self,
-        address: &Address,
-        port: u16,
-        source: SocketAddr,
-    ) -> Result<SocketAddr, Error> {
-        let (domain, ips) = self.resolve(address).await?;
-        for ip in ips {
-            match self
-                .policy
-                .select(domain.as_deref(), ip, port, "udp", source)
-                .kind
-                .as_str()
-            {
-                "block" => continue,
-                "direct" => return Ok(SocketAddr::new(ip, port)),
-                // Never silently bypass a requested proxy for UDP.
-                _ => return Err(Error::Unsupported),
-            }
-        }
-        Err(Error::Blocked)
-    }
-}
-
-async fn socks(outbound: &Outbound, destination: SocketAddr) -> Result<TcpStream, Error> {
-    let mut stream = TcpStream::connect(SocketAddr::new(
-        outbound.server.ok_or(Error::Config)?,
-        outbound.server_port.ok_or(Error::Config)?,
-    ))
-    .await?;
-    let method = if outbound.username.is_some() { 2 } else { 0 };
-    stream.write_all(&[5, 1, method]).await?;
-    let mut pair = [0; 2];
-    stream.read_exact(&mut pair).await?;
-    if pair != [5, method] {
-        return Err(Error::Protocol);
-    }
-    if let (Some(user), Some(password)) = (&outbound.username, &outbound.password) {
-        let mut auth = vec![1, user.len() as u8];
-        auth.extend(user.as_bytes());
-        auth.push(password.len() as u8);
-        auth.extend(password.as_bytes());
-        stream.write_all(&auth).await?;
-        stream.read_exact(&mut pair).await?;
-        if pair != [1, 0] {
-            return Err(Error::Protocol);
-        }
-    }
-    let mut request = vec![5, 1, 0];
-    match destination.ip() {
-        IpAddr::V4(ip) => {
-            request.push(1);
-            request.extend(ip.octets());
-        }
-        IpAddr::V6(ip) => {
-            request.push(4);
-            request.extend(ip.octets());
-        }
-    }
-    request.extend(destination.port().to_be_bytes());
-    stream.write_all(&request).await?;
-    let mut reply = [0; 4];
-    stream.read_exact(&mut reply).await?;
-    if reply[..3] != [5, 0, 0] {
-        return Err(Error::Protocol);
-    }
-    let size = match reply[3] {
-        1 => 4,
-        4 => 16,
-        3 => {
-            let n = stream.read_u8().await? as usize;
-            if n == 0 {
-                return Err(Error::Protocol);
-            }
-            n
-        }
-        _ => return Err(Error::Protocol),
-    };
-    let mut bound = [0; 257];
-    stream.read_exact(&mut bound[..size + 2]).await?;
-    Ok(stream)
 }

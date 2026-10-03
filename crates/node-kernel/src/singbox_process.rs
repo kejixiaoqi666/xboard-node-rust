@@ -24,6 +24,9 @@ impl SingBoxProcessKernel {
     pub fn traffic_snapshot(&self) -> Result<Option<node_core::TrafficSnapshot>, KernelError> {
         self.process.traffic_snapshot()
     }
+    pub fn activity(&self) -> Result<node_core::ActivitySnapshot, KernelError> {
+        self.process.activity()
+    }
     pub fn traffic_ack(&self, snapshot: &node_core::TrafficSnapshot) -> Result<(), KernelError> {
         self.process.traffic_ack(snapshot)
     }
@@ -32,6 +35,10 @@ impl SingBoxProcessKernel {
     }
     pub fn without_environment(mut self, keys: impl IntoIterator<Item = String>) -> Self {
         self.process = self.process.without_environment(keys);
+        self
+    }
+    pub fn with_embedded(mut self, launcher: std::sync::Arc<dyn crate::EmbeddedLauncher>) -> Self {
+        self.process = self.process.with_embedded(launcher);
         self
     }
     /// Opt-in companion kernel; stock sing-box does not implement this protocol.
@@ -72,7 +79,11 @@ impl KernelAdapter for SingBoxProcessKernel {
         let candidate = self.process.prepare_serialized(
             &json,
             config.server_port,
-            Some(std::net::SocketAddr::new(ip, config.server_port)),
+            if matches!(config.protocol.as_str(), "hysteria2" | "tuic") {
+                None
+            } else {
+                Some(std::net::SocketAddr::new(ip, config.server_port))
+            },
         )?;
         self.process.check_candidate(&candidate)?;
         Ok(candidate)

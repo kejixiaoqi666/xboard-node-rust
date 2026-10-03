@@ -13,10 +13,13 @@ node-core = { path = "../node-core" }
 node-panel = { path = "../node-panel" }
 node-kernel = { path = "../node-kernel" }
 node-native = { path = "../node-native" }
+node-admin = { path = "../node-admin" }
+async-trait = "0.1"
+libc = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-tokio = { version = "1", features = ["rt", "macros", "sync", "time", "signal"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "net", "io-util"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util"] }

@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "purpose": "Official test clients only; not bundled with the Rust server. Archive digests pinned from official release metadata/checksums; binary digests independently calculated after verified extraction.",
+  "assets": [
+    {
+      "client": "sing-box",
+      "version": "1.14.2",
+      "platform": "linux-amd64",
+      "archive": "sing-box-1.14.2-linux-amd64.tar.gz",
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-linux-amd64.tar.gz",
+      "archive_sha256": "a684484d7477d1437282ee411f4d131d0340aaad60a7868841ebd5d87dd8a0c6",
+      "member": "sing-box-1.14.2-linux-amd64/sing-box",
+      "binary_sha256": "fc9c6e6ab345f045b16a0ed10d1ff28d68e8e56e7749fca30738d1406e98d7b8",
+      "checksum_source": "https://api.github.com/repos/SagerNet/sing-box/releases/tags/v1.14.2"
+    },
+    {
+      "client": "sing-box",
+      "version": "1.14.2",
+      "platform": "linux-arm64",
+      "archive": "sing-box-1.14.2-linux-arm64.tar.gz",
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-linux-arm64.tar.gz",
+      "archive_sha256": "b43a1fb1bda131c6653576741ce527eb2bdeab7c9308ca90ee8b972abb7e4a7f",
+      "member": "sing-box-1.14.2-linux-arm64/sing-box",
+      "binary_sha256": "b8610f45abb7e967e195264383f5cbd20fba7821a3c37e3a8c4c5ab6cad28eac",
+      "checksum_source": "https://api.github.com/repos/SagerNet/sing-box/releases/tags/v1.14.2"
+    },
+    {
+      "client": "sing-box",
+      "version": "1.14.2",
+      "platform": "windows-amd64",
+      "archive": "sing-box-1.14.2-windows-amd64.zip",
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.2/sing-box-1.14.2-windows-amd64.zip",
+      "archive_sha256": "c2d8bfff918755808781dfdeeb8581b6c91eb3a243d9a7b55483cfc0c0684d32",
+      "member": "sing-box-1.14.2-windows-amd64/sing-box.exe",
+      "binary_sha256": "7bbef1dea9189ee12799ae834ea4b4658355da25c47a21ad8804904c0ccd9410",
+      "checksum_source": "https://api.github.com/repos/SagerNet/sing-box/releases/tags/v1.14.2"
+    },
+    {
+      "client": "xray",
+      "version": "26.3.27",
+      "platform": "linux-amd64",
+      "archive": "Xray-linux-64.zip",
+      "url": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-64.zip",
+      "archive_sha256": "23cd9af937744d97776ee35ecad4972cf4b2109d1e0fe6be9930467608f7c8ae",
+      "member": "xray",
+      "binary_sha256": "8255dd939c34cf966cc91517b6324dd3c8d0bcf49ffac8beca049a38c46845ed",
+      "checksum_source": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-64.zip.dgst"
+    },
+    {
+      "client": "xray",
+      "version": "26.3.27",
+      "platform": "linux-arm64",
+      "archive": "Xray-linux-arm64-v8a.zip",
+      "url": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-arm64-v8a.zip",
+      "archive_sha256": "4d30283ae614e3057f730f67cd088a42be6fdf91f8639d82cb69e48cde80413c",
+      "member": "xray",
+      "binary_sha256": "c2d20a7045250497083afea0d79db0672f6c89a25aaaf37c92de034d6b764b04",
+      "checksum_source": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-linux-arm64-v8a.zip.dgst"
+    },
+    {
+      "client": "xray",
+      "version": "26.3.27",
+      "platform": "windows-amd64",
+      "archive": "Xray-windows-64.zip",
+      "url": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-windows-64.zip",
+      "archive_sha256": "d004c39288ce9ada487c6f398c7c545f7d749e44bdfdd59dbc9f865afba4e1ad",
+      "member": "xray.exe",
+      "binary_sha256": "15c2d007954ac53ba69b80ec91242786b3c0b71d52649165b4ca1d5cc96ef8f1",
+      "checksum_source": "https://github.com/XTLS/Xray-core/releases/download/v26.3.27/Xray-windows-64.zip.dgst"
+    }
+  ]
+}

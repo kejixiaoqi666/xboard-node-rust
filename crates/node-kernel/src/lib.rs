@@ -1,7 +1,9 @@
 use node_core::{AppliedSnapshot, ConfigError, NodeSpec, UserSpec};
 use thiserror::Error;
 
+mod embedded;
 mod process;
+pub use embedded::{EmbeddedLauncher, EmbeddedWorker};
 mod traffic_control;
 mod user_control;
 pub use process::{ProcessCandidate, ProcessKernel, ProcessKernelConfig};

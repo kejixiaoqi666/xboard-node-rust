@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "panel_url": "https://panel.example.com",
+      "token_env": "XBOARD_PANEL_TOKEN",
+      "node_id": 7,
+      "machine_id": 1,
+      "state_dir": "/var/lib/xboard-node-rust/node-7",
+      "embedded": true,
+      "poll_seconds": 30,
+      "report_seconds": 60,
+      "traffic_reporting": true,
+      "native_user_updates": true,
+      "websocket": true
+    },
+    {
+      "panel_url": "https://panel.example.com",
+      "token_env": "XBOARD_PANEL_TOKEN",
+      "node_id": 8,
+      "machine_id": 1,
+      "state_dir": "/var/lib/xboard-node-rust/node-8",
+      "embedded": true,
+      "poll_seconds": 30,
+      "report_seconds": 60,
+      "traffic_reporting": true,
+      "native_user_updates": true,
+      "websocket": true
+    }
+  ]
+}
