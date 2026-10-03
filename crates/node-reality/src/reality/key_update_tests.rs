@@ -10,6 +10,7 @@ fn connection(cs: CipherSuite) -> RealityServerConnection {
         min_client_version: None,
         max_client_version: None,
         cipher_suites: vec![cs],
+        key_update_after_records: MAX_KEY_UPDATE_RECORDS,
     })
     .unwrap()
     .complete_with_secrets_for_test(cs, secret(cs, 0), secret(cs, 1))
@@ -406,4 +407,229 @@ fn blocked_update_response_still_delivers_already_decrypted_plaintext() {
         (22, vec![24, 0, 0, 1, 0])
     );
     assert!(io.flushed.is_empty());
+}
+
+#[test]
+fn automatic_rotation_splits_crossing_batches_all_suites_and_default_limit() {
+    for cs in DEFAULT_CIPHER_SUITES {
+        for limit in [16, MAX_KEY_UPDATE_RECORDS] {
+            let mut s = connection(*cs);
+            s.config.key_update_after_records = limit;
+            s.write_seq = limit - 1;
+            let body: Vec<_> = (0..3 * 16384).map(|n| (n % 251) as u8).collect();
+            s.writer().write_all(&body).unwrap();
+            let mut wire = Vec::new();
+            s.write_tls(&mut wire).unwrap();
+            let old = secret(*cs, 1);
+            let new = update_traffic_secret(&old, *cs).unwrap();
+            assert_eq!(
+                decrypt_first(*cs, &old, limit - 1, &mut wire),
+                (23, body[..16384].to_vec())
+            );
+            assert_eq!(
+                decrypt_first(*cs, &old, limit, &mut wire),
+                (22, vec![24, 0, 0, 1, 0])
+            );
+            assert_eq!(
+                decrypt_first(*cs, &new, 0, &mut wire),
+                (23, body[16384..32768].to_vec())
+            );
+            assert_eq!(
+                decrypt_first(*cs, &new, 1, &mut wire),
+                (23, body[32768..].to_vec())
+            );
+            assert!(wire.is_empty());
+            assert_eq!(s.write_seq, 2);
+            // Receive keys are unaffected by server's unilateral update.
+            feed(&mut s, &record(*cs, &secret(*cs, 0), 0, b"reply", 23)).unwrap();
+            let mut reply = [0; 5];
+            s.reader().read_exact(&mut reply).unwrap();
+            assert_eq!(&reply, b"reply");
+        }
+    }
+}
+
+#[test]
+fn automatic_rotation_repeats_without_timer_or_unneeded_idle_updates() {
+    for cs in DEFAULT_CIPHER_SUITES {
+        let mut s = connection(*cs);
+        s.config.key_update_after_records = 16;
+        let mut current = secret(*cs, 1);
+        let mut seq = 0;
+        for index in 0..50u8 {
+            s.writer().write_all(&[index; 9]).unwrap();
+            let mut wire = Vec::new();
+            s.write_tls(&mut wire).unwrap();
+            if seq == 16 {
+                assert_eq!(
+                    decrypt_first(*cs, &current, seq, &mut wire),
+                    (22, vec![24, 0, 0, 1, 0])
+                );
+                current = update_traffic_secret(&current, *cs).unwrap();
+                seq = 0;
+            }
+            assert_eq!(
+                decrypt_first(*cs, &current, seq, &mut wire),
+                (23, vec![index; 9])
+            );
+            seq += 1;
+            assert!(wire.is_empty() && !s.wants_write());
+            s.write_tls(&mut wire).unwrap();
+            assert!(wire.is_empty());
+        }
+    }
+}
+
+#[test]
+fn automatic_boundary_and_requested_response_coalesce_before_close() {
+    for requested in [false, true] {
+        let cs = CipherSuite::AES_128_GCM_SHA256;
+        let mut s = connection(cs);
+        s.config.key_update_after_records = 16;
+        s.write_seq = 16;
+        if requested {
+            feed(
+                &mut s,
+                &record(cs, &secret(cs, 0), 0, &[24, 0, 0, 1, 1], 22),
+            )
+            .unwrap();
+        }
+        s.send_close_notify();
+        let mut wire = Vec::new();
+        s.write_tls(&mut wire).unwrap();
+        assert_eq!(
+            decrypt_first(cs, &secret(cs, 1), 16, &mut wire),
+            (22, vec![24, 0, 0, 1, 0])
+        );
+        assert_eq!(
+            decrypt_first(
+                cs,
+                &update_traffic_secret(&secret(cs, 1), cs).unwrap(),
+                0,
+                &mut wire
+            ),
+            (21, vec![1, 0])
+        );
+        assert!(wire.is_empty());
+    }
+}
+
+#[test]
+fn automatic_rotation_partial_output_is_not_replayed_or_reordered() {
+    let cs = CipherSuite::AES_128_GCM_SHA256;
+    let mut s = connection(cs);
+    s.config.key_update_after_records = 16;
+    s.write_seq = 15;
+    struct Partial(Vec<u8>);
+    impl Write for Partial {
+        fn write(&mut self, b: &[u8]) -> io::Result<usize> {
+            let n = b.len().min(7);
+            self.0.extend_from_slice(&b[..n]);
+            Ok(n)
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut out = Partial(Vec::new());
+    s.writer().write_all(b"old").unwrap();
+    s.write_tls(&mut out).unwrap();
+    s.writer().write_all(b"new").unwrap();
+    while s.wants_write() {
+        s.write_tls(&mut out).unwrap();
+    }
+    assert_eq!(
+        decrypt_first(cs, &secret(cs, 1), 15, &mut out.0),
+        (23, b"old".to_vec())
+    );
+    assert_eq!(
+        decrypt_first(cs, &secret(cs, 1), 16, &mut out.0),
+        (22, vec![24, 0, 0, 1, 0])
+    );
+    assert_eq!(
+        decrypt_first(
+            cs,
+            &update_traffic_secret(&secret(cs, 1), cs).unwrap(),
+            0,
+            &mut out.0
+        ),
+        (23, b"new".to_vec())
+    );
+    assert!(out.0.is_empty());
+}
+
+#[test]
+fn engine_rejects_out_of_range_automatic_budget_even_without_controller() {
+    let template = connection(CipherSuite::AES_128_GCM_SHA256).config;
+    for limit in [0, 15, MAX_KEY_UPDATE_RECORDS + 1, u64::MAX] {
+        let mut config = template.clone();
+        config.key_update_after_records = limit;
+        assert!(
+            matches!(RealityServerConnection::new(config), Err(e) if e.kind()==io::ErrorKind::InvalidInput)
+        );
+    }
+}
+
+#[test]
+fn automatic_update_survives_async_write_and_flush_backpressure() {
+    use std::{
+        pin::Pin,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, AtomicU8, Ordering},
+        },
+        task::{Context, Poll},
+    };
+    use tokio::io::AsyncWrite;
+    let cs = CipherSuite::AES_128_GCM_SHA256;
+    for mode in [1, 2] {
+        let mut conn = connection(cs);
+        conn.config.key_update_after_records = 16;
+        conn.write_seq = 16;
+        let write_mode = Arc::new(AtomicU8::new(mode));
+        let flush_pending = Arc::new(AtomicBool::new(true));
+        let io = BufferedIo {
+            input: io::Cursor::new(Vec::new()),
+            buffered: Vec::new(),
+            flushed: Vec::new(),
+            write_mode: write_mode.clone(),
+            flush_pending: flush_pending.clone(),
+            reads: 0,
+        };
+        let mut stream = crate::CryptoTlsStream::new(io, conn);
+        let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+        let result = Pin::new(&mut stream).poll_write(&mut cx, b"after");
+        if mode == 2 {
+            assert!(matches!(result,Poll::Ready(Err(e)) if e.kind()==io::ErrorKind::WriteZero));
+            continue;
+        }
+        assert!(matches!(result, Poll::Ready(Ok(5))));
+        assert!(Pin::new(&mut stream).poll_flush(&mut cx).is_pending());
+        write_mode.store(0, Ordering::SeqCst);
+        assert!(Pin::new(&mut stream).poll_flush(&mut cx).is_pending());
+        flush_pending.store(false, Ordering::SeqCst);
+        assert!(matches!(
+            Pin::new(&mut stream).poll_flush(&mut cx),
+            Poll::Ready(Ok(()))
+        ));
+        assert!(matches!(
+            Pin::new(&mut stream).poll_flush(&mut cx),
+            Poll::Ready(Ok(()))
+        ));
+        let (mut io, _) = stream.into_inner();
+        assert_eq!(
+            decrypt_first(cs, &secret(cs, 1), 16, &mut io.flushed),
+            (22, vec![24, 0, 0, 1, 0])
+        );
+        assert_eq!(
+            decrypt_first(
+                cs,
+                &update_traffic_secret(&secret(cs, 1), cs).unwrap(),
+                0,
+                &mut io.flushed
+            ),
+            (23, b"after".to_vec())
+        );
+        assert!(io.flushed.is_empty() && io.buffered.is_empty());
+    }
 }

@@ -7,6 +7,33 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 const UUID_A: &str = "00000000-0000-4000-8000-000000000100";
 const UUID_B: &str = "00000000-0000-4000-8000-000000000200";
 
+#[test]
+fn reality_key_update_budget_survives_controller_to_engine_mapping() {
+    assert_eq!(
+        node_core::reality::MAX_KEY_UPDATE_RECORDS,
+        node_reality::MAX_KEY_UPDATE_RECORDS
+    );
+    assert_eq!(
+        node_core::reality::MIN_KEY_UPDATE_RECORDS,
+        node_reality::MIN_KEY_UPDATE_RECORDS
+    );
+    let mut settings: node_core::reality::Settings = serde_json::from_value(json!({
+        "private_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "server_name":"example.test"
+    }))
+    .unwrap();
+    assert_eq!(
+        reality_config(&settings).unwrap().key_update_after_records,
+        node_reality::MAX_KEY_UPDATE_RECORDS
+    );
+    settings.key_update_after_records = 16;
+    assert_eq!(
+        reality_config(&settings).unwrap().key_update_after_records,
+        16
+    );
+    settings.key_update_after_records = 0;
+    assert!(reality_config(&settings).is_err());
+}
+
 pub(super) fn config(users: Value) -> Value {
     json!({"log":{"level":"error","timestamp":true},"inbounds":[{"type":"vless","tag":"vless-in","listen":"127.0.0.1","listen_port":12345,"users":users}],"outbounds":[{"type":"direct","tag":"direct"}],"route":{"final":"direct"}})
 }

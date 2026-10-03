@@ -36,6 +36,7 @@ pub fn reality_config(
         min_client_version: s.min_client_version,
         max_client_version: s.max_client_version,
         cipher_suites: Vec::new(),
+        key_update_after_records: s.key_update_after_records,
     })
 }
 pub fn generate_reality_keypair() -> std::io::Result<(String, String)> {

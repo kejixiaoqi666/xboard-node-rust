@@ -30,3 +30,5 @@
     "Bounded peer TLS1.3 KeyUpdate and requested response; independent secrets/sequence reset, output ordering, async response flush/backpressure"
   ]
 }
+
+Local preview.9 adaptation: configurable bounded write-record budget and server-initiated TLS 1.3 KeyUpdate (not requested), batch-boundary splitting, close-notify budget, shared peer-response rotation, independent receive keys, and all-suite/partial-output/backpressure regressions. No timers or new server dependencies.

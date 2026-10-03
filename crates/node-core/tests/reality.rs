@@ -26,3 +26,39 @@ fn panel_reality_settings_are_bounded_and_private_debug_is_redacted() {
     v["unsupported_security"] = json!(true);
     assert!(serde_json::from_value::<Settings>(v).is_err());
 }
+
+#[test]
+fn key_update_budget_defaults_and_rejects_disable_overflow_and_wrong_types() {
+    use node_core::reality::{MAX_KEY_UPDATE_RECORDS, MIN_KEY_UPDATE_RECORDS};
+    assert_eq!(
+        serde_json::from_value::<Settings>(base())
+            .unwrap()
+            .key_update_after_records,
+        MAX_KEY_UPDATE_RECORDS
+    );
+    for count in [MIN_KEY_UPDATE_RECORDS, MAX_KEY_UPDATE_RECORDS] {
+        let mut value = base();
+        value["key_update_after_records"] = json!(count);
+        let settings: Settings = serde_json::from_value(value).unwrap();
+        settings.validate().unwrap();
+        assert_eq!(
+            serde_json::to_value(settings).unwrap()["key_update_after_records"],
+            count
+        );
+    }
+    for count in [0, 15, MAX_KEY_UPDATE_RECORDS + 1, u64::MAX] {
+        let mut value = base();
+        value["key_update_after_records"] = json!(count);
+        assert!(
+            serde_json::from_value::<Settings>(value)
+                .unwrap()
+                .validate()
+                .is_err()
+        );
+    }
+    for count in [json!(-1), json!(16.5), json!("16"), json!(null)] {
+        let mut value = base();
+        value["key_update_after_records"] = count;
+        assert!(serde_json::from_value::<Settings>(value).is_err());
+    }
+}

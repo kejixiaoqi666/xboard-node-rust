@@ -1,8 +1,9 @@
-"""Loopback-only authenticated Xray + TLS record adapter to force KeyUpdate.
+"""Loopback Xray KeyUpdate injection and unchanged-ciphertext auto-rotation observer.
 
-Xray performs the real REALITY handshake. The adapter uses its ephemeral test
-key log to insert rotations and translates the record generations back for the
-unmodified client. No key log is printed or included in release artifacts.
+Xray performs the real REALITY handshake. Peer-update cases use an ephemeral
+test key log to insert rotations and translate the generations. The automatic
+case only observes and forwards original ciphertext to the unmodified client.
+No key log is printed or included in release artifacts.
 """
 import hashlib
 import hmac
@@ -70,7 +71,6 @@ def inner_type(inner):
 
 def exercise(config, run, wait, cases, measurements, node_port, user, temp, settings):
     config.pop('flow', None)
-    run('restart')
     binary = Path(os.environ['XRAY_TEST_BINARY'])
     assert '26.3.27' in subprocess.check_output([str(binary), 'version'], text=True).splitlines()[0]
     class Server(socketserver.ThreadingTCPServer):
@@ -91,9 +91,16 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, sett
     origin = Server(('127.0.0.1', 0), Echo)
     threading.Thread(target=origin.serve_forever, daemon=True).start()
     try:
-        for mode in ['rotate', 'invalid-request']:
+        for mode in ['rotate', 'invalid-request', 'auto-rotate']:
+            automatic = mode == 'auto-rotate'
+            config['tls_settings']['key_update_after_records'] = 16 if automatic else 1 << 20
+            run('restart')
             metrics = {'sent_key_updates': 0, 'received_responses': 0, 'fragment_records': 0,
-                       'client_data_records': 0, 'server_data_records': 0}
+                       'client_data_records': 0, 'server_data_records': 0,
+                       'observed_server_updates': 0, 'observed_client_updates': 0,
+                       'max_records_per_generation': 0,
+                       'forwarded_client_ciphertext_bytes': 0, 'forwarded_server_ciphertext_bytes': 0}
+            forwarded = {name: {'in': hashlib.sha256(), 'out': hashlib.sha256()} for name in ['client', 'server']}
             failures = []
             handler_done = threading.Event()
             with origin_lock: origin_baseline = origin_connections[0]
@@ -143,6 +150,18 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, sett
                                         continue
                                     inner = app_in.decrypt(record)
                                     kind, _ = inner_type(inner)
+                                    if automatic:
+                                        # Observation only: every byte forwarded unchanged to the node.
+                                        upstream.sendall(record)
+                                        forwarded['client']['in'].update(record)
+                                        forwarded['client']['out'].update(record)
+                                        metrics['forwarded_client_ciphertext_bytes'] += len(record)
+                                        if kind == 23: metrics['client_data_records'] += 1
+                                        elif kind == 22:
+                                            assert inner_type(inner)[1] in [b'\x18\0\0\1\0', b'\x18\0\0\1\1']
+                                            metrics['observed_client_updates'] += 1
+                                            app_in.rotate()
+                                        continue
                                     if kind == 23:
                                         index = metrics['client_data_records']
                                         if index < 3:
@@ -192,6 +211,24 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, sett
                                     continue
                                 inner = app_in.decrypt(record)
                                 kind, body = inner_type(inner)
+                                if automatic:
+                                    # Keep the observer independent of the client's key update handling.
+                                    before_update = app_in.seq - 1
+                                    if kind == 22:
+                                        assert body == b'\x18\0\0\1\0'
+                                        assert before_update == 16, 'server rotated at wrong record boundary'
+                                        metrics['observed_server_updates'] += 1
+                                        metrics['max_records_per_generation'] = max(metrics['max_records_per_generation'], before_update)
+                                        app_in.rotate()
+                                    else:
+                                        assert app_in.seq <= 16, 'server exceeded configured record budget'
+                                        metrics['max_records_per_generation'] = max(metrics['max_records_per_generation'], app_in.seq)
+                                        if kind == 23: metrics['server_data_records'] += 1
+                                    self.request.sendall(record)
+                                    forwarded['server']['in'].update(record)
+                                    forwarded['server']['out'].update(record)
+                                    metrics['forwarded_server_ciphertext_bytes'] += len(record)
+                                    continue
                                 if kind == 22:
                                     assert body == b'\x18\0\0\1\0'
                                     app_in.rotate()
@@ -232,8 +269,8 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, sett
                             stream.sendall(b'\5\1\0\1' + socket.inet_aton('127.0.0.1') + struct.pack('!H', origin.server_address[1]))
                             header = receive(stream, 4); assert header[:2] == b'\5\0'
                             receive(stream, (4 if header[3] == 1 else 16) + 2)
-                            if mode == 'rotate':
-                                for index in range(12):
+                            if mode in ['rotate', 'auto-rotate']:
+                                for index in range(32 if automatic else 12):
                                     body = bytes([index]) * 8192 + b'\x16\x03\x03'
                                     stream.sendall(body); assert receive(stream, len(body)) == body
                             else:
@@ -247,7 +284,21 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, sett
                         bridge.shutdown(); bridge.server_close()
                         assert handler_done.wait(18), 'record adapter did not stop'
                 assert not failures, failures
-                if mode == 'rotate':
+                if automatic:
+                    assert metrics['observed_server_updates'] >= 3, metrics
+                    assert metrics['sent_key_updates'] == 0 and metrics['received_responses'] == 0
+                    assert metrics['observed_client_updates'] == 0
+                    assert metrics['max_records_per_generation'] == 16
+                    assert metrics['server_data_records'] >= 49
+                    for name, digest in forwarded.items():
+                        assert digest['in'].hexdigest() == digest['out'].hexdigest()
+                        metrics[name + '_ciphertext_sha256'] = digest['in'].hexdigest()
+                    metrics.update(payload_bytes_per_direction=32*8195, ciphertext_forwarded_unchanged=True,
+                        test_record_observer=True, key_update_after_records=16, loopback_only=True,
+                        official_client_version='v26.3.27', secrets_retained=False,
+                        client_binary_sha256=hashlib.sha256(binary.read_bytes()).hexdigest())
+                    measurements['reality_auto_key_update'] = metrics
+                elif mode == 'rotate':
                     assert metrics['sent_key_updates'] == 3 and metrics['received_responses'] == 2, metrics
                     assert metrics['fragment_records'] == 5 and metrics['client_data_records'] >= 3, metrics
                     metrics.update(payload_bytes_per_direction=12*8195, test_adapter=True, loopback_only=True,
@@ -257,6 +308,7 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, sett
                 else:
                     assert metrics['sent_key_updates'] == 1 and metrics['received_responses'] == 0
                     with origin_lock: assert origin_connections[0] == origin_baseline, 'invalid update reached origin'
-            cases.append('installed-native-REALITY-KeyUpdate-' + mode + '-official-handshake-test-record-adapter')
+            cases.append('installed-native-REALITY-KeyUpdate-' + mode + (
+                '-unmodified-official-client-unchanged-ciphertext-observer' if automatic else '-official-handshake-test-record-adapter'))
     finally:
         origin.shutdown(); origin.server_close()

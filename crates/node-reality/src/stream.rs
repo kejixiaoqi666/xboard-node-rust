@@ -537,6 +537,7 @@ mod tests {
             min_client_version: None,
             max_client_version: None,
             cipher_suites: Vec::new(),
+            key_update_after_records: crate::MAX_KEY_UPDATE_RECORDS,
         };
         RealityServerConnection::new(config)
             .unwrap()

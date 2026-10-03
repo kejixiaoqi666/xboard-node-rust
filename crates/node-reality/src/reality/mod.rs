@@ -12,7 +12,8 @@ mod reality_tls13_messages;
 mod reality_util;
 pub use reality_cipher_suite::{CipherSuite, DEFAULT_CIPHER_SUITES};
 pub use reality_server_connection::{
-    RealityServerConfig, RealityServerConnection, feed_reality_server_connection,
+    MAX_KEY_UPDATE_RECORDS, MIN_KEY_UPDATE_RECORDS, RealityServerConfig, RealityServerConnection,
+    feed_reality_server_connection,
 };
 pub use reality_util::{decode_private_key, decode_public_key, decode_short_id, generate_keypair};
 pub fn public_key_from_private(key: [u8; 32]) -> [u8; 32] {

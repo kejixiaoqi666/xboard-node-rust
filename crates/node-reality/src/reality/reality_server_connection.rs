@@ -39,6 +39,10 @@ use super::reality_util::{
 use crate::slide_buffer::SlideBuffer;
 use crate::util::allocate_vec;
 
+/// Conservative application-record budget, below the TLS 1.3 AES-GCM limit.
+pub const MAX_KEY_UPDATE_RECORDS: u64 = 1 << 20;
+pub const MIN_KEY_UPDATE_RECORDS: u64 = 16;
+
 /// Configuration for REALITY server connections
 #[derive(Clone)]
 pub struct RealityServerConfig {
@@ -56,6 +60,9 @@ pub struct RealityServerConfig {
     pub max_client_version: Option<[u8; 3]>,
     /// Supported TLS 1.3 cipher suites (empty = use defaults)
     pub cipher_suites: Vec<CipherSuite>,
+    /// Rotate write keys before exceeding this many non-KeyUpdate records.
+    /// Must be in 16..=1_048_576; one old-key KeyUpdate record is additional.
+    pub key_update_after_records: u64,
 }
 
 /// Handshake state machine for REALITY server
@@ -132,6 +139,14 @@ pub struct RealityServerConnection {
 impl RealityServerConnection {
     /// Create a new REALITY server connection
     pub fn new(config: RealityServerConfig) -> io::Result<Self> {
+        if !(MIN_KEY_UPDATE_RECORDS..=MAX_KEY_UPDATE_RECORDS)
+            .contains(&config.key_update_after_records)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid KeyUpdate record budget",
+            ));
+        }
         Ok(RealityServerConnection {
             config,
             handshake_state: HandshakeState::Initial,
@@ -1055,25 +1070,12 @@ impl RealityServerConnection {
             return Ok(n);
         }
 
-        self.queue_key_update_response()?;
-        // Encrypt any pending plaintext (with automatic fragmentation for large data)
-        if !self.plaintext_write_buf.is_empty() {
-            let (app_write_key, app_write_iv) = match (&self.app_write_key, &self.app_write_iv) {
-                (Some(key), Some(iv)) => (key, iv),
-                _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Application keys not available",
-                    ));
-                }
-            };
-
-            let mut encryptor =
-                RecordEncryptor::new(app_write_key, app_write_iv, &mut self.write_seq);
-            encryptor.encrypt_app_data(
-                &mut self.plaintext_write_buf,
-                &mut self.ciphertext_write_buf,
-            )?;
+        if let Err(error) = self
+            .queue_key_update_response()
+            .and_then(|()| self.encrypt_pending_plaintext())
+        {
+            self.fatal_error = Some(error.kind());
+            return Err(error);
         }
 
         // Write buffered ciphertext
@@ -1139,7 +1141,10 @@ impl RealityServerConnection {
             return;
         }
 
-        if let Err(error) = self.queue_key_update_response() {
+        if let Err(error) = self
+            .queue_key_update_response()
+            .and_then(|()| self.maybe_rotate_write_key())
+        {
             self.fatal_error = Some(error.kind());
             return;
         }
@@ -1166,6 +1171,57 @@ impl RealityServerConnection {
         if !self.key_update_response_pending {
             return Ok(());
         }
+        self.queue_write_key_update()?;
+        self.key_update_response_pending = false;
+        Ok(())
+    }
+
+    fn maybe_rotate_write_key(&mut self) -> io::Result<()> {
+        if self.write_seq >= self.config.key_update_after_records {
+            self.queue_write_key_update()?;
+        }
+        Ok(())
+    }
+
+    fn encrypt_pending_plaintext(&mut self) -> io::Result<()> {
+        if self.plaintext_write_buf.is_empty() {
+            return Ok(());
+        }
+        let records = self.plaintext_write_buf.len().div_ceil(16384) as u64;
+        // Retain the existing single/batched encryption path until a boundary
+        // actually falls inside this write. No extra allocation on that path.
+        if self.write_seq + records <= self.config.key_update_after_records {
+            return RecordEncryptor::new(
+                self.app_write_key.as_ref().expect("complete write key"),
+                self.app_write_iv.as_ref().expect("complete write IV"),
+                &mut self.write_seq,
+            )
+            .encrypt_app_data(
+                &mut self.plaintext_write_buf,
+                &mut self.ciphertext_write_buf,
+            );
+        }
+        let mut plaintext = std::mem::take(&mut self.plaintext_write_buf);
+        let mut chunk = Vec::with_capacity(16384 + 17);
+        let result = (|| {
+            for part in plaintext.chunks(16384) {
+                self.maybe_rotate_write_key()?;
+                chunk.extend_from_slice(part);
+                RecordEncryptor::new(
+                    self.app_write_key.as_ref().expect("complete write key"),
+                    self.app_write_iv.as_ref().expect("complete write IV"),
+                    &mut self.write_seq,
+                )
+                .encrypt_app_data(&mut chunk, &mut self.ciphertext_write_buf)?;
+            }
+            Ok(())
+        })();
+        plaintext.clear();
+        self.plaintext_write_buf = plaintext;
+        result
+    }
+
+    fn queue_write_key_update(&mut self) -> io::Result<()> {
         let cs = self.cipher_suite.expect("complete cipher suite");
         let secret = update_traffic_secret(
             self.app_write_secret.as_deref().ok_or_else(|| {
@@ -1190,7 +1246,6 @@ impl RealityServerConnection {
         self.app_write_key = Some(key);
         self.app_write_iv = Some(iv);
         self.write_seq = 0;
-        self.key_update_response_pending = false;
         Ok(())
     }
 }
@@ -1226,6 +1281,7 @@ mod tests {
             min_client_version: None,
             max_client_version: None,
             cipher_suites: Vec::new(),
+            key_update_after_records: crate::MAX_KEY_UPDATE_RECORDS,
         })
         .unwrap()
         .complete_for_test()
@@ -1320,6 +1376,7 @@ mod tests {
             min_client_version: None,
             max_client_version: None,
             cipher_suites: Vec::new(),
+            key_update_after_records: crate::MAX_KEY_UPDATE_RECORDS,
         };
 
         let conn = RealityServerConnection::new(config).unwrap();
@@ -1339,6 +1396,7 @@ mod tests {
             min_client_version: None,
             max_client_version: None,
             cipher_suites: Vec::new(),
+            key_update_after_records: crate::MAX_KEY_UPDATE_RECORDS,
         };
 
         let mut conn = RealityServerConnection::new(config).unwrap();

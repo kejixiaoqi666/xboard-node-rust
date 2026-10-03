@@ -17,10 +17,18 @@ pub struct Settings {
     pub server_port: u16,
     #[serde(default = "age")]
     pub max_time_diff: u64,
+    /// Maximum non-KeyUpdate records sent with one application traffic key.
+    #[serde(default = "key_update_records")]
+    pub key_update_after_records: u64,
     #[serde(default)]
     pub min_client_version: Option<[u8; 3]>,
     #[serde(default)]
     pub max_client_version: Option<[u8; 3]>,
+}
+pub const MAX_KEY_UPDATE_RECORDS: u64 = 1 << 20;
+pub const MIN_KEY_UPDATE_RECORDS: u64 = 16;
+fn key_update_records() -> u64 {
+    MAX_KEY_UPDATE_RECORDS
 }
 fn port() -> u16 {
     443
@@ -65,6 +73,8 @@ impl Settings {
             || !crate::routing::valid_domain(&self.server_name)
             || self.server_port == 0
             || self.max_time_diff > 3_600_000
+            || !(MIN_KEY_UPDATE_RECORDS..=MAX_KEY_UPDATE_RECORDS)
+                .contains(&self.key_update_after_records)
             || self
                 .min_client_version
                 .zip(self.max_client_version)
