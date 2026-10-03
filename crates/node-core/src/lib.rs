@@ -7,6 +7,7 @@ mod traffic;
 pub use traffic::{MAX_TRAFFIC_ROWS, TrafficSnapshot};
 pub mod reality;
 pub mod routing;
+pub mod shadowsocks;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum ConfigError {

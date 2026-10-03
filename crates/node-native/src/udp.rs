@@ -44,6 +44,7 @@ async fn packet<R: AsyncRead + Unpin>(
             let size = ((first as usize) << 8) | reader.read_u8().await? as usize;
             (fixed.0.clone(), fixed.1, size)
         }
+        Protocol::Shadowsocks => return Err(Error::Unsupported),
         Protocol::Trojan => {
             let address = protocol::address(reader, first, 3, 4).await?;
             let port = reader.read_u16().await?;
@@ -284,6 +285,7 @@ mod tests {
                 bytes.extend([1, 127, 0, 0, 1]);
                 bytes
             }
+            Protocol::Shadowsocks => unreachable!("SS uses native datagrams"),
             Protocol::Trojan => {
                 let mut bytes = auth::trojan_key(UUID).to_vec();
                 bytes.extend([13, 10, 3, 1, 0, 0, 0, 0, 0, 0, 13, 10]);

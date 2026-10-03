@@ -4,7 +4,7 @@
 
 **用 Rust 重构的 Xboard 节点后端。** 安装在 Linux VPS 上，向 Xboard 面板获取节点配置和用户列表，并提供当前已迁移的代理协议、用户同步和流量统计能力。
 
-本项目从 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3) 的迁移工作继续开发，目标是保留原版的使用流程，改进运行架构、配置更新和资源管理。**`v0.1.0-preview.9`** 补上 REALITY 外层按记录数量自动轮换发送密钥，同时保留客户端 KeyUpdate 与请求应答；保留普通 VLESS REALITY UDP 和多记录 ClientHello 认证。REALITY TCP 可搭配 Vision，也保留文件 TLS 下的 Vision TCP：支持填充、去填充和内层 TLS 1.3 的双向直通切换。保留 TCP/UDP、共享限速、来源 IP 限制、路由、自定义 DNS 和 SOCKS5 TCP 上游。Rust 服务端可独立运行，一键安装和管理入口已提供，完整原版功能仍在迁移。
+本项目从 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3) 的迁移工作继续开发，目标是保留原版的使用流程，改进运行架构、配置更新和资源管理。**`v0.1.0-preview.10` 新增 Shadowsocks 原生 Rust TCP/UDP**，覆盖传统 AEAD 三种方法和 2022 AES 两种方法；用户更新、限速、来源 IP 限制、路由和持久计数接入同一套基础能力。保留 VLESS/Trojan、REALITY、Vision TCP 与一键安装管理入口。服务端可以独立运行，完整原版功能仍在迁移。
 
 ## 先了解它做什么
 
@@ -20,7 +20,7 @@ flowchart LR
   P[Xboard 面板] -->|REST 配置和用户| C[Rust 控制层]
   P -->|WebSocket 重同步提示| C
   C -->|校验与配置 / 原子用户更新| N[Rust 数据层]
-  U[用户客户端] -->|VLESS / Trojan TCP 和 UDP| N
+  U[用户客户端] -->|VLESS / Trojan / Shadowsocks TCP 和 UDP| N
   N --> T[目标服务]
   N -->|计数存档和采集回执| Q[本地持久上报队列]
   Q -->|流量报告| P
@@ -72,6 +72,7 @@ xboard-rust
 | 出站 | 直连、阻断、SOCKS5 TCP 上游（可用用户名/密码）；不支持 SOCKS5 UDP 或代理链 |
 | DNS | 默认系统解析；可指定 UDP/TCP DNS、静态 hosts、地址族偏好、超时和共享缓存 |
 | 用户限速 | `speed_limit` 按 Mbps；同一用户的连接、上传和下载共用一个预算，0 表示不限速 |
+| Shadowsocks TCP / UDP | 传统 AEAD：AES-128/256-GCM、ChaCha20-IETF-Poly1305；2022：BLAKE3-AES-128/256-GCM；详见下方配置与资源边界 |
 | 设备 / 来源 IP 限制 | `device_limit` 限制本节点同一用户同时活跃的不同来源 IP；同一 IP 多条连接共用名额，0 表示不限 |
 | Xboard 配置与用户同步 | v2 machine / v1 legacy REST；固定一个明确的节点 ID |
 | WebSocket | 可信地址校验、重连及目标节点重同步提示；实际数据重新从 REST 拉取 |
@@ -81,7 +82,40 @@ xboard-rust
 | 持久化 | 原生周期存档、冻结快照/采集回执、持久待报队列及确认停止流程 |
 | 交付与管理 | AMD64/ARM64 安装包、SHA-256 校验、systemd、升级、程序回退、配置备份 |
 
-### 限制怎么生效
+### Shadowsocks 怎么用
+
+Shadowsocks 是客户端连接节点的一种协议。本版服务端包含认证、加解密和 TCP/UDP 转发，无需另外运行 Go 或 Xray 服务端。客户端仍需支持所选的加密方法。
+
+**面板的节点响应**使用以下字段；它们不是安装时填写的本地 `runtime.json`：
+
+```json
+{
+  "protocol": "shadowsocks",
+  "server_port": 8388,
+  "cipher": "aes-128-gcm",
+  "tls": 0
+}
+```
+
+| 加密方法 | 服务端密钥 | 用户密码来源 | 用户上限 |
+| --- | --- | --- | --- |
+| `aes-128-gcm` | 不设置 `server_key` | 面板用户 `uuid` 的原文 | 256 |
+| `aes-256-gcm` | 不设置 `server_key` | 同上 | 256 |
+| `chacha20-ietf-poly1305` | 不设置 `server_key` | 同上 | 256 |
+| `2022-blake3-aes-128-gcm` | `server_key`：Base64 编码的 16 字节密钥 | 按原版规则转换 `uuid`，见下文 | 65,536 |
+| `2022-blake3-aes-256-gcm` | `server_key`：Base64 编码的 32 字节密钥 | 同上，长度改为 32 字节 | 65,536 |
+
+2022 模式保持原 Go 节点的用户转换：取 `uuid` 的 UTF-8 字节，复制到 16/32 字节的零填充数组，超长截断，再使用标准 Base64 编码。客户端通常使用 `server_key:转换后的用户密钥`；面板订阅生成器也必须采用同样规则。**两个不同 UUID 的前 16/32 字节相同，可能得到相同密钥**，节点会拒绝这种配置，不会让它们共用用户身份。不能直接把 UUID 原文当作 2022 客户端密码。
+
+TCP 与 UDP 监听同一端口；启用服务器防火墙时需要分别放行。只支持普通 Shadowsocks，不叠加文件 TLS、REALITY、Vision、mux 或插件。2022 ChaCha、旧流密码、SIP003 插件和其他传输未迁移。仅用户变化可以热更新；方法、服务端密钥、端口、路由和 DNS 变化需要重启数据进程。
+
+计数只包含实际转发的用户有效载荷，不包含 salt、加密标签、地址头和填充。TCP/UDP 共用用户速率预算和来源 IP 名额。删除用户后旧密码不能再次认证；已有 TCP 会话保留已认证身份，UDP 不再接受旧密钥的新数据包。TCP 可以使用已有 SOCKS5 上游；UDP 只支持直接或阻断路由。
+
+资源和重放检查有明确边界：同时最多 64 个 TCP 握手、10 秒握手期限；TCP salt 缓存最多 65,536 项，保存 120 秒。传统 UDP salt 最多 65,536 项，保存 60 秒；2022 UDP 使用 1,024 包重排窗口，最多保留 4,096 个会话记录，空闲 120 秒后清除。缓存满时拒绝新项，不逐出未过期记录。UDP 最多 1,024 个活跃关联、每个关联 64 个目标；全局在途/排队数据分配预算 8 MiB，每个队列最多 8 包，关联空闲 60 秒关闭。UDP **加密后的报文**不能超过 65,507 字节，因此可用的明文长度更小。上述是软件边界，不代表实测承载量。缓存不跨重启保留，也不宣称无限时间的重放保护。
+
+协议帧采用固定版本的 MIT `shadowsocks-rust` 库，保留完整来源与许可。为避免热更新后密钥地址复用造成 UDP 缓存误命中，本项目把该缓存改为按密钥内容比较，并限制为 4,096 项；修改记录见 [UPSTREAM.json](vendor/shadowsocks/UPSTREAM.json)。
+
+## 限制怎么生效
 
 面板设置 `speed_limit=8` 时，同一用户所有连接的上传加下载共用约 **1,000,000 字节/秒** 的有效载荷预算，允许一秒突发额度，最小额度为 64 KiB。它不是每个连接各自获得 8 Mbps，也不表示网卡总流量。
 
@@ -93,7 +127,7 @@ VLESS UDP 每个连接使用固定目标；Trojan UDP 一个连接可访问多�
 
 ### 还没有迁完的部分
 
-REALITY 外层 PQ/HRR 扩展、Vision UDP、mux/XUDP、VMess、Shadowsocks、AnyTLS、TUIC、Hysteria2、其他传输方式、GeoIP/GeoSite、正则/规则集、其他代理出站、加密 DNS、单进程多节点/多面板、在线 IP 向面板上报和自动 ACME 证书管理仍未完成。**当前不能视作原版的完整替换。**
+REALITY 外层 PQ/HRR 扩展、Vision UDP、mux/XUDP、VMess、Shadowsocks 2022 ChaCha/旧流密码及插件、AnyTLS、TUIC、Hysteria2、其他传输方式、GeoIP/GeoSite、正则/规则集、其他代理出站、加密 DNS、单进程多节点/多面板、在线 IP 向面板上报和自动 ACME 证书管理仍未完成。**当前不能视作原版的完整替换。**
 
 未支持的协议和配置会明确拒绝。原生 Rust 模式会执行上述非零用户限制；可选的旧外部内核适配器仍拒绝非零限制，避免没有执行却声称支持。当前 JSON 运行配置与原版 Go `config.yml` 不直接互换。面板已绑定的旧节点不会被安装器自动迁移或停掉。
 
@@ -306,6 +340,6 @@ Windows 可以进行模块构建和测试；默认原生数据层需要 Unix 控
 
 ## 开源与来源
 
-本项目遵循 **[MPL-2.0](LICENSE)**，保留原版来源及许可证，没有额外添加用途或商业使用限制。Vision 和 REALITY 子模块采用其原始 **MIT** 许可，保留 [cfal/shoes](https://github.com/cfal/shoes) 的版权和来源；其余项目遵循 MPL-2.0。运行包包含该子模块、第三方依赖与 Rust/musl 工具链的许可说明。
+本项目遵循 **[MPL-2.0](LICENSE)**，保留原版来源及许可证，没有额外添加用途或商业使用限制。Vision 和 REALITY 子模块采用其原始 **MIT** 许可，保留 [cfal/shoes](https://github.com/cfal/shoes) 的版权和来源；Shadowsocks 加密与帧依赖保留 MIT 许可；其余自有模块遵循 MPL-2.0。运行包包含该子模块、第三方依赖与 Rust/musl 工具链的许可说明。
 
 感谢 [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3)、[xboard-node](https://github.com/cedar2025/xboard-node)、Xboard 及 Rust 生态的相关项目。详细来源见 [NOTICE.md](NOTICE.md)。

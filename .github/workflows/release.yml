@@ -4,13 +4,13 @@ on:
   push:
     tags: ['v*']
     branches: [main]
-    paths: ['crates/**', 'Cargo.*', 'rust-toolchain.toml', 'install.sh', 'scripts/**', 'LICENSE', 'NOTICE.md', '.github/workflows/release.yml']
+    paths: ['crates/**', 'vendor/**', 'Cargo.*', 'rust-toolchain.toml', 'install.sh', 'scripts/**', 'LICENSE', 'NOTICE.md', '.github/workflows/release.yml']
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release tag (for example v0.1.0-preview.9)'
+        description: 'Release tag (for example v0.1.0-preview.10)'
         required: true
-        default: v0.1.0-preview.9
+        default: v0.1.0-preview.10
 
 permissions:
   contents: read
@@ -54,7 +54,7 @@ jobs:
           echo "XRAY_TEST_BINARY=$RUNNER_TEMP/xray-vision-test/xray" >> "$GITHUB_ENV"
       - name: Package and verify installer lifecycle
         env:
-          RELEASE_VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v0.1.0-preview.9' }}
+          RELEASE_VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v0.1.0-preview.10' }}
         run: |
           python3 scripts/package_release.py --target ${{ matrix.target }} --version "$RELEASE_VERSION" --binary target/${{ matrix.target }}/release/xboard-node-rust
           sudo python3 scripts/test_installer.py --binary target/${{ matrix.target }}/release/xboard-node-rust --package dist/xboard-node-rust-linux-${{ matrix.arch }}.tar.gz --checksums dist/SHA256SUMS --output dist/installer-tests-${{ matrix.arch }}.json

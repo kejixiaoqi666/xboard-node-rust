@@ -14,6 +14,8 @@ pub struct Snapshot {
     trojan: HashMap<[u8; 56], Arc<str>>,
     policies: HashMap<Arc<str>, crate::limits::Policy>,
     vision: HashSet<Arc<str>>,
+    pub(crate) shadowsocks: Option<Arc<crate::shadowsocks::Credentials>>,
+    ss_pending: Vec<(Arc<str>, String)>,
 }
 
 impl Snapshot {
@@ -23,6 +25,8 @@ impl Snapshot {
             trojan: HashMap::new(),
             policies: HashMap::new(),
             vision: HashSet::new(),
+            shadowsocks: None,
+            ss_pending: Vec::new(),
         };
         let mut names = HashSet::with_capacity(users.len());
         for user in users {
@@ -34,7 +38,7 @@ impl Snapshot {
                     .flow
                     .as_deref()
                     .is_some_and(|flow| !matches!(flow, "" | "xtls-rprx-vision"))
-                || protocol == Protocol::Trojan
+                || matches!(protocol, Protocol::Trojan | Protocol::Shadowsocks)
                     && user.flow.as_ref().is_some_and(|flow| !flow.is_empty())
             {
                 return Err(Error::Auth);
@@ -55,6 +59,16 @@ impl Snapshot {
                         return Err(Error::Auth);
                     }
                 }
+                Protocol::Shadowsocks => {
+                    if user.uuid.is_some() {
+                        return Err(Error::Auth);
+                    }
+                    let password = user.password.ok_or(Error::Auth)?;
+                    if password.is_empty() || password.len() > 1024 {
+                        return Err(Error::Auth);
+                    }
+                    snapshot.ss_pending.push((name, password));
+                }
                 Protocol::Trojan => {
                     if user.uuid.is_some() {
                         return Err(Error::Auth);
@@ -74,6 +88,16 @@ impl Snapshot {
             }
         }
         Ok(snapshot)
+    }
+    pub(crate) fn configure_shadowsocks(
+        &mut self,
+        settings: &node_core::shadowsocks::Settings,
+    ) -> Result<(), Error> {
+        self.shadowsocks = Some(Arc::new(crate::shadowsocks::Credentials::new(
+            settings,
+            std::mem::take(&mut self.ss_pending),
+        )?));
+        Ok(())
     }
     pub fn has_vision(&self) -> bool {
         !self.vision.is_empty()

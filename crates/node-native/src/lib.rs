@@ -11,6 +11,7 @@ mod os_dns;
 pub mod protocol;
 #[cfg(any(unix, test))]
 mod reality;
+mod shadowsocks;
 
 pub fn reality_config(
     s: &node_core::reality::Settings,
@@ -213,6 +214,28 @@ async fn serve(
     let (quiesced_tx, quiesced_rx) = tokio::sync::watch::channel(0_u8);
     let mut checkpoint = tokio::time::interval(checkpoint_period);
     checkpoint.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let reality = initial_reality;
+    let tls = tls.map(TlsAcceptor::from);
+    let limits = Arc::new(limits::Registry::new(Arc::clone(&users)));
+    let udp_slots = Arc::new(tokio::sync::Semaphore::new(1024));
+    let ss_service = Arc::new(shadowsocks::Service::new());
+    let mut ss_udp: Option<shadowsocks::UdpHandle> = if protocol == config::Protocol::Shadowsocks {
+        Some(
+            shadowsocks::serve_udp(
+                listener.as_ref().unwrap().local_addr()?,
+                shadowsocks::UdpContext {
+                    users: users.clone(),
+                    traffic: traffic.clone(),
+                    limits: limits.clone(),
+                    network: network.clone(),
+                },
+                ss_service.clone(),
+            )
+            .await?,
+        )
+    } else {
+        None
+    };
     let mut controller = tokio::spawn(control::serve(
         control,
         initial,
@@ -224,10 +247,6 @@ async fn serve(
             done: quiesced_rx,
         },
     ));
-    let reality = initial_reality;
-    let tls = tls.map(TlsAcceptor::from);
-    let limits = Arc::new(limits::Registry::new(Arc::clone(&users)));
-    let udp_slots = Arc::new(tokio::sync::Semaphore::new(1024));
     const MAX_CONNECTIONS: usize = 16384;
     let mut connections = JoinSet::new();
     let mut accept_after = tokio::time::Instant::now();
@@ -245,11 +264,15 @@ async fn serve(
         tokio::select! {
             _=&mut shutdown => break Ok(()),
             _=&mut controller => { control_finished=true; break Err(Error::Task); },
+            result=async {ss_udp.as_mut().expect("enabled Shadowsocks UDP").finished().await},if ss_udp.is_some()=> {
+                break result.and(Err(Error::Task));
+            },
             changed=quiesce_rx.changed(), if listener.is_some() => {
                 if changed.is_err() { break Err(Error::Task); }
                 listener.take();
                 connections.abort_all();
                 while connections.join_next().await.is_some() {}
+                if let Some(udp)=ss_udp.take() && let Err(error)=udp.shutdown().await {break Err(error);}
                 let persisted=match traffic.blocking(|t|t.checkpoint(true)).await { Ok(result)=>result,Err(_)=>break Err(Error::Task) };
                 let _=quiesced_tx.send(if persisted.is_ok() {1} else {2});
                 if let Err(error)=persisted { break Err(Error::Io(error)); }
@@ -281,10 +304,11 @@ async fn serve(
                 let limits=Arc::clone(&limits);
                 let udp_slots=Arc::clone(&udp_slots);
                 let network=Arc::clone(&network);
+                let ss_service=ss_service.clone();
                 connections.spawn(async move {
                     let _=stream.set_nodelay(true);
                     let context=ConnectionContext { users: &users, traffic: &traffic, source, limits: &limits, udp_slots: &udp_slots, network: &network };
-                    if let Some(reality)=reality {let _=reality::connection(stream,&reality,context).await;} else if let Some(tls)=tls {
+                    if protocol==config::Protocol::Shadowsocks {let _=shadowsocks::connection(stream,&ss_service,context).await;} else if let Some(reality)=reality {let _=reality::connection(stream,&reality,context).await;} else if let Some(tls)=tls {
                         if let Ok(Ok(stream))=tokio::time::timeout(Duration::from_secs(10),tls.accept(vision::RecordIo::new(stream))).await {
                             let _=connection_tls(stream,protocol,context).await;
                         }
@@ -298,12 +322,17 @@ async fn serve(
     listener.take();
     connections.abort_all();
     while connections.join_next().await.is_some() {}
+    let udp_stop = match ss_udp.take() {
+        Some(udp) => udp.shutdown().await,
+        None => Ok(()),
+    };
     let final_save = traffic.blocking(|t| t.checkpoint(true)).await;
     if !control_finished {
         controller.abort();
         let _ = controller.await;
     }
     final_save.map_err(|_| Error::Task)??;
+    udp_stop?;
     result
 }
 

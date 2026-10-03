@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+exclude = ["vendor/shadowsocks"]
 members = ["crates/node-core", "crates/node-panel", "crates/node-kernel", "crates/node-native", "crates/node-vision", "crates/node-reality", "crates/node-runtime"]
 
 [profile.release]
@@ -12,3 +13,6 @@ panic = "unwind"
 inherits = "release"
 strip = "none"
 debug = "line-tables-only"
+
+[patch.crates-io]
+shadowsocks = { path = "vendor/shadowsocks" }

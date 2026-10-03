@@ -4,7 +4,7 @@
 
 A Rust node backend for Xboard. It runs on a Linux VPS, synchronizes node configuration and users with the panel, authenticates clients, forwards supported proxy traffic, and reports collected payload counters.
 
-This project continues the Rust migration of [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). **`v0.1.0-preview.9` adds record-budget automatic outer REALITY write-key rotation, retaining peer KeyUpdate and requested responses, retaining ordinary VLESS REALITY UDP, multi-record ClientHello authentication, REALITY TCP with optional Vision and Vision over file TLS 1.3**, including padding, unpadding and bidirectional inner-TLS-1.3 direct switching. It retains TCP/UDP, shared rate/IP limits, routing, custom DNS and SOCKS5 TCP outbounds. It includes a standalone Rust server and an installer. Full upstream parity is still in progress.
+This project continues the Rust migration of [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). **`v0.1.0-preview.10` adds native Rust Shadowsocks TCP/UDP for three traditional AEAD and two 2022 AES methods**, integrated with user updates, shared rate/IP limits, routing and durable counters. VLESS/Trojan, REALITY, Vision TCP and the installer remain available. Full upstream parity is still in progress.
 
 ## Install
 
@@ -48,9 +48,29 @@ The control and data plane use the same Rust executable in separate processes. D
 
 UDP associations close after 60 seconds without successful payload activity. Each association tracks at most 64 destination endpoints, with at most 1,024 UDP associations on the node. These are resource bounds, not benchmarked capacity claims.
 
-Not yet migrated: REALITY outer PQ/HRR extensions, Vision UDP, mux/XUDP, VMess, Shadowsocks, AnyTLS, TUIC, Hysteria2, other transports, GeoIP/GeoSite, regex/rule sets, other proxy outbounds, encrypted DNS, multiple nodes/panels in one process, online-IP reporting to the panel, and automatic ACME. Unsupported settings are explicitly rejected. Native Rust mode enforces supported user limits; the optional legacy external adapter still rejects nonzero limits and native routing/DNS options. The Rust runtime JSON is not interchangeable with the original Go YAML.
+Not yet migrated: REALITY outer PQ/HRR extensions, Vision UDP, mux/XUDP, VMess, Shadowsocks 2022 ChaCha/legacy stream ciphers/plugins, AnyTLS, TUIC, Hysteria2, other transports, GeoIP/GeoSite, regex/rule sets, other proxy outbounds, encrypted DNS, multiple nodes/panels in one process, online-IP reporting to the panel, and automatic ACME. Unsupported settings are explicitly rejected. Native Rust mode enforces supported user limits; the optional legacy external adapter still rejects nonzero limits and native routing/DNS options. The Rust runtime JSON is not interchangeable with the original Go YAML.
 
 For TLS, provide local certificate/key files and set the corresponding panel `cert_mode=file`, `cert_file`, and `key_file`. Existing certificate tooling handles issuance and renewal.
+
+## Configure Shadowsocks
+
+Shadowsocks is another supported client-to-node protocol. Its authentication, encryption and TCP/UDP relay run in the Rust server; no separate Go/Xray server is required. Your client must support the selected cipher.
+
+The **panel node response**, rather than local `runtime.json`, needs:
+
+```json
+{"protocol":"shadowsocks","server_port":8388,"cipher":"aes-128-gcm","tls":0}
+```
+
+Traditional methods are `aes-128-gcm`, `aes-256-gcm` and `chacha20-ietf-poly1305`. Use the panel user's raw `uuid` as the password; omit `server_key`. These trial-decryption methods are limited to 256 users.
+
+For `2022-blake3-aes-128-gcm` or `2022-blake3-aes-256-gcm`, supply `server_key` as standard Base64 for exactly 16 or 32 bytes. Preserve the original Go user-key conversion: copy the UUID's UTF-8 bytes into a zero-filled fixed-length buffer, truncate if longer, then Base64-encode it. Clients generally use `server_key:converted_user_key`. Matching UUID prefixes can produce identical keys; such configurations are rejected. The indexed 2022 modes accept at most 65,536 users. Subscription generation must match this conversion.
+
+TCP and UDP bind the same port; permit both in your firewall. No TLS/REALITY/Vision/mux/plugins are layered on Shadowsocks. Only user changes apply live; method/server-key/listener/routing/DNS changes require a data-process restart. Removed keys cannot authenticate new TCP connections or UDP packets. Established TCP sessions retain their authenticated identity. Both protocols share user rate/IP policy and count payload only, excluding cipher framing, tags and padding. SOCKS5 outbounds are TCP-only.
+
+Bounds: 64 simultaneous TCP handshakes with a 10-second deadline; 65,536 TCP salt entries retained for 120 seconds; 65,536 traditional UDP salts retained for 60 seconds; a 1,024-packet 2022 UDP reordering window with at most 4,096 session records retained for 120 idle seconds. Full replay caches reject new entries rather than evict unexpired ones. UDP has at most 1,024 active associations, 64 targets each, an 8 MiB global allocation budget for queued/in-flight packets and eight queue slots per association. Associations expire after 60 idle seconds. The **encrypted datagram** must fit 65,507 bytes, leaving a smaller plaintext maximum. These are resource limits, not measured capacity. Replay state is process-local and time-bounded.
+
+2022 ChaCha, legacy stream ciphers, SIP003 plugins and other transports remain unsupported. The pinned MIT `shadowsocks-rust` framing library retains provenance. Its UDP cipher cache is patched to compare key contents across hot reloads, with a 4,096-entry cap; see [UPSTREAM.json](vendor/shadowsocks/UPSTREAM.json).
 
 ## Configure Vision
 

@@ -428,6 +428,8 @@ def main():
                 # send an HTTP request. Include unsent bytes on both snapshots.
                 return [sum(report.get('1', [0, 0])[i] for report in reports) + pending[i] + prepared[i] for i in range(2)]
             reality_exercise(config, run, wait, cases, measurements, node_port, cert, key, USER, temp, args.binary.resolve(), traffic_snapshot)
+            from test_shadowsocks import exercise as shadowsocks_exercise
+            shadowsocks_exercise(config, users, run, wait, cases, measurements, node_port, USER, temp, traffic_snapshot, parent, child_ids)
             run('restart'); wait(lambda: fetch(tls=True))
             udp_roundtrip('vless')
             config['protocol'] = 'trojan'

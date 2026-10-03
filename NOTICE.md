@@ -12,4 +12,6 @@ Vision data-stream modules in `crates/node-vision` and the narrow REALITY server
 
 Default server code consists of the `node-core`, `node-panel`, `node-kernel`, `node-native` and `node-runtime` Rust crates. The historical Go transition kernel is not included or required by this repository. Its separate historical artifacts remain in the original project and retain their own licenses.
 
+The pinned MIT `shadowsocks` 1.24.0 source in `vendor/shadowsocks` retains its original LICENSE and provenance. Its UDP cipher cache is patched to compare key contents with an equality-consistent total ordering, and its capacity is reduced to 4,096. See `vendor/shadowsocks/UPSTREAM.json`. Cryptographic primitives remain the library's implementations.
+
 Each runtime release contains `third-party-notices.tar.gz`, collected from the exact normal Cargo dependency tree and Rust toolchain notices; static Linux builds also include the build system's musl/GCC notices. Dependency license expressions remain in Cargo metadata. This notice is an attribution document, not a new license or a declaration that all upstream features have been ported.

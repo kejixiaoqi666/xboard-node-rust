@@ -48,6 +48,10 @@ struct Inbound {
     #[serde(default)]
     tls: Option<Tls>,
     users: Vec<User>,
+    #[serde(default)]
+    method: Option<node_core::shadowsocks::Cipher>,
+    #[serde(default)]
+    password: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -72,6 +76,7 @@ struct Config {
 pub enum Protocol {
     Vless,
     Trojan,
+    Shadowsocks,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -84,6 +89,7 @@ pub struct Base {
     pub listen: IpAddr,
     pub port: u16,
     pub tls: Option<Tls>,
+    pub shadowsocks: Option<node_core::shadowsocks::Settings>,
     log: Log,
 }
 
@@ -126,6 +132,7 @@ pub fn decode(data: &[u8]) -> Result<Candidate, Error> {
     let protocol = match inbound.kind.as_str() {
         "vless" => Protocol::Vless,
         "trojan" => Protocol::Trojan,
+        "shadowsocks" => Protocol::Shadowsocks,
         _ => return Err(Error::Unsupported),
     };
     if protocol == Protocol::Trojan && inbound.tls.is_none() {
@@ -154,7 +161,27 @@ pub fn decode(data: &[u8]) -> Result<Candidate, Error> {
             return Err(Error::Config);
         }
     }
-    let auth = Arc::new(Snapshot::new(protocol, inbound.users)?);
+    let shadowsocks = if protocol == Protocol::Shadowsocks {
+        if inbound.tls.is_some() {
+            return Err(Error::Unsupported);
+        }
+        let settings = node_core::shadowsocks::Settings {
+            method: inbound.method.ok_or(Error::Config)?,
+            password: inbound.password,
+        };
+        settings.validate().map_err(|_| Error::Config)?;
+        Some(settings)
+    } else {
+        if inbound.method.is_some() || inbound.password.is_some() {
+            return Err(Error::Unsupported);
+        }
+        None
+    };
+    let mut auth = Snapshot::new(protocol, inbound.users)?;
+    if let Some(settings) = &shadowsocks {
+        auth.configure_shadowsocks(settings)?;
+    }
+    let auth = Arc::new(auth);
     if auth.has_vision() && inbound.tls.is_none() {
         return Err(Error::Unsupported);
     }
@@ -168,6 +195,7 @@ pub fn decode(data: &[u8]) -> Result<Candidate, Error> {
             listen: inbound.listen,
             port: inbound.listen_port,
             tls: inbound.tls,
+            shadowsocks,
             log: config.log,
         },
         auth,

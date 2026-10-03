@@ -6,7 +6,7 @@
 
 - Linux AMD64 或 ARM64，已运行 systemd，使用 root。推荐 Debian 12/13、Ubuntu 22.04/24.04。
 - 已有 Xboard 面板和一个明确的节点 ID；v2 machine 模式还需要服务器 ID 与对应 token。
-- 面板给该节点配置当前支持的 VLESS/Trojan；TCP 和协议内 UDP 已支持，原生 Rust 模式执行用户限速和来源 IP 限制。文件 TLS1.3 下的 VLESS Vision TCP 已支持，面板与客户端字段见[首页 Vision 配置](../README.md#vision-怎么用)。REALITY TCP 可带或不带 Vision，字段见[首页 REALITY 配置](../README.md#reality-怎么用)；REALITY UDP、Vision UDP、mux 和其他未迁移配置会被拒绝。
+- 面板给该节点配置当前支持的 VLESS/Trojan/Shadowsocks；TCP 和协议内 UDP 已支持，原生 Rust 模式执行用户限速和来源 IP 限制。文件 TLS1.3 下的 VLESS Vision TCP 已支持，面板与客户端字段见[首页 Vision 配置](../README.md#vision-怎么用)。REALITY TCP 可带或不带 Vision，字段见[首页 REALITY 配置](../README.md#reality-怎么用)；普通 REALITY UDP 已支持；Vision UDP、mux 和其他未迁移配置会被拒绝。Shadowsocks 字段与密钥转换见[首页配置](../README.md#shadowsocks-怎么用)。
 - 文件 TLS 需要已有证书和私钥文件，并在面板填入 file 证书配置。推荐放在 `/etc/ssl/` 或 `/etc/letsencrypt/`，本服务启用了 `ProtectHome=true`。
 - 需要按面板设置开放节点端口；脚本不会修改防火墙或其他网络参数。
 

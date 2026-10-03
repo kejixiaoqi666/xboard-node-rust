@@ -1,0 +1,14 @@
+{
+  "crate": "shadowsocks",
+  "version": "1.24.0",
+  "license": "MIT",
+  "repository": "https://github.com/shadowsocks/shadowsocks-rust",
+  "crate_checksum": "482831bf9d55acf3c98e211b6c852c3dfdf1d1b0d23fdf1d887c5a4b2acad4e4",
+  "patches": [
+    {
+      "path": "src/relay/udprelay/aead_2022.rs",
+      "original_sha256": "981956d46206211c56e927030458a9162183249609abe0a71c3090099229372f",
+      "reason": "Cache credentials by bytes, use a total ordering consistent with equality, and bound UDP crypto cache to 4096 entries."
+    }
+  ]
+}

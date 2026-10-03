@@ -50,7 +50,9 @@ impl SingBoxConfigBuilder {
     ) -> Result<SingBoxConfig<'a>, KernelError> {
         node.validate()
             .map_err(|e| KernelError::Invalid(e.to_string()))?;
-        if !matches!(node.protocol.as_str(), "vless" | "trojan") {
+        if !matches!(node.protocol.as_str(), "vless" | "trojan")
+            && !(self.native && node.protocol == "shadowsocks")
+        {
             return Err(KernelError::Invalid(format!(
                 "sing-box tracer supports only vless/trojan, got {}",
                 node.protocol
@@ -58,6 +60,35 @@ impl SingBoxConfigBuilder {
         }
         // Explicitly reject features this experimental adapter cannot enforce.
         // Comparing the supported subset also guards future NodeSpec additions.
+        let ss = if node.protocol == "shadowsocks" {
+            let method: node_core::shadowsocks::Cipher = serde_json::from_value(json!(node.cipher))
+                .map_err(|_| KernelError::Invalid("unsupported Shadowsocks cipher".into()))?;
+            let settings = node_core::shadowsocks::Settings {
+                method,
+                password: node.server_key.clone(),
+            };
+            settings
+                .validate()
+                .map_err(|_| KernelError::Invalid("invalid Shadowsocks server key".into()))?;
+            if users.len() > method.max_users() {
+                return Err(KernelError::Invalid(
+                    "Shadowsocks user limit exceeded".into(),
+                ));
+            }
+            let mut keys = std::collections::HashSet::new();
+            for user in users {
+                if user.uuid.len() > 1024
+                    || !keys.insert(node_core::shadowsocks::user_password(method, &user.uuid))
+                {
+                    return Err(KernelError::Invalid(
+                        "duplicate or oversized Shadowsocks credential".into(),
+                    ));
+                }
+            }
+            Some(settings)
+        } else {
+            None
+        };
         let mut supported = NodeSpec::new(&node.protocol, node.server_port);
         supported.listen_ip = node.listen_ip.clone();
         supported.network = node.network.clone();
@@ -66,6 +97,10 @@ impl SingBoxConfigBuilder {
         supported.tls = node.tls;
         supported.cert_config = node.cert_config.clone();
         supported.server_name = node.server_name.clone();
+        if self.native && ss.is_some() {
+            supported.cipher = node.cipher.clone();
+            supported.server_key = node.server_key.clone();
+        }
         if self.native {
             supported.flow = node.flow.clone();
             if node.tls == 2 {
@@ -115,7 +150,7 @@ impl SingBoxConfigBuilder {
             ));
         }
         let tls = match node.tls {
-            0 if node.protocol == "vless"
+            0 if matches!(node.protocol.as_str(), "vless" | "shadowsocks")
                 && node.cert_config.is_none()
                 && node.server_name.is_none() =>
             {
@@ -239,16 +274,21 @@ impl SingBoxConfigBuilder {
                 listen_port: node.server_port,
                 tag: if node.protocol == "vless" {
                     "vless-in"
+                } else if node.protocol == "shadowsocks" {
+                    "shadowsocks-in"
                 } else {
                     "trojan-in"
                 },
                 tls,
+                method: ss.as_ref().map(|s| s.method.name()),
+                password: ss.as_ref().and(node.server_key.as_deref()),
                 kind: &node.protocol,
                 users: Users {
                     users,
                     vless: node.protocol == "vless",
                     flow,
                     native: self.native,
+                    shadowsocks: ss.as_ref().map(|s| s.method),
                 },
             }],
             log: Log {
@@ -280,6 +320,10 @@ struct Inbound<'a> {
     tag: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     tls: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    method: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    password: Option<&'a str>,
     #[serde(rename = "type")]
     kind: &'a str,
     users: Users<'a>,
@@ -296,6 +340,7 @@ struct Users<'a> {
     flow: Option<&'a str>,
     vless: bool,
     native: bool,
+    shadowsocks: Option<node_core::shadowsocks::Cipher>,
 }
 
 impl Serialize for Users<'_> {
@@ -307,6 +352,7 @@ impl Serialize for Users<'_> {
                 flow: self.flow,
                 vless: self.vless,
                 native: self.native,
+                shadowsocks: self.shadowsocks,
             })?;
         }
         sequence.end()
@@ -318,6 +364,7 @@ struct User<'a> {
     flow: Option<&'a str>,
     vless: bool,
     native: bool,
+    shadowsocks: Option<node_core::shadowsocks::Cipher>,
 }
 
 impl Serialize for User<'_> {
@@ -335,7 +382,10 @@ impl Serialize for User<'_> {
         }
         map.serialize_entry(
             if self.vless { "uuid" } else { "password" },
-            &self.user.uuid,
+            &match self.shadowsocks {
+                Some(method) => node_core::shadowsocks::user_password(method, &self.user.uuid),
+                None => std::borrow::Cow::Borrowed(self.user.uuid.as_str()),
+            },
         )?;
         map.end()
     }

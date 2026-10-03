@@ -68,6 +68,7 @@ def dependency_notices(target):
     files['vendored/node-vision/UPSTREAM.json'] = (ROOT / 'crates/node-vision/UPSTREAM.json').read_bytes()
     files['vendored/node-reality/LICENSE'] = (ROOT / 'crates/node-reality/LICENSE').read_bytes()
     files['vendored/node-reality/UPSTREAM.json'] = (ROOT / 'crates/node-reality/UPSTREAM.json').read_bytes()
+    files['vendored/shadowsocks/UPSTREAM.json'] = (ROOT / 'vendor/shadowsocks/UPSTREAM.json').read_bytes()
     files['NOTICE_MANIFEST.json'] = (json.dumps({'target': target, 'dependencies': entries,
         'files': [{'path': name, 'sha256': sha(body)} for name, body in sorted(files.items())]}, indent=2) + '\n').encode()
     output = io.BytesIO()
@@ -106,7 +107,7 @@ def main():
     except (subprocess.CalledProcessError, FileNotFoundError):
         commit = 'local-uncommitted-test-candidate'
     source_files = {}
-    for pattern in ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**/*.rs', 'crates/**/Cargo.toml']:
+    for pattern in ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml', 'crates/**/*.rs', 'crates/**/Cargo.toml', 'vendor/**/*.rs', 'vendor/**/Cargo.toml']:
         for path in sorted(ROOT.glob(pattern)):
             if path.is_file():
                 source_files[path.relative_to(ROOT).as_posix()] = sha(path.read_bytes())

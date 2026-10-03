@@ -120,6 +120,7 @@ pub async fn handshake<R: AsyncRead + Unpin>(
                 command,
             })
         }
+        Protocol::Shadowsocks => Err(Error::Unsupported),
         Protocol::Trojan => {
             let mut key = [0; 56];
             reader.read_exact(&mut key).await?;
