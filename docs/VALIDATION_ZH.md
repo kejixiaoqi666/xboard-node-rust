@@ -52,3 +52,14 @@ ACME HTTP-01 使用实际本地 Pebble CA：见 [PEBBLE_FIXTURE.md](../crates/no
 [发行工作流](../.github/workflows/release.yml)分别在 AMD64 和 ARM64 运行源码检查、官方客户端、静态 ELF 构建、安装器与 systemd 生命周期。公开报告保留架构、源码/二进制/归档 SHA；不同版本的结果不能直接转用。
 
 真实面板验收使用独立隐藏节点和专用测试用户，检查实际转发字节、节点原始计数、倍率后的用户计费、在线记录及正常重启。凭据、真实用户资料和生产配置不进入公开报告。面板缺少批次去重时的未知上报仍需要人工对账；周期存档后的强杀尾部、WAN 最大承载量和长期稳定性保持明确边界。
+
+### v0.1.0-preview.12 的精确结果
+
+本版所有公开发行文件都绑定提交 `8b6e35046f894d305fb8f26aea62230ed71a6c3c`。GitHub Actions [37150453220](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37150453220) 在 AMD64 和 ARM64 均通过源码回归、clippy、固定 SHA 的官方 sing-box/Xray 互通、35 节点生产入口、静态 musl 构建、安装器和 systemd 生命周期。对应包的 SHA256 为：
+
+| 架构 | ELF SHA256 | 发行包 SHA256 |
+| --- | --- | --- |
+| Linux AMD64 | `faf6d5f3360c2c89a6b37d30539d9f9a3469dfe3dbb694b18266a78082b352ad` | `e9ec0edd87e77cdbc6d5cfffb22c85d998ffb87cc6afb06ad48ea3faae34d7fd` |
+| Linux ARM64 | `9d1eed2bca27228192f7c1d0b9527c1102fd2a0d7586597d91116127aa885255` | `9af569d5a18ba0a67de7dfb9fc9967bdfca90baff9846cf57de8a2671dfb8c49` |
+
+独立的奥地利 Flash 隐藏实验节点也已用上述 AMD64 ELF 和固定 SHA 的 sing-box 完成真实业务验收：在线/IP/资源观测、TCP/UDP 实际转发、节点原始计数、倍率计费、正常停止清理和重启不重放均为 PASS。测试用倍率 2 的专用用户验证原始每方向 69,000 字节计为 138,000；重启后新增每方向 4,157 字节的批次也正确计费，结束时没有待报或不确定批次。该结果只覆盖自有隔离面板和回环业务，不能推导公网容量、长期运行或生产 DNS/公共 CA 结论。

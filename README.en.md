@@ -84,6 +84,8 @@ Vision requires `xtls-rprx-vision` and outer TLS1.3 or REALITY. Generate REALITY
 
 Ordinary tests, pinned official-client interoperability, Linux binary/installer lifecycle and isolated real-panel billing are separate gates. An active service or HTTP200 is not business acceptance. See [validation records](docs/VALIDATION_ZH.md) and the matching release reports.
 
+For the `v0.1.0-preview.12` candidate, [Actions run 37150453220](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37150453220) passed these gates on both AMD64 and ARM64 for commit `8b6e35046f894d305fb8f26aea62230ed71a6c3c`. The hidden Flash lab also passed real embedded-runtime TCP/UDP forwarding, online/IP/resource observation, rate-2 billing, normal stop, and restart-without-replay checks. The validation is isolated and loopback-based; it is not a WAN capacity or long-term stability claim.
+
 Official sing-box v1.14.2 and Xray v26.3.27 clients are fixed by archive and independently verified executable hashes; they are test dependencies and are not shipped with the server. ACME issuance/renewal/recovery is tested with a real local Pebble CA. Cloudflare record ownership/cleanup uses a local mock; production public-CA/DNS writes are not claimed as verified.
 
 Full upstream field/protocol parity, kernel splice, production WAN capacity and long-term stability are not claimed. Unsupported options include remote rule sets/SRS, gRPC multiMode, legacy VMess AlterID, Brutal and client-pool settings on an inbound. Multiplex `protocol`/`padding` describe client negotiation; supported server formats are accepted, while `enabled` and `max_streams` enforce admission policy. Software resource ceilings are rejection/recovery limits, not throughput measurements.

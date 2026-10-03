@@ -24,7 +24,7 @@ Linux AMD64/ARM64 静态 musl 包、一键管理脚本、SHA256SUMS、第三方�
 
 ## 验证范围
 
-发行流程检查准确源码的普通回归与严格 lint、固定版本官方 sing-box/Xray、35 节点实际生产入口的 TCP/UDP 与计数，以及真实 Linux 安装/启停/升级/回退。真实 Flash 计费使用隐藏节点与专用用户，分别核对原始载荷和面板倍率后的用户流量。具体执行结论以本版匹配的报告为准，见 [验证入口](docs/VALIDATION_ZH.md)。
+发行流程检查准确源码的普通回归与严格 lint、固定版本官方 sing-box/Xray、35 节点实际生产入口的 TCP/UDP 与计数，以及真实 Linux 安装/启停/升级/回退；这些门在 [Actions 37150453220](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37150453220) 全部通过。真实 Flash 计费也已使用隐藏节点与专用用户通过，分别核对原始载荷和面板倍率后的用户流量、在线记录、正常停止和重启不重放。具体范围与 SHA 见 [验证入口](docs/VALIDATION_ZH.md)。
 
 ## 明确边界
 
@@ -32,4 +32,4 @@ Linux AMD64/ARM64 静态 musl 包、一键管理脚本、SHA256SUMS、第三方�
 
 面板没有通用批次去重时，HTTP 结果未知的流量批次需人工对账；周期存档后的强杀/断电尾部仍可能丢失。重启要重新拉取面板配置。旧 VMess AlterID、二进制 SRS、远程规则集下载、gRPC multiMode 和 Brutal 等未支持设置明确拒绝。
 
-English: This preview adds VMess, AnyTLS, Hysteria2, TUIC, broader Shadowsocks support, transports/multiplexing, routing and encrypted DNS, proxy chains, a single-process fleet, machine discovery, observations, YAML import and certificate integration. The default server and controller are Rust. Exact-source official-client, actual Linux fleet, installer and service reports define the validated scope. Real-panel billing uses a dedicated hidden Flash node. Production DNS/public CA, full upstream parity, WAN capacity and long-term stability are not claimed; unknown acknowledgements and unsaved crash-tail boundaries remain explicit.
+English: This preview adds VMess, AnyTLS, Hysteria2, TUIC, broader Shadowsocks support, transports/multiplexing, routing and encrypted DNS, proxy chains, a single-process fleet, machine discovery, observations, YAML import and certificate integration. The default server and controller are Rust. The exact-source official-client, actual Linux fleet, installer, service and hidden Flash billing gates passed for the published candidate; see the linked validation record for the commit and SHA scope. Production DNS/public CA, full upstream parity, WAN capacity and long-term stability are not claimed; unknown acknowledgements and unsaved crash-tail boundaries remain explicit.
