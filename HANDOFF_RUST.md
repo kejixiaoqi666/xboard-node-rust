@@ -31,7 +31,7 @@ cargo clippy --workspace --all-targets --all-features --locked -j 2 -- -D warnin
 
 发布前核对两架构包内 BUILDINFO 的 commit、源文件与实际 ELF SHA，再核对报告和公开下载。代码测试、模拟面板、真实 Flash 业务和公开文件校验分别记录。不要把 --check、systemd active 或 HTTP 200 当作计费验收。
 
-`v0.1.0-preview.12` 已完成精确提交 `8b6e35046f894d305fb8f26aea62230ed71a6c3c` 的双架构发行门和隐藏 Flash 真实计费门。公开 CI 记录在 [Actions 37150453220](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37150453220)，包内 `BUILDINFO.json`、`SHA256SUMS` 和三类安装/协议报告必须与同一提交配套使用。Flash 结果只证明隔离面板、实际 Rust embedded runtime 和回环 TCP/UDP 业务，不替代 WAN 容量或长期稳定性验收。
+`v0.1.0-preview.12` 最终 tag 已绑定提交 `ef0355843693c3e4738d028c8af7ab5c0f0228ce`，双架构发行门和安装器/systemd 报告见 [Actions 37154037856](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37154037856)。包内 `BUILDINFO.json`、`SHA256SUMS` 和三类安装/协议报告必须与同一提交配套使用。隐藏 Flash 真实计费结果来自前一份候选提交 `8b6e35046f894d305fb8f26aea62230ed71a6c3c`；最终 tag 的停止路径修复由精确 tag CI 重新覆盖。Flash 结果只证明隔离面板、实际 Rust embedded runtime 和回环 TCP/UDP 业务，不替代 WAN 容量或长期稳定性验收。
 
 ## 保留的边界
 
