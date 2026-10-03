@@ -20,6 +20,7 @@ import socketserver
 import ssl
 import struct
 import subprocess
+import shutil
 import tempfile
 import threading
 import time
@@ -82,6 +83,25 @@ def pinned(binary, client):
     version = subprocess.check_output([str(binary), 'version'], text=True, timeout=10)
     assert ('1.14.2' if client == 'sing-box' else '26.3.27') in version
     return actual
+
+
+def preserve_failure(directory, output, error):
+    """Keep a bounded, secret-free failure bundle before the temp directory is removed."""
+    failure = Path(str(output) + '.failure')
+    shutil.rmtree(failure, ignore_errors=True)
+    failure.mkdir(mode=0o700, parents=True)
+    candidates = [directory / 'runtime.log', directory / 'fleet.json']
+    candidates.extend(directory.glob('*.client.log'))
+    candidates.extend(directory.glob('*.client.json'))
+    candidates.extend(directory.glob('node-*/*.json'))
+    for source in candidates:
+        if source.is_file() and source.stat().st_size <= 2 * 1024 * 1024:
+            target = failure / source.relative_to(directory)
+            target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+    (failure / 'error.txt').write_text(
+        f'{type(error).__name__}: {error}\n', encoding='utf-8')
+    return failure
 
 
 class TcpEcho(socketserver.ThreadingTCPServer):
@@ -175,7 +195,11 @@ def matrix(cert, key, reality):
             outbound['password'] = USER
         if protocol == 'vmess':
             node['cipher'] = 'aes-128-gcm'
-            outbound.update(security='aes-128-gcm', alter_id=0)
+            # The fleet gate sends one SOCKS UDP association to a loopback
+            # target selected at runtime. XUDP carries that target per packet;
+            # legacy VMess command=2 binds a connection to its header target
+            # and is covered separately by the official codec matrix.
+            outbound.update(security='aes-128-gcm', alter_id=0, packet_encoding='xudp')
         if protocol == 'shadowsocks':
             node['cipher'] = 'aes-128-gcm'
             outbound['method'] = 'aes-128-gcm'
@@ -372,6 +396,9 @@ def main():
                     assert totals == [69000, 69000], (result['case'], 'payload billing', totals)
                     assert not list(state.glob('*.sock')), 'control listener survived graceful stop'
                     result['accounted_each_direction'] = totals
+            except BaseException as error:
+                preserve_failure(directory, args.output, error)
+                raise
             finally:
                 if runtime.poll() is None:
                     runtime.terminate()
