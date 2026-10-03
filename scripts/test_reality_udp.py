@@ -12,7 +12,7 @@ import threading
 from test_vision import free_port, receive
 
 
-def exercise(config, run, wait, cases, measurements, node_port, user, temp, reality):
+def exercise(config, run, wait, cases, measurements, node_port, user, temp, reality, traffic_snapshot):
     logs, observed = {}, []
     lock = threading.Lock()
 
@@ -79,7 +79,8 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, real
         assert struct.unpack('!H', reply[end:end+2])[0] == port and reply[end+2:] == body
 
     try:
-        config.pop('flow', None); run('restart')
+        config.pop('flow', None)
+        before = traffic_snapshot(); run('start')
         for index, name in enumerate(['IPv4', 'domain', 'IPv6']):
             with client(name) as (datagram, relay):
                 for size in [1, 37, 8000]: roundtrip(datagram, relay, index, size)
@@ -101,13 +102,25 @@ def exercise(config, run, wait, cases, measurements, node_port, user, temp, real
         with lock: assert len(observed) == baseline
         cases.append('installed-REALITY-Vision-required-user-denies-ordinary-UDP')
         config.pop('flow', None); run('restart')
+        with client('active-stop') as (datagram, relay):
+            roundtrip(datagram, relay, 0, 37)
+            run('stop')
+        cases.append('installed-REALITY-UDP-active-association-cancelled-by-service-stop')
+        run('start')
         with client('restart') as (datagram, relay): roundtrip(datagram, relay, 0, 37)
         cases.append('installed-REALITY-UDP-new-association-after-service-restart')
+        after = traffic_snapshot()
+        expected = 3 * (1 + 37 + 8000) + 2 * 37
+        assert [after[i] - before[i] for i in range(2)] == [expected, expected], (before, after, expected)
+        with lock: assert len(observed) == 11 and sum(map(len, observed)) == expected
+        cases.append('installed-REALITY-UDP-exact-payload-counters-and-graceful-drain-exclude-framing-and-denied-packets')
         measurements['reality_udp'] = {'client_only': True, 'loopback_only': True,
             'flow': '', 'mux': False, 'cone_disabled': True, 'payload_sizes': [1, 37, 8000],
             'zero_datagram_unverified': 'Pinned Xray SOCKS drops empty datagrams',
             'maximum_datagram_unverified': 'Pinned Xray uses 8192-byte buffers',
             'wrong_uuid_origin_packets': 0, 'vision_required_origin_packets': 0,
+            'expected_payload_bytes_per_direction': expected,
+            'reported_payload_bytes_per_direction': [after[i] - before[i] for i in range(2)],
             'client_logs_sha256': {label: hashlib.sha256(body.encode()).hexdigest() for label, body in logs.items()}}
     except BaseException:
         for label, body in logs.items(): print('Xray UDP ' + label + ':\n' + body[-16000:])

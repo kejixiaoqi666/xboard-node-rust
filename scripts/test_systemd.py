@@ -415,7 +415,12 @@ def main():
             from test_vision import exercise as vision_exercise
             vision_exercise(config, run, wait, cases, measurements, node_port, cert, key, USER, temp)
             from test_reality import exercise as reality_exercise
-            reality_exercise(config, run, wait, cases, measurements, node_port, cert, key, USER, temp, args.binary.resolve())
+            def traffic_snapshot():
+                run('stop')
+                book = json.loads((STATE_DIR / 'native-traffic.json').read_text())
+                assert not book['counters'] and book['frozen'] is None, 'Synthetic accepted reports must drain native counters'
+                return [sum(report.get('1', [0, 0])[i] for report in reports) for i in range(2)]
+            reality_exercise(config, run, wait, cases, measurements, node_port, cert, key, USER, temp, args.binary.resolve(), traffic_snapshot)
             run('restart'); wait(lambda: fetch(tls=True))
             udp_roundtrip('vless')
             config['protocol'] = 'trojan'
