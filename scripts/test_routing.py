@@ -83,6 +83,14 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
                 assert username == b'fixture-user' and password == b'fixture-password'
                 self.request.sendall(b'\1\0')
                 header = receive(self.request, 4)
+                if header == b'\5\3\0\1':
+                    # The native SOCKS route is intentionally exercised for
+                    # UDP too.  This fixture has no UDP relay, so reject the
+                    # association after consuming its IPv4 target and prove
+                    # that the node does not fall back to DIRECT.
+                    receive(self.request, 6)
+                    self.request.sendall(b'\5\1\0')
+                    return
                 assert header == b'\5\1\0\1', 'Routing must pass the pinned IPv4, not re-resolve at SOCKS'
                 ip = socket.inet_ntoa(receive(self.request, 4))
                 port = struct.unpack('!H', receive(self.request, 2))[0]
@@ -228,9 +236,11 @@ def exercise(config, runtime_path, run, wait, fetch, connect, parent, child_ids,
         cases.append('installed-panel-route-update-replaces-child-keeps-controller-and-routes-TCP-via-authenticated-SOCKS5')
         cases.append('installed-domain-suffix-and-resolved-CIDR-blocks-and-proxied-UDP-refuses-direct-fallback')
 
-        # Invalid new panel routes must preserve the current service and rule behavior.
+        # An un-compilable new panel route must preserve the current service
+        # and rule behavior.  `.*` is a valid regex and is not a rejection
+        # fixture.
         old_children = child_ids()
-        config['custom_routes'].append({'domain_regex': ['.*'], 'outbound': 'block'})
+        config['custom_routes'].append({'domain_regex': ['('], 'outbound': 'block'})
         time.sleep(2.2)
         assert child_ids() == old_children and parent() == original_pid
         roundtrip('proxy.test'); assert denied('sub.blocked.test')

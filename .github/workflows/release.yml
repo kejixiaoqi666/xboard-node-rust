@@ -40,6 +40,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_ref || github.sha }}
+      - name: Verify exact source and release identity
+        env:
+          SOURCE_REF: ${{ inputs.source_ref || github.sha }}
+          RELEASE_VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'v0.1.0-preview.12' }}
+          PUBLISH_DRAFT: ${{ inputs.publish_draft || false }}
+        run: |
+          set -euo pipefail
+          source_commit=$(git rev-parse HEAD)
+          requested_commit=$(git rev-parse "${SOURCE_REF}^{commit}")
+          test "$source_commit" = "$requested_commit"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            test "$GITHUB_REF_NAME" = "$RELEASE_VERSION"
+            tag_commit=$(git ls-remote origin "refs/tags/${RELEASE_VERSION}^{}" | awk '{print $1}')
+            test "$tag_commit" = "$source_commit"
+          elif [[ "$PUBLISH_DRAFT" == "true" ]]; then
+            tag_commit=$(git ls-remote origin "refs/tags/${RELEASE_VERSION}^{}" | awk '{print $1}')
+            test "$tag_commit" = "$source_commit"
+          fi
       - name: Install build tools and pinned Rust
         run: |
           sudo apt-get update
@@ -101,6 +119,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_ref || github.sha }}
+      - name: Verify draft source and tag identity
+        env:
+          SOURCE_REF: ${{ inputs.source_ref || github.sha }}
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          set -euo pipefail
+          source_commit=$(git rev-parse HEAD)
+          requested_commit=$(git rev-parse "${SOURCE_REF}^{commit}")
+          test "$source_commit" = "$requested_commit"
+          tag_commit=$(git ls-remote origin "refs/tags/${RELEASE_VERSION}^{}" | awk '{print $1}')
+          test "$tag_commit" = "$source_commit"
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
