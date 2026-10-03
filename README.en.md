@@ -4,7 +4,7 @@
 
 A Rust node backend for Xboard. It runs on a Linux VPS, synchronizes node configuration and users with the panel, authenticates clients, forwards supported proxy traffic, and reports collected payload counters.
 
-This project continues the Rust migration of [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). **`v0.1.0-preview.5` adds native VLESS Vision TCP over file TLS 1.3**, including padding, unpadding and bidirectional inner-TLS-1.3 direct switching. It retains TCP/UDP, shared rate/IP limits, routing, custom DNS and SOCKS5 TCP outbounds. It includes a standalone Rust server and an installer. Full upstream parity is still in progress.
+This project continues the Rust migration of [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). **`v0.1.0-preview.6` adds native VLESS REALITY TCP with optional Vision, retaining Vision over file TLS 1.3**, including padding, unpadding and bidirectional inner-TLS-1.3 direct switching. It retains TCP/UDP, shared rate/IP limits, routing, custom DNS and SOCKS5 TCP outbounds. It includes a standalone Rust server and an installer. Full upstream parity is still in progress.
 
 ## Install
 
@@ -25,9 +25,10 @@ After installation, `xboard-rust` opens the management menu. Use an actual clien
 | Capability | Scope |
 | --- | --- |
 | VLESS | TCP, UUID authentication; optional file TLS |
-| Vision TCP | `xtls-rprx-vision` over file TLS 1.3; plain TCP and inner TLS 1.2/1.3; TLS 1.3 can switch both directions to direct transport; no REALITY, Vision UDP or mux/XUDP |
+| Vision TCP | `xtls-rprx-vision` over file TLS 1.3 or REALITY; plain TCP and inner TLS 1.2/1.3; TLS 1.3 can switch both directions to direct transport; no Vision UDP or mux/XUDP |
 | Routing/outbounds | Ordered domain/suffix/CIDR/port/network/source matching; direct, block and authenticated SOCKS5 TCP |
 | DNS | OS or explicit UDP/TCP DNS, hosts, address-family strategy, timeouts and shared TTL cache |
+| REALITY TCP | VLESS with optional Vision; one SNI, X25519, short IDs, time/version checks and fixed mirror; no REALITY UDP |
 | Trojan | TCP authentication and file TLS |
 | UDP | VLESS fixed destinations and Trojan multiple destinations; IPv4, IPv6, system domain resolution and file TLS |
 | User rate limits | Decimal Mbps, shared across every connection and both payload directions; 0 means unlimited |
@@ -47,7 +48,7 @@ The control and data plane use the same Rust executable in separate processes. D
 
 UDP associations close after 60 seconds without successful payload activity. Each association tracks at most 64 destination endpoints, with at most 1,024 UDP associations on the node. These are resource bounds, not benchmarked capacity claims.
 
-Not yet migrated: REALITY, Vision UDP, mux/XUDP, VMess, Shadowsocks, AnyTLS, TUIC, Hysteria2, other transports, GeoIP/GeoSite, regex/rule sets, other proxy outbounds, encrypted DNS, multiple nodes/panels in one process, online-IP reporting to the panel, and automatic ACME. Unsupported settings are explicitly rejected. Native Rust mode enforces supported user limits; the optional legacy external adapter still rejects nonzero limits and native routing/DNS options. The Rust runtime JSON is not interchangeable with the original Go YAML.
+Not yet migrated: REALITY UDP, outer KeyUpdate/PQ/HRR extensions, Vision UDP, mux/XUDP, VMess, Shadowsocks, AnyTLS, TUIC, Hysteria2, other transports, GeoIP/GeoSite, regex/rule sets, other proxy outbounds, encrypted DNS, multiple nodes/panels in one process, online-IP reporting to the panel, and automatic ACME. Unsupported settings are explicitly rejected. Native Rust mode enforces supported user limits; the optional legacy external adapter still rejects nonzero limits and native routing/DNS options. The Rust runtime JSON is not interchangeable with the original Go YAML.
 
 For TLS, provide local certificate/key files and set the corresponding panel `cert_mode=file`, `cert_file`, and `key_file`. Existing certificate tooling handles issuance and renewal.
 
@@ -74,6 +75,41 @@ Use actual certificate paths/domain and matching client VLESS/TCP/TLS/UUID/flow 
 Routing, shared limits and durable counters remain around the payload path. For HTTPS targets, payload includes inner TLS records but excludes VLESS/Vision padding and outer TLS overhead. This is not the plaintext file size. Direct mode still uses bounded Tokio copying; kernel splice, zero-copy and maximum-throughput improvements are not claimed.
 
 Remove Vision flow from the panel and client before downgrading to preview.3 or earlier. Program rollback retains current traffic state and disconnects sessions.
+
+## Configure REALITY
+
+REALITY is a VLESS connection option, with optional Vision. The server authenticates X25519 keys, short IDs and one permitted SNI. It does not need a node certificate file. Ordinary TLS or failed REALITY authentication forwards only to the administrator's fixed mirror endpoint; it never grants proxy access. Reachability, concealment and performance are not guaranteed.
+
+Generate keys on the installed node:
+
+```bash
+/usr/local/lib/xboard-node-rust/current/bin/xboard-node-rust generate-reality-keypair
+```
+
+Keep `private_key` in server-side panel settings and give clients `public_key`. The **panel node response**, not local `runtime.json`, needs:
+
+```json
+{
+  "protocol": "vless", "network": "tcp", "tls": 2,
+  "flow": "xtls-rprx-vision", "server_name": "www.example.com",
+  "tls_settings": {
+    "private_key": "REPLACE_WITH_PRIVATE_KEY",
+    "public_key": "REPLACE_WITH_MATCHING_PUBLIC_KEY_OR_OMIT_FIELD",
+    "short_id": "1234567890abcdef", "server_name": "www.example.com",
+    "dest": "www.example.com:443", "max_time_diff": 300000
+  }
+}
+```
+
+Replace the placeholder hostname with an endpoint reachable from your VPS that supports TLS 1.3 and X25519. `server_name` permits one client SNI; `dest` is the fixed domain/IP endpoint, with `[IPv6]:port` syntax. Without `dest`, the server uses `server_name` and `server_port` (443 by default). An optional outer `server_name` must match. Do not mix REALITY with `cert_config`. Clients need matching VLESS/TCP/REALITY/UUID/public key/short ID/SNI/flow settings. Xray v26.3.27 accepts the client public key in `password`; use your client's corresponding UI field.
+
+`short_id` is an even-length hexadecimal string of 0–16 characters or a list of up to 16 strings. Short strings are right-zero-padded; missing/empty means accepting an empty short ID. `max_time_diff` is milliseconds, default 300000, maximum 3600000; 0 disables the time check. Optional `min_client_version` and `max_client_version` are three-byte arrays. Keep clocks accurate. Server `public_key` is optional; if supplied, it must match the private key.
+
+Scope: **VLESS REALITY TCP with or without Vision**. Remove flow on both ends to use ordinary VLESS. Authenticated proxy payload retains target routing, shared rate/source-IP limits and durable counters. Pre-authentication mirroring uses the bounded configured DNS resolver followed by a direct connection to the fixed endpoint; user SOCKS5 routing and user proxy accounting do not apply to that mirroring. Target changes replace the data process and disconnect sessions.
+
+Currently, a complete ClientHello must fit one TLS record, and the mirror must return a non-HRR TLS 1.3 ServerHello. Other cases forward the mirror or fail rather than authenticate a proxy. Outer post-handshake KeyUpdate is rejected; **inner** TLS HRR is covered by real-client regression. Handshakes have a 10-second deadline, mirror handshake capture is bounded by 16 records/64 KiB, and pre-auth forwarding lasts at most 300 seconds. Record/buffer limits fail closed. Forwarding stays in owned listener tasks and is cancelled on shutdown. These limits do not establish anti-probing or capacity guarantees.
+
+Before downgrading to preview.5 or earlier, change both panel and client to file TLS or plain VLESS supported by that version; program rollback does not convert REALITY settings.
 
 ## Routing and DNS
 
@@ -161,7 +197,7 @@ The retained migration baseline passed Rust formatting, serial workspace tests a
 
 Release builds separately verify AMD64/ARM64 compilation, installer lifecycle, private permissions, archive rejection, configuration retention and rollback. A fresh systemd installation uses a synthetic loopback panel and real TCP/TLS/UDP echoes, including IPv4, domain and IPv6 targets, zero-length and 65,507-byte datagrams. It measures bidirectional shared limits across two connections and checks live IP/rate policy changes without restarting either process. Upgrade and two-way rollback use the actual published preview.1 binary and retain configuration and native counter identity. `installer-tests-*.json` and `systemd-tests-*.json` accompany the release assets and measurements.
 
-Vision acceptance uses a pinned official Xray **client** against the installed AMD64/ARM64 Rust server: plain TCP, inner TLS 1.2/1.3, wire-observed HelloRetryRequest followed by TLS 1.3, both DIRECT commands and byte equality, and missing-flow/wrong-UUID refusal before origin connect. Regressions also cover 512-byte transport buffers, fragmented UUIDs, TLS-like payload tails and TLS close_notify without TCP FIN. The test client is neither bundled nor a server runtime dependency.
+File-TLS and REALITY Vision acceptance uses a pinned official Xray **client** against the installed AMD64/ARM64 Rust server: plain TCP, inner TLS 1.2/1.3, wire-observed HelloRetryRequest followed by TLS 1.3, both DIRECT commands and byte equality, and missing-flow/wrong-UUID refusal before origin connect. Regressions also cover 512-byte transport buffers, fragmented UUIDs, TLS-like payload tails and TLS close_notify without TCP FIN. REALITY additionally checks trusted ordinary-TLS mirror forwarding, wrong-short-ID refusal before origin connect, and VLESS without Vision. The test client is neither bundled nor a server runtime dependency.
 
 Unpersisted crash-tail bytes can still be lost; periodic checkpoints do not guarantee zero loss on power failure. Ambiguous report delivery pauses the batch until reconciled. API acceptance does not prove billing-database reconciliation. The tests do not establish maximum TCP capacity, WAN speed or long-running production stability.
 
@@ -180,4 +216,4 @@ Windows module builds/tests are supported; the default native runtime requires U
 
 ## License
 
-[MPL-2.0](LICENSE), with upstream attribution retained and no added commercial-use or purpose restrictions. The Vision subset retains its upstream **MIT** license and attribution to [cfal/shoes](https://github.com/cfal/shoes); the rest of this project follows MPL-2.0. Runtime archives include that subset, exact dependency, Rust toolchain and relevant static-library notices. See [NOTICE.md](NOTICE.md).
+[MPL-2.0](LICENSE), with upstream attribution retained and no added commercial-use or purpose restrictions. The Vision and REALITY subsets retain their upstream **MIT** license and attribution to [cfal/shoes](https://github.com/cfal/shoes); the rest of this project follows MPL-2.0. Runtime archives include that subset, exact dependency, Rust toolchain and relevant static-library notices. See [NOTICE.md](NOTICE.md).

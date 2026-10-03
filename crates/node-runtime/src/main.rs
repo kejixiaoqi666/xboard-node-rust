@@ -36,7 +36,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     if args == ["--help"] || args.is_empty() {
         println!(
-            "xboard-node-rust (experimental)\nUsage: xboard-node-rust --config <runtime.json> [--check | --traffic-status | --traffic-resolve <batch-id> delivered|not-delivered]\nToken is read from the environment variable named by token_env.\n--check validates runtime settings without contacting the panel or starting a kernel.\nTraffic status/reconciliation is local only; stop the node first and verify the exact uncertain batch against panel records before resolving it."
+            "xboard-node-rust (experimental)\nUsage: xboard-node-rust --config <runtime.json> [--check | --traffic-status | --traffic-resolve <batch-id> delivered|not-delivered]\ngenerate-reality-keypair prints a new X25519 private/public JSON pair.\nToken is read from the environment variable named by token_env.\n--check validates runtime settings without contacting the panel or starting a kernel.\nTraffic status/reconciliation is local only; stop the node first and verify the exact uncertain batch against panel records before resolving it."
         );
         return Ok(());
     }

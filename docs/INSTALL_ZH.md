@@ -6,8 +6,8 @@
 
 - Linux AMD64 或 ARM64，已运行 systemd，使用 root。推荐 Debian 12/13、Ubuntu 22.04/24.04。
 - 已有 Xboard 面板和一个明确的节点 ID；v2 machine 模式还需要服务器 ID 与对应 token。
-- 面板给该节点配置当前支持的 VLESS/Trojan；TCP 和协议内 UDP 已支持，原生 Rust 模式执行用户限速和来源 IP 限制。文件 TLS1.3 下的 VLESS Vision TCP 已支持，面板与客户端字段见[首页 Vision 配置](../README.md#vision-怎么用)。REALITY、Vision UDP、mux 和其他未迁移配置会被拒绝。
-- TLS 需要已有证书和私钥文件，并在面板填入 file 证书配置。推荐放在 `/etc/ssl/` 或 `/etc/letsencrypt/`，本服务启用了 `ProtectHome=true`。
+- 面板给该节点配置当前支持的 VLESS/Trojan；TCP 和协议内 UDP 已支持，原生 Rust 模式执行用户限速和来源 IP 限制。文件 TLS1.3 下的 VLESS Vision TCP 已支持，面板与客户端字段见[首页 Vision 配置](../README.md#vision-怎么用)。REALITY TCP 可带或不带 Vision，字段见[首页 REALITY 配置](../README.md#reality-怎么用)；REALITY UDP、Vision UDP、mux 和其他未迁移配置会被拒绝。
+- 文件 TLS 需要已有证书和私钥文件，并在面板填入 file 证书配置。推荐放在 `/etc/ssl/` 或 `/etc/letsencrypt/`，本服务启用了 `ProtectHome=true`。
 - 需要按面板设置开放节点端口；脚本不会修改防火墙或其他网络参数。
 
 机器模式是 **machine 认证 + 一个固定节点**，此版不会自动枚举一台服务器的全部节点。
@@ -34,8 +34,8 @@ apt-get install -y ca-certificates curl
 先下载安装器，再运行指定版本：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.5/install.sh -o install.sh
-bash install.sh install --version v0.1.0-preview.5
+curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.6/install.sh -o install.sh
+bash install.sh install --version v0.1.0-preview.6
 ```
 
 自动化安装时，从权限为 0600 的文件或指定环境变量读取 token，避免把 token 直接写在命令参数中。例如先用编辑器准备 `/root/panel-token`：
@@ -69,7 +69,7 @@ ARM64 改用 `xboard-node-rust-linux-arm64.tar.gz`。归档在解压前校验，
 xboard-rust                 # 菜单
 xboard-rust configure       # 重新配置；空 token 沿用已有 token
 xboard-rust update          # 最新有本架构文件的已发布版，含预览版
-xboard-rust update --version v0.1.0-preview.5
+xboard-rust update --version v0.1.0-preview.6
 xboard-rust rollback        # 上一个程序版本；检查声明的状态格式
 xboard-rust start
 xboard-rust stop

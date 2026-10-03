@@ -535,4 +535,63 @@ mod tests {
             Poll::Ready(Err(error)) if error.kind() == io::ErrorKind::WriteZero
         ));
     }
+    struct PendingAfterBytes(std::io::Cursor<Vec<u8>>);
+    impl AsyncRead for PendingAfterBytes {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            use std::io::Read;
+            if self.0.position() == self.0.get_ref().len() as u64 {
+                return Poll::Pending;
+            }
+            let n = self.0.read(buf.initialize_unfilled()).unwrap();
+            buf.advance(n);
+            Poll::Ready(Ok(()))
+        }
+    }
+    impl AsyncWrite for PendingAfterBytes {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            buf: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            Poll::Ready(Ok(buf.len()))
+        }
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+        fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+    #[test]
+    fn reality_close_notify_returns_eof_without_tcp_fin_and_keeps_tail() {
+        let mut peer = completed_reality_connection();
+        peer.writer().write_all(b"tail\x16\x03\x03").unwrap();
+        let mut bytes = Vec::new();
+        peer.write_tls(&mut bytes).unwrap();
+        peer.send_close_notify();
+        peer.write_tls(&mut bytes).unwrap();
+        let mut stream = CryptoTlsStream::new(
+            PendingAfterBytes(std::io::Cursor::new(bytes)),
+            completed_reality_connection(),
+        );
+        let mut cx = Context::from_waker(noop_waker_ref());
+        let mut out = [0; 64];
+        let mut buf = ReadBuf::new(&mut out);
+        assert!(matches!(
+            Pin::new(&mut stream).poll_read(&mut cx, &mut buf),
+            Poll::Ready(Ok(()))
+        ));
+        assert_eq!(buf.filled(), b"tail\x16\x03\x03");
+        let mut out = [0; 64];
+        let mut buf = ReadBuf::new(&mut out);
+        assert!(matches!(
+            Pin::new(&mut stream).poll_read(&mut cx, &mut buf),
+            Poll::Ready(Ok(()))
+        ));
+        assert!(buf.filled().is_empty());
+    }
 }

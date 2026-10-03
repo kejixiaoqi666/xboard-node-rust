@@ -383,13 +383,9 @@ impl RealityServerConnection {
         });
 
         if !short_id_ok {
-            log::warn!(
-                "REALITY: Client short_id {:02x?} not in configured list",
-                client_short_id
-            );
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
-                format!("Invalid short_id: {:02x?}", client_short_id),
+                "REALITY authentication rejected",
             ));
         }
 
@@ -683,10 +679,22 @@ impl RealityServerConnection {
                 .get_u16_be(3)
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Buffer too short"))?
                 as usize;
+            if ccs_len != 1 || self.ciphertext_read_buf[1..3] != [3, 3] {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid compatibility CCS",
+                ));
+            }
 
             // Need complete ChangeCipherSpec record
             if self.ciphertext_read_buf.len() < TLS_RECORD_HEADER_SIZE + ccs_len {
                 return Ok(false); // Need more data
+            }
+            if self.ciphertext_read_buf[5] != 1 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid compatibility CCS",
+                ));
             }
 
             // Skip ChangeCipherSpec (compatibility message)
@@ -706,6 +714,12 @@ impl RealityServerConnection {
             .get_u16_be(3)
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Buffer too short"))?
             as usize;
+        if self.ciphertext_read_buf[..3] != [23, 3, 3] || !(17..=16_640).contains(&record_len) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "invalid TLS 1.3 Finished record header",
+            ));
+        }
 
         // Check if we have the complete record
         let total_record_len = TLS_RECORD_HEADER_SIZE + record_len;
@@ -769,6 +783,15 @@ impl RealityServerConnection {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Finished message too short",
+            ));
+        }
+        let declared = ((plaintext[1] as usize) << 16)
+            | ((plaintext[2] as usize) << 8)
+            | plaintext[3] as usize;
+        if declared != plaintext.len() - 4 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "invalid Finished message length",
             ));
         }
         let client_verify_data = &plaintext[4..];
@@ -843,6 +866,12 @@ impl RealityServerConnection {
                 .get_u16_be(3)
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Buffer too short"))?
                 as usize;
+            if self.ciphertext_read_buf[..3] != [23, 3, 3] || !(17..=16_640).contains(&record_len) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "invalid TLS 1.3 application record header",
+                ));
+            }
 
             // Check if we have the complete record
             let total_record_len = TLS_RECORD_HEADER_SIZE + record_len;
@@ -861,7 +890,15 @@ impl RealityServerConnection {
             match content_type {
                 CONTENT_TYPE_APPLICATION_DATA => {
                     // Compact plaintext buffer if needed before extending
-                    self.plaintext_read_buf.maybe_compact(4096);
+                    if self.plaintext_read_buf.remaining_capacity() < plaintext.len() {
+                        self.plaintext_read_buf.compact();
+                    }
+                    if self.plaintext_read_buf.remaining_capacity() < plaintext.len() {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "REALITY plaintext buffer limit exceeded",
+                        ));
+                    }
                     self.plaintext_read_buf.extend_from_slice(plaintext);
                 }
                 CONTENT_TYPE_ALERT => {
@@ -891,10 +928,12 @@ impl RealityServerConnection {
                 }
                 // CONTENT_TYPE_HANDSHAKE is invalid after handshake complete
                 // strip_content_type() validates and returns error for invalid types
-                _ => unreachable!(
-                    "strip_content_type validates content type; unexpected: 0x{:02x}",
-                    content_type
-                ),
+                _ => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "unsupported post-handshake TLS message",
+                    ));
+                }
             }
 
             // Consume the processed record from the buffer (after plaintext borrow ends)
@@ -1055,6 +1094,98 @@ pub fn feed_reality_server_connection(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn complete() -> RealityServerConnection {
+        RealityServerConnection::new(RealityServerConfig {
+            private_key: [0; 32],
+            short_ids: vec![[0; 8]],
+            server_name: "localhost".into(),
+            max_time_diff: None,
+            min_client_version: None,
+            max_client_version: None,
+            cipher_suites: Vec::new(),
+        })
+        .unwrap()
+        .complete_for_test()
+        .unwrap()
+    }
+    fn encrypted(content: &[u8], kind: u8, sequence: u64) -> Vec<u8> {
+        let key = AeadKey::new(CipherSuite::AES_128_GCM_SHA256, &[0; 16]).unwrap();
+        let mut plain = content.to_vec();
+        plain.push(kind);
+        let n = plain.len() + 16;
+        let header = [23, 3, 3, (n >> 8) as u8, n as u8];
+        let mut result = header.to_vec();
+        result.extend(key.seal(&plain, &[0; 12], sequence, &header).unwrap());
+        result
+    }
+    #[test]
+    fn valid_ciphertext_with_mutated_outer_header_is_rejected() {
+        for (index, value) in [(0, 22), (1, 2), (2, 1)] {
+            let mut s = complete();
+            let mut record = encrypted(b"hello", 23, 0);
+            record[index] = value;
+            feed_reality_server_connection(&mut s, &record).unwrap();
+            assert_eq!(
+                s.process_new_packets().unwrap_err().kind(),
+                io::ErrorKind::InvalidData
+            );
+        }
+    }
+    #[test]
+    fn unsupported_key_update_is_protocol_error_instead_of_task_panic() {
+        let mut s = complete();
+        let record = encrypted(&[24, 0, 0, 1, 0], 22, 0);
+        feed_reality_server_connection(&mut s, &record).unwrap();
+        assert_eq!(
+            s.process_new_packets().unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+    }
+    #[test]
+    fn finished_requires_handshake_inner_type_and_matching_declared_length() {
+        let cs = CipherSuite::AES_128_GCM_SHA256;
+        let secret = vec![1; 32];
+        let hash = vec![2; 32];
+        let verify = compute_finished_verify_data(cs, &secret, &hash).unwrap();
+        let (key, iv) = derive_traffic_keys(&secret, cs).unwrap();
+        let aead = AeadKey::new(cs, &key).unwrap();
+        for (kind, declared, valid) in [(22, 32, true), (23, 32, false), (22, 0, false)] {
+            let mut s = complete();
+            s.handshake_state = HandshakeState::ServerHelloSent {
+                handshake_hash_with_server_finished: hash.clone(),
+                client_handshake_traffic_secret: secret.clone(),
+                master_secret: vec![3; 32],
+                cipher_suite: cs,
+            };
+            let mut data = vec![20, 0, 0, declared];
+            data.extend(&verify);
+            data.push(kind);
+            let n = data.len() + 16;
+            let header = [23, 3, 3, (n >> 8) as u8, n as u8];
+            let mut r = header.to_vec();
+            r.extend(aead.seal(&data, &iv, 0, &header).unwrap());
+            feed_reality_server_connection(&mut s, &r).unwrap();
+            assert_eq!(s.process_new_packets().is_ok(), valid);
+        }
+    }
+    #[test]
+    fn ciphertext_and_unconsumed_plaintext_have_hard_limits() {
+        let mut s = complete();
+        let mut input = io::repeat(0);
+        while s.read_tls(&mut input).is_ok() {}
+        assert_eq!(s.ciphertext_read_buf.len(), CIPHERTEXT_READ_BUF_CAPACITY);
+        let mut s = complete();
+        for seq in 0..2 {
+            feed_reality_server_connection(&mut s, &encrypted(&vec![9; 16384], 23, seq)).unwrap();
+            s.process_new_packets().unwrap();
+        }
+        feed_reality_server_connection(&mut s, &encrypted(&vec![9; 1024], 23, 2)).unwrap();
+        assert_eq!(
+            s.process_new_packets().unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+        assert_eq!(s.plaintext_read_buf.len(), 32768);
+    }
 
     #[test]
     fn test_reality_server_connection_creation() {

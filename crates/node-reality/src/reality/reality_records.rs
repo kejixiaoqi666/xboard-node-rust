@@ -322,6 +322,12 @@ impl<'a> RecordDecryptor<'a> {
             ));
         }
 
+        if valid_end > MAX_TLS_PLAINTEXT_LEN {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "TLS plaintext limit exceeded",
+            ));
+        }
         Ok((content_type, &plaintext[..valid_end]))
     }
 }

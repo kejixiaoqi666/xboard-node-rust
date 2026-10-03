@@ -327,6 +327,14 @@ mod tests {
         no13[last] = 3;
         assert_eq!(client_name(&no13), None);
     }
+    #[test]
+    fn supplied_public_key_must_correspond_to_private_key() {
+        let (private, public) = crate::generate_reality_keypair().unwrap();
+        let mut settings:Settings=serde_json::from_value(serde_json::json!({"private_key":private,"public_key":public,"server_name":"localhost"})).unwrap();
+        assert!(crate::reality_config(&settings).is_ok());
+        settings.public_key = Some("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".into());
+        assert!(crate::reality_config(&settings).is_err());
+    }
     #[tokio::test]
     async fn excessive_record_is_rejected_before_body_read() {
         let (mut a, mut b) = tokio::io::duplex(64);
