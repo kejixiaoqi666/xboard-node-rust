@@ -6,7 +6,7 @@
 
 The panel manages users and subscriptions; this program runs the node. It continues the migration from [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). The name and installer entry point are unchanged. Local standalone configurations are also supported.
 
-The `v0.1.0-preview.14` prerelease keeps the preview.13 protocol, transport, routing, DNS, fleet and certificate modules and adds the release-gate fix that waits for the final panel acknowledgement on slower ARM64 runners. The default server uses Rust throughout and requires no Go, Xray or external sing-box server. New features are not a claim of complete upstream compatibility, maximum capacity or proven long-term production stability.
+The `v0.1.0-preview.15` prerelease keeps the preview.14 protocol, transport, routing, DNS, fleet and certificate modules and adds a release-gate fix that waits for a traffic report to leave the sending state before systemd shutdown; an unknown delivery still fails the gate. The default server uses Rust throughout and requires no Go, Xray or external sing-box server. New features are not a claim of complete upstream compatibility, maximum capacity or proven long-term production stability.
 
 ![Architecture](docs/assets/architecture.svg)
 
