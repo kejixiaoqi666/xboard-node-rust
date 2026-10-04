@@ -377,6 +377,28 @@ def main():
                     results.append({'node_id': number, 'case': label, 'tcp_each_direction': len(TCP_PAYLOAD),
                                     'udp_each_direction': len(UDP_PAYLOAD), 'result': 'PASS'})
                     print(label + ': actual fleet TCP66000/UDP3000 PASS', flush=True)
+                # The report loop runs independently of the protocol cases.  On
+                # slower runners (especially ARM64), the final case can finish
+                # while its durable report is still in flight.  Wait for the
+                # panel acknowledgement before stopping the fleet so this gate
+                # checks the real acknowledged state instead of turning a normal
+                # scheduling race into a false unknown-ack failure.
+                def reports_quiesced():
+                    assert runtime.poll() is None, (
+                        'fleet exited before report drain: '
+                        + log.read_text(errors='replace')[-4000:]
+                    )
+                    for case in results:
+                        state = directory / ('node-' + str(case['node_id']))
+                        path = state / 'traffic.json'
+                        if not path.exists():
+                            return False
+                        book = json.loads(path.read_text())
+                        if book.get('flight') is not None:
+                            return False
+                    return True
+
+                wait(reports_quiesced, 15)
                 children = set()
                 for path in (Path('/proc') / str(runtime.pid) / 'task').glob('*/children'):
                     children.update(path.read_text().split())
