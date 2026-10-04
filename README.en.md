@@ -6,7 +6,7 @@
 
 The panel manages users and subscriptions; this program runs the node. It continues the migration from [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). The name and installer entry point are unchanged. Local standalone configurations are also supported.
 
-The `v0.1.0-preview.12` candidate adds the previously listed protocol, transport, routing, DNS, fleet and certificate modules. The default server uses Rust throughout and requires no Go, Xray or external sing-box server. New features are not a claim of complete upstream compatibility, maximum capacity or proven long-term production stability.
+The `v0.1.0-preview.12` prerelease adds the previously listed protocol, transport, routing, DNS, fleet and certificate modules. The default server uses Rust throughout and requires no Go, Xray or external sing-box server. New features are not a claim of complete upstream compatibility, maximum capacity or proven long-term production stability.
 
 ![Architecture](docs/assets/architecture.svg)
 
