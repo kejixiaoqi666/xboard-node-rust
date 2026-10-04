@@ -2,7 +2,7 @@
 
 > 本页下方保留 2026-10-02 的早期迁移记录，其中的“未完成”、测试数与旧客户端只描述当时阶段。当前安装、模块和支持范围以 [首页](../README.md)、[接续入口](../HANDOFF_RUST.md) 与 [验证入口](VALIDATION_ZH.md) 为准；历史 GNU 构建证据不能替代新 musl 发行文件。
 
-## preview.13 当前状态
+## preview.14 当前状态
 
 当前默认服务端和控制层为 Rust，已接入 VLESS/Trojan、Vision/REALITY、VMess、Shadowsocks、AnyTLS、Hysteria2/TUIC，包含 TCP/UDP、传输/复用、共享限制、持久计数、路由与加密 DNS、代理链、单进程多节点/机器发现、在线及资源观测、YAML 导入和证书挂接。协议及字段限制见首页，不是全部上游选项等价的声明。
 

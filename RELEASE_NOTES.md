@@ -1,6 +1,6 @@
-# Xboard Node Rust v0.1.0-preview.13
+# Xboard Node Rust v0.1.0-preview.14
 
-这一版补齐此前列出的主要协议、传输、路由、DNS、多节点和证书模块。它仍是给 Xboard 使用的 Linux 节点后端：面板管理套餐与用户，Rust 程序负责 VPS 上的认证、转发、限制、计数和上报。默认控制层和协议服务端均为 Rust。
+这一版延续 preview.13 的功能内容，并修正 ARM64 发布门禁在最后一次面板上报尚未确认时过早停机造成的时序误报。产品仍是给 Xboard 使用的 Linux 节点后端：面板管理套餐与用户，Rust 程序负责 VPS 上的认证、转发、限制、计数和上报。默认控制层和协议服务端均为 Rust。
 
 ## 新增与补齐
 
@@ -18,14 +18,14 @@
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/main/install.sh) install
-xboard-rust update --version v0.1.0-preview.13
+xboard-rust update --version v0.1.0-preview.14
 ```
 
 Linux AMD64/ARM64 静态 musl 包、一键管理脚本、SHA256SUMS、第三方许可及分架构互通/安装/systemd 报告随发行版提供。原服务不会自动迁移；接入、YAML 导入和多节点见 [安装指南](docs/INSTALL_ZH.md)。
 
 ## 验证范围
 
-发行流程检查准确源码的普通回归与严格 lint、固定版本官方 sing-box/Xray、35 节点实际生产入口的 TCP/UDP 与计数，以及真实 Linux 安装/启停/升级/回退；这些门在最终 tag [Actions 37154037856](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37154037856) 全部通过，AMD64/ARM64 的 systemd 报告各含 88 个案例。真实 Flash 计费也使用最终 tag 的 AMD64 包在隐藏节点与专用用户上通过，分别核对原始载荷和面板倍率后的用户流量、在线记录、正常停止和重启不重放。具体范围与最终 SHA 见 [验证入口](docs/VALIDATION_ZH.md)。
+发行流程检查准确源码的普通回归与严格 lint、固定版本官方 sing-box/Xray、35 节点实际生产入口的 TCP/UDP 与计数，以及真实 Linux 安装/启停/升级/回退；preview.14 的 AMD64/ARM64 结果见 [Actions 37181124382](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37181124382)，并包含等待真实面板 ACK 清空 durable flight 的收尾门禁。真实 Flash 计费仍引用 preview.12 的独立隐藏节点证据，未把本版的发布门禁误写成新的 Flash 业务验收。具体范围与最终 SHA 见 [验证入口](docs/VALIDATION_ZH.md)。
 
 ## 明确边界
 
@@ -33,4 +33,4 @@ Linux AMD64/ARM64 静态 musl 包、一键管理脚本、SHA256SUMS、第三方�
 
 面板没有通用批次去重时，HTTP 结果未知的流量批次需人工对账；周期存档后的强杀/断电尾部仍可能丢失。配置缓存只桥接面板不可达窗口，不保存 Token、面板地址或未知流量 ACK，也不声明断电零丢失。旧 VMess AlterID、二进制 SRS、远程规则集下载、gRPC multiMode 和 Brutal 等未支持设置明确拒绝。
 
-English: This preview adds VMess, AnyTLS, Hysteria2, TUIC, broader Shadowsocks support, transports/multiplexing, routing and encrypted DNS, proxy chains, a single-process fleet, machine discovery, observations, YAML import and certificate integration. The default server and controller are Rust. The exact-source official-client, actual Linux fleet, installer, service and isolated Flash billing gates passed for final tag `ef0355843693c3e4738d028c8af7ab5c0f0228ce` in Actions 37154037856. Production DNS/public CA, full upstream parity, WAN capacity and long-term stability are not claimed; unknown acknowledgements and unsaved crash-tail boundaries remain explicit.
+English: Preview.14 carries the preview.13 feature set and hardens the ARM64 release gate so the fleet waits for a real panel acknowledgement before shutdown. The exact-source official-client, actual Linux fleet, installer and service gates passed for commit `437241d3a34c337915008d9b8faf3ecacf75ea7d` in [Actions 37181124382](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37181124382). Flash billing remains the separate preview.12 evidence; this release does not claim a new Flash run. Production DNS/public CA, full upstream parity, WAN capacity and long-term stability are not claimed; unknown acknowledgements and unsaved crash-tail boundaries remain explicit.

@@ -34,8 +34,8 @@ apt-get install -y ca-certificates curl
 先下载安装器，再运行指定版本：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.13/install.sh -o install.sh
-bash install.sh install --version v0.1.0-preview.13
+curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.14/install.sh -o install.sh
+bash install.sh install --version v0.1.0-preview.14
 ```
 
 自动化安装时，从权限为 0600 的文件或指定环境变量读取 token，避免把 token 直接写在命令参数中。例如先用编辑器准备 `/root/panel-token`：
@@ -69,7 +69,7 @@ ARM64 改用 `xboard-node-rust-linux-arm64.tar.gz`。归档在解压前校验，
 xboard-rust                 # 菜单
 xboard-rust configure       # 重新配置；空 token 沿用已有 token
 xboard-rust update          # 分页读取并按发布时间选择兼容版，含预览版
-xboard-rust update --version v0.1.0-preview.13
+xboard-rust update --version v0.1.0-preview.14
 xboard-rust rollback        # 上一个程序版本；检查声明的状态格式
 xboard-rust start
 xboard-rust stop
@@ -103,7 +103,7 @@ xboard-rust uninstall
 | 设置限速后单连接速率与预期不同 | 同一用户所有连接的上传和下载共用预算，单位是十进制 Mbps；有一秒突发额度，最小 64 KiB |
 | 同一 IP 多设备仍能连接 | 限制统计本节点不同来源 IP，同一个公网 IP 共用名额，不能识别实际设备数量 |
 | 文件证书不可读 | 检查文件路径与权限；`ProtectHome` 会隐藏家目录，私钥应放在服务可读取的位置 |
-| 用户删除后旧连接还在 | preview.13 会撤销删除用户或旧 UUID/密码的会话；确认面板新用户快照已被接收并激活 |
+| 用户删除后旧连接还在 | preview.14 会撤销删除用户或旧 UUID/密码的会话；确认面板新用户快照已被接收并激活 |
 | 上报批次显示 uncertain | 停机后用 `traffic-status` 看批次，先与实际面板记录核对；不盲目重发 |
 | 服务重启后面板暂不可用 | 只要该节点曾成功同步过，程序会从 `state_dir/runtime-snapshot.json` 校验身份后恢复；面板连接失败或 5xx 才使用缓存，面板恢复后会重新拉取并覆盖 |
 
