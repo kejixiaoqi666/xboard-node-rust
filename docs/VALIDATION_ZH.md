@@ -55,7 +55,9 @@ ACME HTTP-01 使用实际本地 Pebble CA：见 [PEBBLE_FIXTURE.md](../crates/no
 
 ### v0.1.0-preview.16 的精确结果
 
-预发布 tag `v0.1.0-preview.16` 的发布门禁将绑定本次 tag workflow；除 preview.15 已通过的双架构源码、官方客户端、35 节点生产入口、安装器和 systemd 检查外，新增 `traffic-status` 摘要状态机的 10 项回归。该摘要只整理本地持久队列，不访问面板，也不替操作员判断未知 ACK。真实 Flash 计费仍引用下方 preview.12 的独立记录。
+预发布 tag `v0.1.0-preview.16` 精确绑定提交 `5d4a1366219ff8486508e686347eacae950899a0`。GitHub Actions [37190058135](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37190058135) 在 AMD64（job `111400178628`，14 分 34 秒）和 ARM64（job `111400178844`，16 分 10 秒）均通过源码回归、clippy、固定 SHA 的官方 sing-box/Xray 互通、35 节点生产入口、静态 musl 构建、安装器和 systemd 生命周期；发布 draft 生成 job `111402743931` 也通过。除 preview.15 已覆盖的门禁外，本版新增 `traffic-status` 摘要状态机的 10 项回归：它只整理本地持久队列，保留原始批次字段，不访问面板，也不替操作员把未知 ACK 猜成成功。
+
+公开 Release 为 [v0.1.0-preview.16](https://github.com/kejixiaoqi666/xboard-node-rust/releases/tag/v0.1.0-preview.16)，包含 AMD64/ARM64 压缩包、`install.sh`、`SHA256SUMS`、分架构官方互通日志、原生协议测试、安装器测试和 systemd 测试结果。归档 SHA256：AMD64 `0791b13d2d3b43d6d12dd6a75b52750a50d606ddd877cb479d622abfb1b80bf7`，ARM64 `e9e13d05a38e9c64450487fda3d128fb34bf900945685d66eafe12946e20a612`，`install.sh` `5dd20e884d1379d0a2c14056bed760e742e3a8fe3897767e7d9b0455e06cb7c1`。该版本没有新增 Flash 真实计费运行，计费证据仍引用下方 preview.12 的独立记录。
 
 ### v0.1.0-preview.15 的精确结果
 
