@@ -416,6 +416,17 @@ def main():
             vision_exercise(config, run, wait, cases, measurements, node_port, cert, key, USER, temp)
             from test_reality import exercise as reality_exercise
             def traffic_snapshot():
+                # A report can be in the short HTTP-send window when the next
+                # protocol exercise asks for a stop.  Let that real ACK settle
+                # while the service is still online; stopping an in-flight
+                # report would correctly persist it as `uncertain`, which this
+                # exact-accounting fixture cannot safely attribute.
+                def report_ready():
+                    outbox = json.loads((STATE_DIR / 'traffic.json').read_text())
+                    flight = outbox.get('flight')
+                    return flight is None or flight.get('stage') == 'prepared'
+
+                wait(report_ready, 15)
                 run('stop')
                 book = json.loads((STATE_DIR / 'native-traffic.json').read_text())
                 assert not book['counters'] and book['frozen'] is None, 'Synthetic accepted reports must drain native counters'
