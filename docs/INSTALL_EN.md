@@ -14,8 +14,8 @@ The installer hides token input and stores it in a separate mode-0600 file. HTTP
 ## Fixed release and unattended installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.12/install.sh -o install.sh
-bash install.sh install --version v0.1.0-preview.12
+curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/v0.1.0-preview.13/install.sh -o install.sh
+bash install.sh install --version v0.1.0-preview.13
 ```
 
 For unattended installation, create a private token file using your editor, then run:
@@ -44,7 +44,7 @@ Use `linux-arm64` for ARM64. The installer verifies archive and per-file hashes,
 ```bash
 xboard-rust configure
 xboard-rust update
-xboard-rust update --version v0.1.0-preview.12
+xboard-rust update --version v0.1.0-preview.13
 xboard-rust rollback
 xboard-rust start
 xboard-rust stop

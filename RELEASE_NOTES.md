@@ -1,4 +1,4 @@
-# Xboard Node Rust v0.1.0-preview.12
+# Xboard Node Rust v0.1.0-preview.13
 
 这一版补齐此前列出的主要协议、传输、路由、DNS、多节点和证书模块。它仍是给 Xboard 使用的 Linux 节点后端：面板管理套餐与用户，Rust 程序负责 VPS 上的认证、转发、限制、计数和上报。默认控制层和协议服务端均为 Rust。
 
@@ -18,7 +18,7 @@
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/kejixiaoqi666/xboard-node-rust/main/install.sh) install
-xboard-rust update --version v0.1.0-preview.12
+xboard-rust update --version v0.1.0-preview.13
 ```
 
 Linux AMD64/ARM64 静态 musl 包、一键管理脚本、SHA256SUMS、第三方许可及分架构互通/安装/systemd 报告随发行版提供。原服务不会自动迁移；接入、YAML 导入和多节点见 [安装指南](docs/INSTALL_ZH.md)。

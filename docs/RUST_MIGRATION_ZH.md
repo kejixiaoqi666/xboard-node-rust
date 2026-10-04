@@ -2,11 +2,11 @@
 
 > 本页下方保留 2026-10-02 的早期迁移记录，其中的“未完成”、测试数与旧客户端只描述当时阶段。当前安装、模块和支持范围以 [首页](../README.md)、[接续入口](../HANDOFF_RUST.md) 与 [验证入口](VALIDATION_ZH.md) 为准；历史 GNU 构建证据不能替代新 musl 发行文件。
 
-## preview.12 当前状态
+## preview.13 当前状态
 
 当前默认服务端和控制层为 Rust，已接入 VLESS/Trojan、Vision/REALITY、VMess、Shadowsocks、AnyTLS、Hysteria2/TUIC，包含 TCP/UDP、传输/复用、共享限制、持久计数、路由与加密 DNS、代理链、单进程多节点/机器发现、在线及资源观测、YAML 导入和证书挂接。协议及字段限制见首页，不是全部上游选项等价的声明。
 
-本轮把普通回归、固定客户端互通、实际 Linux 程序、真实 Flash 计费和公开发行文件分别留证；`v0.1.0-preview.12` 最终 tag 已绑定提交 `ef0355843693c3e4738d028c8af7ab5c0f0228ce`，精确 tag 工作流 [37154037856](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37154037856) 在双架构通过。真实 Flash 计费已用该最终 tag 的 AMD64 包复验通过，包含在线/IP/资源观测、TCP/UDP、倍率计费、正常停止和重启不重放；结果只覆盖隔离面板和回环业务。生产 DNS/公共 CA、公网容量、长期运行、未知上报对账和未保存的强杀尾部保持独立边界。
+本轮在 `preview.12` 的双架构发行和隔离 Flash 计费证据之外，增加了身份绑定的 `state_dir/runtime-snapshot.json` 恢复：13 项 runtime 回归、workspace 全量测试、fmt 和严格 clippy 已通过。`preview.12` 的真实 Flash 计费仍是上一版最终 tag 的证据，包含在线/IP/资源观测、TCP/UDP、倍率计费、正常停止和重启不重放；本轮缓存恢复没有扩大这些业务结论。生产 DNS/公共 CA、公网容量、长期运行、未知上报对账和未保存的强杀尾部保持独立边界。
 
 ## 早期迁移记录（2026-10-02，以下不是当前功能表）
 
