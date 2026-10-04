@@ -6,7 +6,7 @@
 
 当前默认服务端和控制层为 Rust，已接入 VLESS/Trojan、Vision/REALITY、VMess、Shadowsocks、AnyTLS、Hysteria2/TUIC，包含 TCP/UDP、传输/复用、共享限制、持久计数、路由与加密 DNS、代理链、单进程多节点/机器发现、在线及资源观测、YAML 导入和证书挂接。协议及字段限制见首页，不是全部上游选项等价的声明。
 
-本轮把普通回归、固定客户端互通、实际 Linux 程序、真实 Flash 计费和公开发行文件分别留证；`v0.1.0-preview.12` 最终 tag 已绑定提交 `ef0355843693c3e4738d028c8af7ab5c0f0228ce`，精确 tag 工作流 [37154037856](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37154037856) 在双架构通过。真实 Flash 计费仍明确绑定前一份候选提交 `8b6e35046f894d305fb8f26aea62230ed71a6c3c`，不把候选构建证据冒充最终 tag 构建。历史 PASS 不自动转用。生产 DNS/公共 CA、公网容量、长期运行、未知上报对账和未保存的强杀尾部保持独立边界。
+本轮把普通回归、固定客户端互通、实际 Linux 程序、真实 Flash 计费和公开发行文件分别留证；`v0.1.0-preview.12` 最终 tag 已绑定提交 `ef0355843693c3e4738d028c8af7ab5c0f0228ce`，精确 tag 工作流 [37154037856](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37154037856) 在双架构通过。真实 Flash 计费已用该最终 tag 的 AMD64 包复验通过，包含在线/IP/资源观测、TCP/UDP、倍率计费、正常停止和重启不重放；结果只覆盖隔离面板和回环业务。生产 DNS/公共 CA、公网容量、长期运行、未知上报对账和未保存的强杀尾部保持独立边界。
 
 ## 早期迁移记录（2026-10-02，以下不是当前功能表）
 
