@@ -79,6 +79,11 @@ impl Health {
                 total.failed = total.failed.saturating_add(node.failed);
                 total.push_resyncs = total.push_resyncs.saturating_add(node.push_resyncs);
                 total.recovered = total.recovered.saturating_add(node.recovered);
+                total.cache_recoveries =
+                    total.cache_recoveries.saturating_add(node.cache_recoveries);
+                total.cache_write_failures = total
+                    .cache_write_failures
+                    .saturating_add(node.cache_write_failures);
                 total.traffic_collected = total
                     .traffic_collected
                     .saturating_add(node.traffic_collected);

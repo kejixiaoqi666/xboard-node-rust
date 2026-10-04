@@ -3,7 +3,7 @@ pub mod certificate;
 pub mod dns;
 pub mod import;
 pub mod secrets;
-mod storage;
+pub mod storage;
 
 pub use certificate::{CertConfig, CertificateFiles, CertificateManager, ChallengeStore};
 pub use import::{

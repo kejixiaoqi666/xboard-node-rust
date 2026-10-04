@@ -10,6 +10,7 @@
 - **多节点与运维**：单进程静态 fleet、多面板、机器节点发现、独立状态与上报队列；在线 IP/连接数、Linux 资源和机器状态、本地健康接口、JSON 日志、原 Go YAML 导入。
 - **证书**：file/content/self、ACME HTTP-01 和 Cloudflare DNS-01；证书轮换接入实际候选生成，申请失败保留上一份成功状态。
 - **生命周期与计费**：凭据撤销唤醒阻塞连接，嵌套任务停止后再保存计数；插件未就绪时响应停机并回收子进程；健康及证书监听由任务所有权管理；拒绝含糊的面板 ACK。
+- **配置恢复**：每个节点持久保存最后一次成功的面板配置/用户源快照。重启时只有在没有活动快照且面板连接失败或返回 5xx 才会做身份校验后的本地恢复；鉴权、解码、身份不匹配或损坏缓存不会激活，面板恢复后会覆盖旧缓存。
 
 用户共享限速、来源 IP 名额、成功转发载荷计数和停止预算。单进程最多 64 节点；协议用户数、缓存和复用上限见 [中文介绍](README.md) / [English](README.en.md)。这些上限不是承载量测量。
 
@@ -30,6 +31,6 @@ Linux AMD64/ARM64 静态 musl 包、一键管理脚本、SHA256SUMS、第三方�
 
 不宣称完整上游字段兼容、公网最大承载量、长期生产稳定性、吞吐提升或抗探测效果。HTTP-01 使用本地 Pebble；Cloudflare DNS-01 使用本地 mock，未据此声称生产 DNS/公共 CA 已验收。
 
-面板没有通用批次去重时，HTTP 结果未知的流量批次需人工对账；周期存档后的强杀/断电尾部仍可能丢失。重启要重新拉取面板配置。旧 VMess AlterID、二进制 SRS、远程规则集下载、gRPC multiMode 和 Brutal 等未支持设置明确拒绝。
+面板没有通用批次去重时，HTTP 结果未知的流量批次需人工对账；周期存档后的强杀/断电尾部仍可能丢失。配置缓存只桥接面板不可达窗口，不保存 Token、面板地址或未知流量 ACK，也不声明断电零丢失。旧 VMess AlterID、二进制 SRS、远程规则集下载、gRPC multiMode 和 Brutal 等未支持设置明确拒绝。
 
 English: This preview adds VMess, AnyTLS, Hysteria2, TUIC, broader Shadowsocks support, transports/multiplexing, routing and encrypted DNS, proxy chains, a single-process fleet, machine discovery, observations, YAML import and certificate integration. The default server and controller are Rust. The exact-source official-client, actual Linux fleet, installer, service and isolated Flash billing gates passed for final tag `ef0355843693c3e4738d028c8af7ab5c0f0228ce` in Actions 37154037856. Production DNS/public CA, full upstream parity, WAN capacity and long-term stability are not claimed; unknown acknowledgements and unsaved crash-tail boundaries remain explicit.

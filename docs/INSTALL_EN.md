@@ -59,6 +59,8 @@ xboard-rust uninstall
 
 Configuration changes retain private backups. Failed local startup restores the previous program/configuration and attempts to restart it. A local check does not prove successful proxying or correct panel billing. Rollback changes the program and keeps current counters/outbox state; already billed traffic is not rolled back. Uninstallation retains configuration, credentials, state and historical releases.
 
+After a node has successfully synchronized, the runtime also keeps its panel configuration and user source snapshot in `state_dir/runtime-snapshot.json`. If the process restarts before the panel is reachable, it can restore that snapshot only when there is no active in-memory snapshot and the panel request fails at the transport layer or returns HTTP 5xx. The cache is bound to the node and panel identity, stored with private file handling, and does not contain the Token or panel URL. Authentication, decoding, identity-mismatch and corrupted-cache failures stay fail-closed; a reachable panel replaces the cache with its new authoritative snapshot.
+
 ## Multiple nodes and YAML migration
 
 See [runtime-fleet.json](../examples/runtime-fleet.json) for two node controllers sharing one Rust process. Fill in real panel IDs and use a distinct absolute `state_dir` for each node. The installer handles a single fixed node; advanced configurations can replace that runtime configuration after an offline check.

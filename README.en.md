@@ -43,6 +43,7 @@ The menu provides install, update, configure, rollback, start/stop/restart, stat
 | Panel/fleet | v2 machine/v1 UniProxy REST, ETag and WS resync; static fleets, multiple panels, machine discovery | Up to 64 nodes per process; distinct state/outboxes; conflicting paths/identities are rejected |
 | Observability | Online IPs/connections, measured Linux host resources, machine status, local health and JSON logs | Local health is independent of panel ACK; partial readiness returns 503 |
 | Certificates | file/content/self; ACME HTTP-01 and Cloudflare DNS-01, renewal and recovery | Failed renewal retains the last certificate; validation scope below |
+| Configuration recovery | Each node stores its last successful panel config/user snapshot in an identity-bound private file; a restarted node can bootstrap while the panel is temporarily unavailable | Used only with no active snapshot and a transport/5xx outage; corrupt, mismatched or unauthorized responses are rejected, and a reachable panel replaces the cache |
 | Accounting/operations | Stable user counters, checkpoints, immutable pending reports, reconciliation, installer and rollback | Program rollback preserves current billing state |
 
 ## Limits, credentials and accounting

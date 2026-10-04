@@ -477,6 +477,8 @@ async fn machine_health_aggregates_metrics_and_rejects_partial_discovery() {
             failed: 1,
             push_resyncs: 2,
             recovered: 1,
+            cache_recoveries: 4,
+            cache_write_failures: 1,
             traffic_collected: 5,
             traffic_reports: 3,
             traffic_uncertain: 1,
@@ -492,6 +494,8 @@ async fn machine_health_aggregates_metrics_and_rejects_partial_discovery() {
             failed: 2,
             push_resyncs: 3,
             recovered: 2,
+            cache_recoveries: 5,
+            cache_write_failures: 2,
             traffic_collected: 9,
             traffic_reports: 2,
             traffic_uncertain: 3,
@@ -519,7 +523,8 @@ async fn machine_health_aggregates_metrics_and_rejects_partial_discovery() {
         body["metrics"],
         json!({
             "sync_attempts":10,"applied":5,"unchanged":3,"failed":3,
-            "push_resyncs":5,"recovered":3,"traffic_collected":14,
+            "push_resyncs":5,"recovered":3,"cache_recoveries":9,"cache_write_failures":3,
+            "traffic_collected":14,
             "traffic_reports":5,"traffic_uncertain":4,
         })
     );

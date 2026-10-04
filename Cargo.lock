@@ -1715,6 +1715,7 @@ dependencies = [
  "node-panel",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
  "tokio",
 ]

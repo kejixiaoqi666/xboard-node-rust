@@ -4,6 +4,8 @@ use node_kernel::{KernelAdapter, KernelError, KernelStatus};
 use node_panel::WsEvent;
 use node_runtime::{ManagedKernel, NodeRuntime, SyncResult};
 use std::{
+    fs,
+    path::PathBuf,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -61,6 +63,17 @@ impl ManagedKernel for Fake {
 }
 fn user(id: i64) -> UserSpec {
     UserSpec::new(id, format!("00000000-0000-4000-8000-{id:012}"))
+}
+
+fn temporary_state_dir(label: &str) -> PathBuf {
+    std::env::temp_dir().join(format!(
+        "xboard-node-runtime-{label}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ))
 }
 
 #[tokio::test]
@@ -419,4 +432,76 @@ async fn duplicate_users_never_replace_active_set() {
     assert!(runtime.sync_once().await.is_err());
     assert_eq!(runtime.snapshot().unwrap().users[0].id, 1);
     assert_eq!(runtime.panel().user_etag(), Some("\"users-1\""));
+}
+
+#[tokio::test]
+async fn offline_process_restart_restores_last_successful_snapshot() {
+    let server = support::TestPanel::new(&NodeSpec::new("vless", 443), &[user(1)]).await;
+    let base = server.base.clone();
+    let state_dir = temporary_state_dir("restore");
+    let mut writer = NodeRuntime::new(server.client(), Fake::default(), 7)
+        .with_snapshot_cache(state_dir.clone());
+    assert_eq!(writer.sync_once().await.unwrap(), SyncResult::Applied);
+    let cache_path = state_dir.join("runtime-snapshot.json");
+    assert!(cache_path.is_file());
+    let cache_text = fs::read_to_string(&cache_path).unwrap();
+    assert!(!cache_text.contains("fixture-only-token"));
+    assert!(!cache_text.contains(&base));
+    server.users(&[user(2)]);
+    assert_eq!(writer.sync_once().await.unwrap(), SyncResult::Applied);
+    drop(writer);
+    drop(server);
+
+    let panel = node_panel::Panel::new_for_test(
+        &base,
+        node_panel::Auth::machine("fixture-only-token", 1, 7),
+    )
+    .unwrap();
+    let fake = Fake::default();
+    let mut reader =
+        NodeRuntime::new(panel, fake.clone(), 7).with_snapshot_cache(state_dir.clone());
+    assert_eq!(reader.sync_once().await.unwrap(), SyncResult::Applied);
+    assert_eq!(reader.snapshot().unwrap().users[0].id, 2);
+    assert_eq!(reader.metrics().cache_recoveries, 1);
+    assert_eq!(fake.0.lock().unwrap().activated, 1);
+    reader.shutdown().await.unwrap();
+    let _ = fs::remove_dir_all(state_dir);
+}
+
+#[tokio::test]
+async fn mismatched_snapshot_cache_never_activates_offline() {
+    let server = support::TestPanel::new(&NodeSpec::new("vless", 443), &[user(1)]).await;
+    let base = server.base.clone();
+    let state_dir = temporary_state_dir("mismatch");
+    let mut writer = NodeRuntime::new(server.client(), Fake::default(), 7)
+        .with_snapshot_cache(state_dir.clone());
+    writer.sync_once().await.unwrap();
+    drop(writer);
+
+    let cache_path = state_dir.join("runtime-snapshot.json");
+    let mut cache: serde_json::Value =
+        serde_json::from_slice(&fs::read(&cache_path).unwrap()).unwrap();
+    cache["identity_hash"] = serde_json::Value::String("0".repeat(64));
+    fs::write(&cache_path, serde_json::to_vec(&cache).unwrap()).unwrap();
+    drop(server);
+
+    let panel = node_panel::Panel::new_for_test(
+        &base,
+        node_panel::Auth::machine("fixture-only-token", 1, 7),
+    )
+    .unwrap();
+    let fake = Fake::default();
+    let mut reader =
+        NodeRuntime::new(panel, fake.clone(), 7).with_snapshot_cache(state_dir.clone());
+    let result = reader.sync_once().await;
+    assert!(matches!(
+        result,
+        Err(node_runtime::RuntimeError::Panel(
+            node_panel::PanelError::Transport
+        ))
+    ));
+    assert!(reader.snapshot().is_none());
+    assert_eq!(reader.metrics().cache_recoveries, 0);
+    assert_eq!(fake.0.lock().unwrap().activated, 0);
+    let _ = fs::remove_dir_all(state_dir);
 }

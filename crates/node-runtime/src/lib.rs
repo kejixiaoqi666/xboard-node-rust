@@ -10,6 +10,7 @@ pub mod logging;
 pub mod observations;
 mod owned_task;
 pub use owned_task::Task as OwnedTask;
+mod snapshot_cache;
 pub mod traffic;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -172,6 +173,8 @@ pub struct RuntimeMetrics {
     pub failed: u64,
     pub push_resyncs: u64,
     pub recovered: u64,
+    pub cache_recoveries: u64,
+    pub cache_write_failures: u64,
     pub traffic_collected: u64,
     pub traffic_reports: u64,
     pub traffic_uncertain: u64,
@@ -210,6 +213,7 @@ pub struct NodeRuntime<K: ManagedKernel> {
     state_dir: PathBuf,
     collector: observations::Collector,
     log: Option<Arc<logging::Log>>,
+    snapshot_cache: Option<snapshot_cache::SnapshotCache>,
 }
 impl<K: ManagedKernel> NodeRuntime<K> {
     pub fn new(panel: Panel, kernel: K, node_id: u32) -> Self {
@@ -234,6 +238,7 @@ impl<K: ManagedKernel> NodeRuntime<K> {
             state_dir: PathBuf::from("/"),
             collector: observations::Collector::default(),
             log: None,
+            snapshot_cache: None,
         }
     }
     pub fn snapshot(&self) -> Option<AppliedSnapshot> {
@@ -254,9 +259,26 @@ impl<K: ManagedKernel> NodeRuntime<K> {
         self.transform = Some(transform);
         self.local = local;
         self.health = Some(health);
+        self.snapshot_cache = Some(snapshot_cache::SnapshotCache::new(
+            state_dir.clone(),
+            self.node_id,
+            &self.panel.traffic_identity(),
+        ));
         self.state_dir = state_dir;
         self.track_period = track;
         self.observation_period = observations;
+        self
+    }
+    /// Enable the durable last-known-good snapshot for a runtime that is not
+    /// using the full administration builder (for example, an integration
+    /// harness). The directory is created with private permissions on write.
+    pub fn with_snapshot_cache(mut self, state_dir: PathBuf) -> Self {
+        self.snapshot_cache = Some(snapshot_cache::SnapshotCache::new(
+            state_dir.clone(),
+            self.node_id,
+            &self.panel.traffic_identity(),
+        ));
+        self.state_dir = state_dir;
         self
     }
     pub fn with_log(mut self, log: Arc<logging::Log>) -> Self {
@@ -404,6 +426,26 @@ impl<K: ManagedKernel> NodeRuntime<K> {
             self.cache_generation = generation;
         }
         let result = self.fetch_and_apply().await;
+        let result = if self.snapshot().is_none()
+            && self.local.is_none()
+            && matches!(&result, Err(RuntimeError::Panel(error)) if error.is_unavailable())
+        {
+            let panel_error = result.expect_err("unavailable panel error");
+            self.panel.reject_config();
+            self.panel.reject_users();
+            match self.recover_from_cache().await {
+                Ok(restored) => Ok(restored),
+                Err(error) => {
+                    self.log(
+                        "warn",
+                        &format!("offline snapshot recovery unavailable: {error}"),
+                    );
+                    Err(panel_error)
+                }
+            }
+        } else {
+            result
+        };
         if result.is_err() {
             self.panel.reject_config();
             self.panel.reject_users();
@@ -413,6 +455,42 @@ impl<K: ManagedKernel> NodeRuntime<K> {
             self.metrics.failed = self.metrics.failed.saturating_add(1);
         }
         result
+    }
+
+    async fn recover_from_cache(&mut self) -> Result<SyncResult, RuntimeError> {
+        let Some(cache) = &self.snapshot_cache else {
+            return Err(RuntimeError::MissingSnapshot);
+        };
+        let cached = match cache.load() {
+            Ok(Some(snapshot)) => snapshot,
+            Ok(None) => return Err(RuntimeError::MissingSnapshot),
+            Err(error) => {
+                self.log(
+                    "warn",
+                    &format!("offline snapshot cache ignored: {error:?}"),
+                );
+                return Err(RuntimeError::MissingSnapshot);
+            }
+        };
+        if self.outbox.is_some() && cached.users.iter().any(|user| user.id <= 0) {
+            return Err(RuntimeError::InvalidSnapshot);
+        }
+        let source_config = cached.source_config;
+        let config = match &self.transform {
+            Some(transform) => transform.transform(source_config.clone()).await?,
+            None => source_config.clone(),
+        };
+        let candidate = AppliedSnapshot::new(config, cached.users)
+            .map_err(|_| RuntimeError::InvalidSnapshot)?;
+        let result = self
+            .apply_candidate(Some(candidate), Some(source_config), false, false)
+            .await?;
+        self.metrics.cache_recoveries = self.metrics.cache_recoveries.saturating_add(1);
+        self.log(
+            "warn",
+            "panel unavailable; restored the last successful local snapshot",
+        );
+        Ok(result)
     }
 
     async fn fetch_and_apply(&mut self) -> Result<SyncResult, RuntimeError> {
@@ -494,7 +572,20 @@ impl<K: ManagedKernel> NodeRuntime<K> {
             };
             Some(AppliedSnapshot::new(config, users).map_err(|_| RuntimeError::InvalidSnapshot)?)
         };
+        let panel_source = self.local.is_none();
+        self.apply_candidate(candidate, source_config, panel_source, panel_source)
+            .await
+    }
+
+    async fn apply_candidate(
+        &mut self,
+        candidate: Option<AppliedSnapshot>,
+        source_config: Option<node_core::NodeSpec>,
+        accept_panel: bool,
+        persist_cache: bool,
+    ) -> Result<SyncResult, RuntimeError> {
         let cache_generation = self.cache_generation;
+        let cache_source = source_config.clone();
         let kernel = Arc::clone(&self.kernel);
         let applied = Arc::clone(&self.applied);
         let transaction = Arc::clone(&self.transaction);
@@ -553,9 +644,24 @@ impl<K: ManagedKernel> NodeRuntime<K> {
         })
         .await
         .map_err(|_| RuntimeError::Worker)??;
-        self.panel.accept_config();
-        self.panel.accept_users();
+        if accept_panel {
+            self.panel.accept_config();
+            self.panel.accept_users();
+        }
         self.cache_generation = generation;
+        if persist_cache
+            && let (Some(cache), Some(source_config)) = (&self.snapshot_cache, cache_source)
+        {
+            let users = self.snapshot().ok_or(RuntimeError::MissingSnapshot)?.users;
+            if let Err(error) = cache.store(&source_config, &users) {
+                self.metrics.cache_write_failures =
+                    self.metrics.cache_write_failures.saturating_add(1);
+                self.log(
+                    "warn",
+                    &format!("last-known-good snapshot cache write failed: {error:?}"),
+                );
+            }
+        }
         match result {
             SyncResult::Applied => self.metrics.applied = self.metrics.applied.saturating_add(1),
             SyncResult::Unchanged => {

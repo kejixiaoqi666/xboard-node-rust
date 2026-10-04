@@ -35,6 +35,15 @@ pub enum PanelError {
     Decode,
 }
 
+impl PanelError {
+    /// A cache may bridge a temporary outage, but never an authentication or
+    /// malformed-response failure. HTTP 5xx is treated as unavailable because
+    /// the panel endpoint is reachable but cannot serve authoritative state.
+    pub fn is_unavailable(&self) -> bool {
+        matches!(self, Self::Transport) || matches!(self, Self::Status(status) if *status >= 500)
+    }
+}
+
 #[derive(Debug)]
 pub enum Fetch<T> {
     Modified(T),
