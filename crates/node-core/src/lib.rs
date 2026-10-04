@@ -6,7 +6,7 @@ use thiserror::Error;
 mod traffic;
 pub use traffic::{MAX_TRAFFIC_ROWS, TRAFFIC_QUIESCE_TIMEOUT_SECS, TrafficSnapshot};
 mod activity;
-pub use activity::ActivitySnapshot;
+pub use activity::{ActivityAudit, ActivitySnapshot, ActivityUserAudit};
 pub mod reality;
 pub mod routing;
 pub mod shadowsocks;

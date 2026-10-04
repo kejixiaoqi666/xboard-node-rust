@@ -56,7 +56,7 @@ xboard-rust
 | 用户限制 | 共享限速、来源 IP 名额、热更新、凭据撤销 | 删除用户或同 ID 更换 UUID/密码后，旧会话停止；改速率不强制断开 |
 | 面板同步 | v2 machine / v1 UniProxy、REST、ETag、WebSocket 重同步提示 | 推送只触发重新读取权威配置；HTTP 200 本身不代表业务确认 |
 | 多节点 | 单进程静态 fleet、多面板、机器节点发现、独立状态/计费队列 | 全进程最多 64 节点；失败节点独立重试；拒绝目录重叠与身份重复 |
-| 观测 | 在线 IP、连接数、Linux CPU/内存/磁盘、机器状态、本地健康接口 | 健康汇总真实叶子状态；部分节点未就绪返回 503；观测上报不携带流量增量 |
+| 观测 | 逻辑会话、活跃用户、去重源 IP、用户-IP 关系、Linux CPU/内存/磁盘、机器状态、本地健康接口 | `online` 是会话数，不等于用户数；`alive` 是按用户记录的源 IP；本地审计会保留跨用户复用 IP；部分节点未就绪返回 503 |
 | 证书 | file / content / self、ACME HTTP-01、Cloudflare DNS-01、申请/续期/恢复 | 失败保留旧证书；HTTP-01 需要域名验证能访问节点；详见本地 CA 与生产验证边界 |
 | 配置恢复 | 每个节点把最后一次成功的面板配置/用户快照以身份绑定的私有文件保存；重启后面板暂时不可达时可先恢复 | 只在没有活动快照且面板连接失败或返回 5xx 时使用；缓存损坏、身份不匹配或鉴权失败都会拒绝，面板恢复后以新快照覆盖 |
 | 运维 | JSON 日志、离线检查、持久流量快照、待报队列、升级/回退 | 回退程序保留当前计费状态；不回滚已经上报的流量 |
@@ -95,6 +95,20 @@ TCP 与原生加密 UDP 使用同一端口。内置 v2ray-plugin 只包装 TCP�
 计数按用户身份归属并持久存档，采集到待报队列后使用冻结批次上报。若连接中断导致无法确定面板是否接收，批次进入 `uncertain`，**不会盲目重发造成重复计费**。需要在面板核对对应批次后使用 `--traffic-resolve` 标记 delivered 或 not-delivered。面板自身没有通用批次去重接口，因此本项目不宣称端到端 exactly-once。
 
 正常停止会先停止转发、回收会话、保存计数并清理在线记录。强制结束时仍有最后一次存档之后的尾部窗口；没有宣称掉电零损失或强杀无尾差。升级和回退只切换程序，保留当前计费状态。
+
+### 在线人数与节点审计口径
+
+节点端会把一次采样拆成几个互不替代的指标：
+
+- `sessions` / `online`：内核观察到的逻辑连接数，按面板用户 ID 分组；同一个用户开多个连接会增加连接数，但不会增加用户数。
+- `online_users`：`online[user_id] > 0` 的用户数量；这是节点范围内的活跃用户数，不是面板全局去重用户数。
+- `unique_source_ips`：所有用户源 IP 的全局去重数量；同一出口 NAT 下的多个用户只占一个源 IP。
+- `user_source_ip_pairs`：按用户统计的源 IP 关系数；它可能大于 `unique_source_ips`。
+- `reused_source_ip_pairs`：两者之差，用来识别跨用户复用出口 IP，不能把它当成重复连接或异常流量。
+
+这些字段只进入节点的本地 `/metrics` 健康接口，以及兼容的状态 `metrics` 对象，不改变 Xboard 原有 `alive`、`online` 和 `traffic` 字段。`/metrics.activity_audit.users` 会给出有会话或源 IP 观测的用户的会话数和源 IP 数，不包含 IP 字符串、凭据或 UUID；多节点 fleet 则在 `node_activity` 下按节点保留审计结果。采样不通过结构校验时会记录 `activity_rejected`，不会把无效数据发送给面板。
+
+流量审计同时在 `rust_runtime` 中按方向累计 `traffic_bytes_collected`、`traffic_bytes_acknowledged`、`traffic_bytes_uncertain` 和 `traffic_bytes_not_sent`，并记录 `last_traffic_batch_id` 与 `last_traffic_outcome`。这些是节点进程和本地持久队列的证据，不代表面板最终入账；`uncertain` 批次仍必须用面板记录人工核对后再执行 `--traffic-resolve`。
 
 ## 多节点和迁移
 

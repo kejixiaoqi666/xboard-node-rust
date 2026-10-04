@@ -28,6 +28,22 @@
 
 `poll_seconds` 和 `report_seconds` 均为 1–3600 秒。同步配置前会额外采集一次；HTTP 上报独立按上报周期触发。状态指标 `traffic_collected/traffic_reports/traffic_uncertain` 是本次进程的批次数，不能当作账单或跨重启累计流量。
 
+## 在线人数、源 IP 与本地审计
+
+节点的在线数据不再用一个数字混合表达。内核快照中的 `online` 是每个用户的逻辑会话数，`sessions` 是所有用户会话数之和；`alive` 是每个用户观察到的源 IP 列表。节点会拒绝同一用户内的重复 IP，并在本地健康接口中计算以下审计字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `tracked_users` | 快照中被跟踪的用户数，包括会话为 0 的用户 |
+| `online_users` | 会话数大于 0 的用户数；这是节点范围，不是面板全局去重 |
+| `unique_source_ips` | 所有用户源 IP 的全局去重数 |
+| `user_source_ip_pairs` | 按用户统计的源 IP 关系数 |
+| `reused_source_ip_pairs` | 关系数减全局去重数，用于识别 NAT/共享出口造成的跨用户复用 |
+
+`GET /metrics`（只监听本机）会在单节点的 `activity_audit` 中提供这些汇总和有会话或源 IP 观测用户的 `sessions/source_ips`；共享健康端口的 fleet 则在 `node_activity` 下按节点保留结果。`activity_valid`、`activity_sample_unix`、`activity_samples` 和 `activity_rejected` 用于判断样本是否新鲜、是否通过结构校验。无效样本会被丢弃，既不会更新在线审计，也不会发到 Xboard。
+
+流量审计字段位于 `metrics`/`rust_runtime`：`traffic_bytes_collected`、`traffic_bytes_acknowledged`、`traffic_bytes_uncertain`、`traffic_bytes_not_sent` 都是 `[上传, 下载]` 方向数组；`last_traffic_batch_id` 和 `last_traffic_outcome` 用来把进程内结果和持久 outbox 的批次对应起来。它们帮助定位“已采集、已发请求、收到严格 ACK、结果不确定”之间的差异，仍不等于面板最终计费。
+
 ## 数据怎样保存
 
 ```mermaid

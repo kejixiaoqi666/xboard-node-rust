@@ -393,7 +393,12 @@ async fn health_sessions_change_even_when_every_panel_report_is_rejected() {
     let task = RuntimeTask::spawn(runtime, stop, rx);
     wait_for(|| {
         let state = health.0.lock().unwrap();
-        state.ready && state.sessions == 9
+        state.ready
+            && state.sessions == 9
+            && state
+                .activity_audit
+                .as_ref()
+                .is_some_and(|audit| audit.online_users == 1 && audit.unique_source_ips == 1)
     })
     .await;
     wait_for(|| panel.rejected.load(Ordering::SeqCst) > 0).await;
@@ -482,6 +487,7 @@ async fn machine_health_aggregates_metrics_and_rejects_partial_discovery() {
             traffic_collected: 5,
             traffic_reports: 3,
             traffic_uncertain: 1,
+            ..Default::default()
         },
         Some(4),
     );
@@ -499,6 +505,7 @@ async fn machine_health_aggregates_metrics_and_rejects_partial_discovery() {
             traffic_collected: 9,
             traffic_reports: 2,
             traffic_uncertain: 3,
+            ..Default::default()
         },
         Some(6),
     );

@@ -116,12 +116,16 @@ impl Group {
         let mut total = RuntimeMetrics::default();
         let mut ready = 0;
         let mut sessions = 0u64;
+        let mut activity = BTreeMap::new();
         for child in &self.children {
             if let Ok(state) = child.health.0.lock() {
                 ready += usize::from(state.ready);
                 sessions = sessions.saturating_add(state.sessions);
                 add_metrics(&mut total, &state.metrics);
                 metrics.insert(child.node_id, state.metrics.clone());
+                if let Some(audit) = &state.activity_audit {
+                    activity.insert(child.node_id, audit.clone());
+                }
             }
         }
         // Commit all fields under one lock: HTTP readers see the totals and
@@ -135,6 +139,10 @@ impl Group {
             state.rejected_nodes = Some(0);
             state.sessions = sessions;
             state.node_metrics = metrics;
+            state.activity_valid = None;
+            state.activity_sample_unix = None;
+            state.activity_audit = None;
+            state.node_activity = activity;
             state.metrics = total;
             state.updated_unix = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -194,4 +202,37 @@ fn add_metrics(total: &mut RuntimeMetrics, node: &RuntimeMetrics) {
     total.traffic_uncertain = total
         .traffic_uncertain
         .saturating_add(node.traffic_uncertain);
+    total.traffic_not_sent = total.traffic_not_sent.saturating_add(node.traffic_not_sent);
+    for (total_bytes, node_bytes) in total
+        .traffic_bytes_collected
+        .iter_mut()
+        .zip(node.traffic_bytes_collected)
+    {
+        *total_bytes = total_bytes.saturating_add(node_bytes);
+    }
+    for (total_bytes, node_bytes) in total
+        .traffic_bytes_acknowledged
+        .iter_mut()
+        .zip(node.traffic_bytes_acknowledged)
+    {
+        *total_bytes = total_bytes.saturating_add(node_bytes);
+    }
+    for (total_bytes, node_bytes) in total
+        .traffic_bytes_uncertain
+        .iter_mut()
+        .zip(node.traffic_bytes_uncertain)
+    {
+        *total_bytes = total_bytes.saturating_add(node_bytes);
+    }
+    for (total_bytes, node_bytes) in total
+        .traffic_bytes_not_sent
+        .iter_mut()
+        .zip(node.traffic_bytes_not_sent)
+    {
+        *total_bytes = total_bytes.saturating_add(node_bytes);
+    }
+    total.activity_samples = total.activity_samples.saturating_add(node.activity_samples);
+    total.activity_rejected = total
+        .activity_rejected
+        .saturating_add(node.activity_rejected);
 }

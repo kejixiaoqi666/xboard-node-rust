@@ -392,6 +392,7 @@ async fn run_restartable(
             return Ok(());
         }
         node.health.update(false, &Default::default(), Some(0));
+        node.health.clear_activity();
         if let Err(error) =
             run_config(node.clone(), services.clone(), log.clone(), stop.clone()).await
         {

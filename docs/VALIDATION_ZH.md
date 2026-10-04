@@ -39,7 +39,8 @@ cargo test -p node-native --test plugin_process -j 2 -- --nocapture
 | Routing/outbound | 实际 TCP/UDP 代理和多层链、规则集/Geo 数据、加密 DNS 及无明文降级 | [测试](../crates/node-outbound/tests/) |
 | 原生接入 | SessionHost 计数/限速/IP/凭据撤销；Unix SIP003 子进程与 WS 插件入口 | [会话测试](../crates/node-native/src/session_integration.rs)、[Unix 入口](../crates/node-native/tests/) |
 | 面板/配置 | 13 项真实 HTTP 观测/ACK 契约；NodeSpec→实际 builder→原生 decoder | [观测](../crates/node-panel/tests/telemetry_contract.rs)、[配置](../crates/node-kernel/tests/full_parity_config.rs) |
-| Runtime | 304 后证书轮换、失败恢复、真实机器健康汇总和监听回收 | [接入](../crates/node-runtime/tests/administration_integration.rs)、[健康](../crates/node-runtime/tests/health_fleet.rs) |
+| Runtime | 304 后证书轮换、失败恢复、真实机器健康汇总、在线审计和监听回收 | [接入](../crates/node-runtime/tests/administration_integration.rs)、[健康](../crates/node-runtime/tests/health_fleet.rs) |
+| Activity audit | 会话/用户/全局去重源 IP/跨用户复用关系、重复 IP 拒绝 | [核心测试](../crates/node-core/tests/activity.rs) |
 
 ## REALITY 与证书
 

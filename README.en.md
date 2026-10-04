@@ -41,7 +41,7 @@ The menu provides install, update, configure, rollback, start/stop/restart, stat
 | Rule data | Local source JSON, V2Ray GeoIP/GeoSite `.dat`, selectors, SHA checks and atomic replacement | Remote sets and binary SRS are unsupported |
 | Outbound/DNS | direct/block, SOCKS5, HTTP CONNECT, VLESS/Trojan/SS, detour chains; UDP/TCP/DoT/DoH/DoQ DNS | Capabilities follow the selected protocol; encrypted DNS verifies certificates and has no silent plaintext fallback |
 | Panel/fleet | v2 machine/v1 UniProxy REST, ETag and WS resync; static fleets, multiple panels, machine discovery | Up to 64 nodes per process; distinct state/outboxes; conflicting paths/identities are rejected |
-| Observability | Online IPs/connections, measured Linux host resources, machine status, local health and JSON logs | Local health is independent of panel ACK; partial readiness returns 503 |
+| Observability | Logical sessions, active users, globally deduplicated source IPs, user-IP relationships, measured Linux host resources, machine status, local health and JSON logs | `online` is a session count, not a user count; `alive` is grouped by user; partial readiness returns 503 |
 | Certificates | file/content/self; ACME HTTP-01 and Cloudflare DNS-01, renewal and recovery | Failed renewal retains the last certificate; validation scope below |
 | Configuration recovery | Each node stores its last successful panel config/user snapshot in an identity-bound private file; a restarted node can bootstrap while the panel is temporarily unavailable | Used only with no active snapshot and a transport/5xx outage; corrupt, mismatched or unauthorized responses are rejected, and a reachable panel replaces the cache |
 | Accounting/operations | Stable user counters, checkpoints, immutable pending reports, reconciliation, installer and rollback | Program rollback preserves current billing state |
@@ -53,6 +53,12 @@ One user's upload plus download across connections share `speed_limit` in Mbps. 
 Only successfully forwarded application payload is counted. Authentication, address headers, frame padding and outer TLS/QUIC overhead are excluded. Inner HTTPS records are payload, so counters are not equivalent to interface bytes or decrypted file size.
 
 Persisted frozen batches separate collection from panel delivery. If the panel may have received a request but its ACK was lost, the batch becomes `uncertain` and is not blindly resent. Reconcile the exact panel batch, then use `--traffic-resolve ... delivered|not-delivered`. The panel has no universal batch deduplication API, so end-to-end exactly-once delivery is not claimed. Forced termination can lose a tail after the latest checkpoint; zero-loss power failure is not claimed.
+
+### Online counts and node-side audit
+
+The node keeps separate units for the same observation sample. `sessions` and `online` are logical connection counts grouped by panel user ID; `online_users` counts users whose session count is above zero; `unique_source_ips` globally deduplicates observed source IPs; `user_source_ip_pairs` keeps the per-user relationships; and `reused_source_ip_pairs` exposes cross-user reuse such as a shared NAT exit. A single user with several connections therefore does not become several users, while two users behind one exit are still two user records and one global source IP.
+
+The localhost `GET /metrics` endpoint exposes these values under `activity_audit`, including session/source-IP counts for users with an observation, without IP strings, credentials or UUIDs. A shared fleet health listener keeps the exact per-node records under `node_activity`. Invalid samples are rejected and counted in `activity_rejected` instead of being sent to Xboard. The runtime also reports directional arrays for `traffic_bytes_collected`, `traffic_bytes_acknowledged`, `traffic_bytes_uncertain` and `traffic_bytes_not_sent`, plus the last traffic batch ID and outcome. These are node and durable-outbox evidence; they do not claim final panel billing.
 
 Shadowsocks2022 preserves the original conversion: copy UUID UTF-8 bytes into a zero-filled 16/32-byte buffer, truncate excess, then Base64. AES2022 uses `server_key:user_key`; ChaCha2022 uses the user key alone. Colliding converted keys are rejected. Legacy methods include AES-128/192/256 CTR/CFB, RC4-MD5, ChaCha20-IETF, XChaCha20 and none.
 

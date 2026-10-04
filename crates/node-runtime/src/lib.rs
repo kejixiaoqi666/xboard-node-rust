@@ -25,6 +25,14 @@ use thiserror::Error;
 use tokio::sync::{mpsc, watch};
 use traffic::{Outbox, TrafficError};
 
+fn is_zero_u64(value: &u64) -> bool {
+    *value == 0
+}
+
+fn is_zero_bytes(value: &[u64; 2]) -> bool {
+    *value == [0, 0]
+}
+
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeConfig {
@@ -178,6 +186,24 @@ pub struct RuntimeMetrics {
     pub traffic_collected: u64,
     pub traffic_reports: u64,
     pub traffic_uncertain: u64,
+    #[serde(skip_serializing_if = "is_zero_u64")]
+    pub traffic_not_sent: u64,
+    #[serde(skip_serializing_if = "is_zero_bytes")]
+    pub traffic_bytes_collected: [u64; 2],
+    #[serde(skip_serializing_if = "is_zero_bytes")]
+    pub traffic_bytes_acknowledged: [u64; 2],
+    #[serde(skip_serializing_if = "is_zero_bytes")]
+    pub traffic_bytes_uncertain: [u64; 2],
+    #[serde(skip_serializing_if = "is_zero_bytes")]
+    pub traffic_bytes_not_sent: [u64; 2],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_traffic_batch_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_traffic_outcome: Option<String>,
+    #[serde(skip_serializing_if = "is_zero_u64")]
+    pub activity_samples: u64,
+    #[serde(skip_serializing_if = "is_zero_u64")]
+    pub activity_rejected: u64,
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum SyncResult {
@@ -330,22 +356,36 @@ impl<K: ManagedKernel> NodeRuntime<K> {
                 return Err(RuntimeError::Closing);
             }
             if kernel.status() != KernelStatus::Ready {
-                return Ok(false);
+                return Ok(((false, [0, 0]), None));
             }
             let Some(snapshot) = kernel.traffic_snapshot()? else {
-                return Ok(false);
+                return Ok(((false, [0, 0]), None));
             };
             let collected = outbox
                 .lock()
                 .map_err(|_| RuntimeError::Worker)?
                 .collect(&snapshot)?;
-            kernel.traffic_ack(&snapshot)?;
-            Ok::<_, RuntimeError>(collected)
+            let mut bytes = [0_u64; 2];
+            if collected {
+                for value in snapshot.traffic.values() {
+                    bytes[0] = bytes[0].saturating_add(value[0]);
+                    bytes[1] = bytes[1].saturating_add(value[1]);
+                }
+            }
+            let ack_error = kernel.traffic_ack(&snapshot).err();
+            Ok::<_, RuntimeError>(((collected, bytes), ack_error))
         })
         .await
         .map_err(|_| RuntimeError::Worker)??;
-        if collected {
+        let ((was_collected, bytes), ack_error) = collected;
+        if was_collected {
             self.metrics.traffic_collected = self.metrics.traffic_collected.saturating_add(1);
+            for (total, value) in self.metrics.traffic_bytes_collected.iter_mut().zip(bytes) {
+                *total = total.saturating_add(value);
+            }
+        }
+        if let Some(error) = ack_error {
+            return Err(RuntimeError::Kernel(error));
         }
         Ok(())
     }
@@ -380,25 +420,61 @@ impl<K: ManagedKernel> NodeRuntime<K> {
         let Some(batch) = batch else {
             return Ok(());
         };
+        let batch_id = batch.id;
+        let mut batch_bytes = [0_u64; 2];
+        for value in batch.traffic.values() {
+            batch_bytes[0] = batch_bytes[0].saturating_add(value[0].max(0) as u64);
+            batch_bytes[1] = batch_bytes[1].saturating_add(value[1].max(0) as u64);
+        }
         let outcome = self.panel.report_traffic(&batch.traffic).await;
         tokio::task::spawn_blocking(move || {
             outbox
                 .lock()
                 .map_err(|_| RuntimeError::Worker)?
-                .finish(batch.id, outcome)?;
+                .finish(batch_id, outcome)?;
             Ok::<_, RuntimeError>(())
         })
         .await
         .map_err(|_| RuntimeError::Worker)??;
         match outcome {
             ReportOutcome::Acknowledged => {
-                self.metrics.traffic_reports = self.metrics.traffic_reports.saturating_add(1)
+                self.metrics.traffic_reports = self.metrics.traffic_reports.saturating_add(1);
+                for (total, value) in self
+                    .metrics
+                    .traffic_bytes_acknowledged
+                    .iter_mut()
+                    .zip(batch_bytes)
+                {
+                    *total = total.saturating_add(value);
+                }
+                self.metrics.last_traffic_outcome = Some("acknowledged".into());
             }
             ReportOutcome::Uncertain => {
-                self.metrics.traffic_uncertain = self.metrics.traffic_uncertain.saturating_add(1)
+                self.metrics.traffic_uncertain = self.metrics.traffic_uncertain.saturating_add(1);
+                for (total, value) in self
+                    .metrics
+                    .traffic_bytes_uncertain
+                    .iter_mut()
+                    .zip(batch_bytes)
+                {
+                    *total = total.saturating_add(value);
+                }
+                self.metrics.last_traffic_outcome = Some("uncertain".into());
             }
-            ReportOutcome::NotSent => {}
+            ReportOutcome::NotSent => {
+                self.metrics.traffic_not_sent = self.metrics.traffic_not_sent.saturating_add(1);
+                for (total, value) in self
+                    .metrics
+                    .traffic_bytes_not_sent
+                    .iter_mut()
+                    .zip(batch_bytes)
+                {
+                    *total = total.saturating_add(value);
+                }
+                self.metrics.last_traffic_outcome = Some("not_sent".into());
+            }
         }
+        self.metrics.last_traffic_batch_id = Some(batch_id);
         Ok(())
     }
 
@@ -913,6 +989,7 @@ impl<K: ManagedKernel> NodeRuntime<K> {
         }
         if let Some(health) = &self.health {
             health.update(false, &self.metrics, Some(0));
+            health.clear_activity();
         }
         result
     }
@@ -924,6 +1001,9 @@ impl<K: ManagedKernel> NodeRuntime<K> {
         let mut activity = tokio::task::spawn_blocking(move || kernel.activity())
             .await
             .map_err(|_| RuntimeError::Worker)??;
+        let Some(_audit) = self.record_activity(&activity) else {
+            return Ok(());
+        };
         if let Some(health) = &self.health {
             health.update(true, &self.metrics, Some(activity.sessions));
         }
@@ -952,8 +1032,49 @@ impl<K: ManagedKernel> NodeRuntime<K> {
         let activity = tokio::task::spawn_blocking(move || kernel.activity())
             .await
             .map_err(|_| RuntimeError::Worker)??;
-        self.panel.report_status(status,serde_json::json!({"rust_runtime":self.metrics,"active_connections":activity.sessions,"active_users":activity.alive.len(),"kernel_status":true})).await?;
+        let Some(audit) = self.record_activity(&activity) else {
+            return Ok(());
+        };
+        if let Some(health) = &self.health {
+            health.update(true, &self.metrics, Some(activity.sessions));
+        }
+        self.panel
+            .report_status(
+                status,
+                serde_json::json!({
+                    "rust_runtime":self.metrics,
+                    "active_connections":audit.sessions,
+                    "active_users":audit.online_users,
+                    "tracked_users":audit.tracked_users,
+                    "active_source_ips":audit.unique_source_ips,
+                    "user_source_ip_pairs":audit.user_source_ip_pairs,
+                    "reused_source_ip_pairs":audit.reused_source_ip_pairs,
+                    "kernel_status":true
+                }),
+            )
+            .await?;
         Ok(())
+    }
+
+    fn record_activity(
+        &mut self,
+        activity: &node_core::ActivitySnapshot,
+    ) -> Option<node_core::ActivityAudit> {
+        self.metrics.activity_samples = self.metrics.activity_samples.saturating_add(1);
+        let audit = activity.audit();
+        if audit.is_none() {
+            self.metrics.activity_rejected = self.metrics.activity_rejected.saturating_add(1);
+            if let Some(health) = &self.health {
+                health.invalidate_activity();
+            }
+            self.log(
+                "warn",
+                "kernel activity sample rejected by accounting bounds",
+            );
+        } else if let Some(health) = &self.health {
+            health.update_activity(activity);
+        }
+        audit
     }
 }
 

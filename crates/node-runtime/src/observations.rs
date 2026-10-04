@@ -1,5 +1,6 @@
 //! Measured Linux host status and local health. No synthetic load measurements.
 use crate::RuntimeMetrics;
+use node_core::{ActivityAudit, ActivitySnapshot};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::{
@@ -21,6 +22,12 @@ pub struct HealthState {
     pub metrics: RuntimeMetrics,
     pub sessions: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub activity_valid: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub activity_sample_unix: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub activity_audit: Option<ActivityAudit>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub nodes: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ready_nodes: Option<usize>,
@@ -30,6 +37,8 @@ pub struct HealthState {
     pub rejected_nodes: Option<usize>,
     #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub node_metrics: std::collections::BTreeMap<u32, RuntimeMetrics>,
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub node_activity: std::collections::BTreeMap<u32, ActivityAudit>,
 }
 #[derive(Default)]
 pub struct Health(pub Mutex<HealthState>);
@@ -45,6 +54,42 @@ impl Health {
             if let Some(sessions) = sessions {
                 state.sessions = sessions;
             }
+            if !ready {
+                state.activity_valid = None;
+                state.activity_sample_unix = None;
+                state.activity_audit = None;
+            }
+        }
+    }
+    pub fn update_activity(&self, activity: &ActivitySnapshot) -> bool {
+        let Some(audit) = activity.audit() else {
+            self.invalidate_activity();
+            return false;
+        };
+        if let Ok(mut state) = self.0.lock() {
+            state.activity_valid = Some(true);
+            state.activity_sample_unix = Some(now_unix());
+            state.activity_audit = Some(audit);
+            state.sessions = activity.sessions;
+            state.updated_unix = now_unix();
+            true
+        } else {
+            false
+        }
+    }
+    pub fn invalidate_activity(&self) {
+        if let Ok(mut state) = self.0.lock() {
+            state.activity_valid = Some(false);
+            state.activity_sample_unix = Some(now_unix());
+            state.activity_audit = None;
+            state.updated_unix = now_unix();
+        }
+    }
+    pub fn clear_activity(&self) {
+        if let Ok(mut state) = self.0.lock() {
+            state.activity_valid = None;
+            state.activity_sample_unix = None;
+            state.activity_audit = None;
         }
     }
     pub fn update_fleet(
@@ -56,12 +101,16 @@ impl Health {
         let mut ready = 0;
         let mut sessions = 0u64;
         let mut metrics = std::collections::BTreeMap::new();
+        let mut activity = std::collections::BTreeMap::new();
         for (id, child) in children {
             count += 1;
             if let Ok(state) = child.0.lock() {
                 ready += usize::from(state.ready);
                 sessions = sessions.saturating_add(state.sessions);
                 metrics.insert(id, state.metrics.clone());
+                if let Some(audit) = &state.activity_audit {
+                    activity.insert(id, audit.clone());
+                }
             }
         }
         if let Ok(mut state) = self.0.lock() {
@@ -91,9 +140,48 @@ impl Health {
                 total.traffic_uncertain = total
                     .traffic_uncertain
                     .saturating_add(node.traffic_uncertain);
+                total.traffic_not_sent =
+                    total.traffic_not_sent.saturating_add(node.traffic_not_sent);
+                for (total_bytes, node_bytes) in total
+                    .traffic_bytes_collected
+                    .iter_mut()
+                    .zip(node.traffic_bytes_collected)
+                {
+                    *total_bytes = total_bytes.saturating_add(node_bytes);
+                }
+                for (total_bytes, node_bytes) in total
+                    .traffic_bytes_acknowledged
+                    .iter_mut()
+                    .zip(node.traffic_bytes_acknowledged)
+                {
+                    *total_bytes = total_bytes.saturating_add(node_bytes);
+                }
+                for (total_bytes, node_bytes) in total
+                    .traffic_bytes_uncertain
+                    .iter_mut()
+                    .zip(node.traffic_bytes_uncertain)
+                {
+                    *total_bytes = total_bytes.saturating_add(node_bytes);
+                }
+                for (total_bytes, node_bytes) in total
+                    .traffic_bytes_not_sent
+                    .iter_mut()
+                    .zip(node.traffic_bytes_not_sent)
+                {
+                    *total_bytes = total_bytes.saturating_add(node_bytes);
+                }
+                total.activity_samples =
+                    total.activity_samples.saturating_add(node.activity_samples);
+                total.activity_rejected = total
+                    .activity_rejected
+                    .saturating_add(node.activity_rejected);
             }
             state.metrics = total;
             state.node_metrics = metrics;
+            state.activity_valid = None;
+            state.activity_sample_unix = None;
+            state.activity_audit = None;
+            state.node_activity = activity;
             state.updated_unix = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
@@ -149,6 +237,13 @@ impl Health {
         while tasks.join_next().await.is_some() {}
         Ok(())
     }
+}
+
+fn now_unix() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 /// A failed or cancelled owner cannot leave its health listener behind.
