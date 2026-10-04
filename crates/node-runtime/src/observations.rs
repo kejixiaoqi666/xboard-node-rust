@@ -39,6 +39,8 @@ pub struct HealthState {
     pub node_metrics: std::collections::BTreeMap<u32, RuntimeMetrics>,
     #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub node_activity: std::collections::BTreeMap<u32, ActivityAudit>,
+    #[serde(skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub node_activity_sample_unix: std::collections::BTreeMap<u32, u64>,
 }
 #[derive(Default)]
 pub struct Health(pub Mutex<HealthState>);
@@ -102,6 +104,7 @@ impl Health {
         let mut sessions = 0u64;
         let mut metrics = std::collections::BTreeMap::new();
         let mut activity = std::collections::BTreeMap::new();
+        let mut activity_sample_unix = std::collections::BTreeMap::new();
         for (id, child) in children {
             count += 1;
             if let Ok(state) = child.0.lock() {
@@ -110,6 +113,9 @@ impl Health {
                 metrics.insert(id, state.metrics.clone());
                 if let Some(audit) = &state.activity_audit {
                     activity.insert(id, audit.clone());
+                }
+                if let Some(sample_unix) = state.activity_sample_unix {
+                    activity_sample_unix.insert(id, sample_unix);
                 }
             }
         }
@@ -182,6 +188,7 @@ impl Health {
             state.activity_sample_unix = None;
             state.activity_audit = None;
             state.node_activity = activity;
+            state.node_activity_sample_unix = activity_sample_unix;
             state.updated_unix = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()

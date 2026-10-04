@@ -1,10 +1,13 @@
 use node_core::TrafficSnapshot;
+use node_kernel::{KernelAdapter, KernelError, KernelStatus};
 use node_panel::ReportOutcome;
 use node_runtime::traffic::{Outbox, Stage, TrafficError};
+use node_runtime::{ManagedKernel, NodeRuntime};
 use std::{
     collections::BTreeMap,
     path::PathBuf,
     sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
 };
 
 struct Directory(PathBuf);
@@ -38,6 +41,64 @@ fn sample(epoch: char, sequence: u64, bytes: [u64; 2]) -> TrafficSnapshot {
         sequence,
         traffic: BTreeMap::from([("100".into(), bytes)]),
     }
+}
+
+#[tokio::test]
+async fn collection_bytes_are_audited_before_a_kernel_ack_failure() {
+    struct Kernel {
+        snapshot: TrafficSnapshot,
+    }
+    impl KernelAdapter for Kernel {
+        type Candidate = ();
+        fn name(&self) -> &'static str {
+            "ack-audit-fixture"
+        }
+        fn prepare(
+            &self,
+            _: &node_core::NodeSpec,
+            _: &[node_core::UserSpec],
+        ) -> Result<(), KernelError> {
+            Ok(())
+        }
+        fn activate(&self, _: ()) -> Result<(), KernelError> {
+            Ok(())
+        }
+        fn rollback(&self) -> Result<(), KernelError> {
+            Ok(())
+        }
+        fn status(&self) -> KernelStatus {
+            KernelStatus::Ready
+        }
+    }
+    impl ManagedKernel for Kernel {
+        fn stop(&self) -> Result<(), KernelError> {
+            Ok(())
+        }
+        fn traffic_snapshot(&self) -> Result<Option<TrafficSnapshot>, KernelError> {
+            Ok(Some(self.snapshot.clone()))
+        }
+        fn traffic_ack(&self, _: &TrafficSnapshot) -> Result<(), KernelError> {
+            Err(KernelError::Invalid("ack lost".into()))
+        }
+    }
+
+    let dir = Directory::new();
+    let panel = node_panel::Panel::new(
+        "https://panel.example.com",
+        node_panel::Auth::machine("fixture-only", 1, 7),
+    )
+    .unwrap();
+    let snapshot = sample('a', 1, [12, 34]);
+    let mut runtime = NodeRuntime::new(panel, Kernel { snapshot }, 7)
+        .with_traffic(&dir.0, Duration::from_secs(60))
+        .unwrap();
+    assert!(runtime.collect_traffic().await.is_err());
+    assert_eq!(runtime.metrics().traffic_collected, 1);
+    assert_eq!(runtime.metrics().traffic_bytes_collected, [12, 34]);
+    let book: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.0.join("traffic.json")).unwrap()).unwrap();
+    assert_eq!(book["pending"]["100"], serde_json::json!([12, 34]));
+    assert_eq!(book["receipts"]["a".repeat(32)]["sequence"], 1);
 }
 
 #[test]

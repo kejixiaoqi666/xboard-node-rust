@@ -106,7 +106,7 @@ TCP 与原生加密 UDP 使用同一端口。内置 v2ray-plugin 只包装 TCP�
 - `user_source_ip_pairs`：按用户统计的源 IP 关系数；它可能大于 `unique_source_ips`。
 - `reused_source_ip_pairs`：两者之差，用来识别跨用户复用出口 IP，不能把它当成重复连接或异常流量。
 
-这些字段只进入节点的本地 `/metrics` 健康接口，以及兼容的状态 `metrics` 对象，不改变 Xboard 原有 `alive`、`online` 和 `traffic` 字段。`/metrics.activity_audit.users` 会给出有会话或源 IP 观测的用户的会话数和源 IP 数，不包含 IP 字符串、凭据或 UUID；多节点 fleet 则在 `node_activity` 下按节点保留审计结果。采样不通过结构校验时会记录 `activity_rejected`，不会把无效数据发送给面板。
+这些字段只进入节点的本地 `/metrics` 健康接口，以及兼容的状态 `metrics` 对象，不改变 Xboard 原有 `alive`、`online` 和 `traffic` 字段。`/metrics.activity_audit.users` 会给出有会话或源 IP 观测的用户的会话数和源 IP 数，不包含 IP 字符串、凭据或 UUID；多节点 fleet 则在 `node_activity` 下按节点保留审计结果，并在 `node_activity_sample_unix` 给出每个节点最后一次有效采样时间。采样不通过结构校验时会记录 `activity_rejected`，不会把无效数据发送给面板。
 
 流量审计同时在 `rust_runtime` 中按方向累计 `traffic_bytes_collected`、`traffic_bytes_acknowledged`、`traffic_bytes_uncertain` 和 `traffic_bytes_not_sent`，并记录 `last_traffic_batch_id` 与 `last_traffic_outcome`。这些是节点进程和本地持久队列的证据，不代表面板最终入账；`uncertain` 批次仍必须用面板记录人工核对后再执行 `--traffic-resolve`。
 

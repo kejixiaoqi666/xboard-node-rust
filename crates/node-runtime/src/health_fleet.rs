@@ -117,6 +117,7 @@ impl Group {
         let mut ready = 0;
         let mut sessions = 0u64;
         let mut activity = BTreeMap::new();
+        let mut activity_sample_unix = BTreeMap::new();
         for child in &self.children {
             if let Ok(state) = child.health.0.lock() {
                 ready += usize::from(state.ready);
@@ -125,6 +126,9 @@ impl Group {
                 metrics.insert(child.node_id, state.metrics.clone());
                 if let Some(audit) = &state.activity_audit {
                     activity.insert(child.node_id, audit.clone());
+                }
+                if let Some(sample_unix) = state.activity_sample_unix {
+                    activity_sample_unix.insert(child.node_id, sample_unix);
                 }
             }
         }
@@ -143,6 +147,7 @@ impl Group {
             state.activity_sample_unix = None;
             state.activity_audit = None;
             state.node_activity = activity;
+            state.node_activity_sample_unix = activity_sample_unix;
             state.metrics = total;
             state.updated_unix = SystemTime::now()
                 .duration_since(UNIX_EPOCH)

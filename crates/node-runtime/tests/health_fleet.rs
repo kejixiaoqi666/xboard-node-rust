@@ -1,3 +1,4 @@
+use node_core::ActivitySnapshot;
 use node_runtime::{RuntimeConfig, RuntimeMetrics, administration::PreparedNode, health_fleet};
 use serde_json::{Value, json};
 use std::{net::Ipv4Addr, sync::Arc, time::Duration};
@@ -138,6 +139,16 @@ async fn real_http_aggregates_live_nodes_and_releases_port_on_shutdown() {
         },
         Some(7),
     );
+    assert!(first.update_activity(&ActivitySnapshot {
+        alive: [(7, vec!["192.0.2.7".into()])].into(),
+        online: [(7, 4)].into(),
+        sessions: 4,
+    }));
+    assert!(second.update_activity(&ActivitySnapshot {
+        alive: [(8, vec!["192.0.2.8".into()])].into(),
+        online: [(8, 7)].into(),
+        sessions: 7,
+    }));
     health_fleet::validate(&nodes).unwrap();
     let group = health_fleet::prepare(&mut nodes).pop().unwrap();
     let (stop, rx) = watch::channel(false);
@@ -161,6 +172,8 @@ async fn real_http_aggregates_live_nodes_and_releases_port_on_shutdown() {
     assert_eq!(metrics["node_metrics"]["7"]["applied"], 2);
     assert_eq!(metrics["node_metrics"]["8"]["applied"], 4);
     assert_eq!(metrics["node_metrics"].as_object().unwrap().len(), 2);
+    assert_eq!(metrics["node_activity"]["7"]["online_users"], 1);
+    assert!(metrics["node_activity_sample_unix"]["7"].as_u64().is_some());
 
     second.update(
         false,

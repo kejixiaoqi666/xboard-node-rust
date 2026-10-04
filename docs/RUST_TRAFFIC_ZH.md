@@ -40,7 +40,7 @@
 | `user_source_ip_pairs` | 按用户统计的源 IP 关系数 |
 | `reused_source_ip_pairs` | 关系数减全局去重数，用于识别 NAT/共享出口造成的跨用户复用 |
 
-`GET /metrics`（只监听本机）会在单节点的 `activity_audit` 中提供这些汇总和有会话或源 IP 观测用户的 `sessions/source_ips`；共享健康端口的 fleet 则在 `node_activity` 下按节点保留结果。`activity_valid`、`activity_sample_unix`、`activity_samples` 和 `activity_rejected` 用于判断样本是否新鲜、是否通过结构校验。无效样本会被丢弃，既不会更新在线审计，也不会发到 Xboard。
+`GET /metrics`（只监听本机）会在单节点的 `activity_audit` 中提供这些汇总和有会话或源 IP 观测用户的 `sessions/source_ips`；共享健康端口的 fleet 则在 `node_activity` 下按节点保留结果，并在 `node_activity_sample_unix` 给出每个节点最后一次有效采样时间。`activity_valid`、`activity_sample_unix`、`activity_samples` 和 `activity_rejected` 用于判断样本是否新鲜、是否通过结构校验。无效样本会被丢弃，既不会更新在线审计，也不会发到 Xboard。
 
 流量审计字段位于 `metrics`/`rust_runtime`：`traffic_bytes_collected`、`traffic_bytes_acknowledged`、`traffic_bytes_uncertain`、`traffic_bytes_not_sent` 都是 `[上传, 下载]` 方向数组；`last_traffic_batch_id` 和 `last_traffic_outcome` 用来把进程内结果和持久 outbox 的批次对应起来。它们帮助定位“已采集、已发请求、收到严格 ACK、结果不确定”之间的差异，仍不等于面板最终计费。
 
