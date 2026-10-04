@@ -6,7 +6,7 @@
 
 The panel manages users and subscriptions; this program runs the node. It continues the migration from [xbord-node-v3](https://github.com/xiaofujie369/xbord-node-v3). The name and installer entry point are unchanged. Local standalone configurations are also supported.
 
-The `v0.1.0-preview.16` prerelease keeps the preview.15 protocol, transport, routing, DNS, fleet and certificate modules and adds a machine-readable offline traffic status summary for bots and operations scripts. The raw pending and batch fields remain available, while the summary reports state, byte totals, user counts, reconciliation requirement and next action. The default server uses Rust throughout and requires no Go, Xray or external sing-box server. New features are not a claim of complete upstream compatibility, maximum capacity or proven long-term production stability.
+The `v0.1.0-preview.17` prerelease keeps the preview.16 protocol, transport, routing, DNS, fleet and certificate modules and adds precise node-side activity audits, source-IP relationship evidence, per-node sample freshness and directional traffic outcome counters. The default server uses Rust throughout and requires no Go, Xray or external sing-box server. New features are not a claim of complete upstream compatibility, maximum capacity or proven long-term production stability.
 
 ![Architecture](docs/assets/architecture.svg)
 

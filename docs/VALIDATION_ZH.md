@@ -1,6 +1,6 @@
 # 验证入口与证据范围
 
-验证按层区分：源码回归、独立官方客户端互通、实际 Linux 程序、真实面板业务。构建成功、服务启动、HTTP 200 或解析器测试不能代替下一层。当前介绍对应 preview.16 预发布版；最终发布状态和执行结果以匹配该版本的 Release 报告为准。
+验证按层区分：源码回归、独立官方客户端互通、实际 Linux 程序、真实面板业务。构建成功、服务启动、HTTP 200 或解析器测试不能代替下一层。当前介绍对应 preview.17 预发布版；最终发布状态和执行结果以匹配该版本的 Release 报告为准。
 
 ## 普通回归与静态检查
 
@@ -53,6 +53,12 @@ ACME HTTP-01 使用实际本地 Pebble CA：见 [PEBBLE_FIXTURE.md](../crates/no
 [发行工作流](../.github/workflows/release.yml)分别在 AMD64 和 ARM64 运行源码检查、官方客户端、静态 ELF 构建、安装器与 systemd 生命周期。公开报告保留架构、源码/二进制/归档 SHA；不同版本的结果不能直接转用。
 
 真实面板验收使用独立隐藏节点和专用测试用户，检查实际转发字节、节点原始计数、倍率后的用户计费、在线记录及正常重启。凭据、真实用户资料和生产配置不进入公开报告。面板缺少批次去重时的未知上报仍需要人工对账；周期存档后的强杀尾部、WAN 最大承载量和长期稳定性保持明确边界。
+
+### v0.1.0-preview.17 的精确结果
+
+预发布 tag `v0.1.0-preview.17` 精确绑定提交 `2dd52a889b123fd453e4392c49d24e280bef99e7`。GitHub Actions [37211872706](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37211872706) 和 [37211872702](https://github.com/kejixiaoqi666/xboard-node-rust/actions/runs/37211872702) 均通过 Rust experimental runtime、AMD64/ARM64 静态构建、源码回归、clippy、官方客户端互通、安装器和 systemd 生命周期。preview.17 新增节点侧 Activity 审计、每节点采样时间、流量方向结果计数，以及 ACK 失败前已采集字节的回归测试；Xboard `alive`、`online` 和 `traffic` 字段保持兼容。
+
+本版发布资产由同一 tag 的发行工作流生成。真实 Flash 计费仍引用 preview.12 的独立隐藏节点证据；本版不新增真实面板最终计费声明，未知 ACK、强杀/掉电尾部、WAN 最大承载量和长期稳定性仍保持独立边界。
 
 ### v0.1.0-preview.16 的精确结果
 
