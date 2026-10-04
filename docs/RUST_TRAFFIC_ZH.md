@@ -65,6 +65,8 @@ HTTP 客户端关闭隐式自动重试。确认连接建立失败或请求构建
 xboard-node-rust --config runtime.json --traffic-status
 ```
 
+输出保留完整的 `pending` 和 `batch` 原始字段，并额外提供 `summary` 供脚本或 Bot 直接读取：`state` 可能是 `idle`、`pending`、`prepared`、`sending` 或 `uncertain`；`pending_bytes` / `batch_bytes` 是上传、下载合计，`*_users` 是对应用户数。只有 `requires_reconciliation:true` 时才表示必须先核对面板，再按 `next_action` 的提示执行 `--traffic-resolve`；摘要不会替你判断面板是否已处理。
+
 核对该批次用户、字节和实际面板记录，确认已经处理后标记已送达；确认未处理后才允许再发。命令里的 `123` 必须换成状态输出中真实的批次 ID：
 
 ```bash

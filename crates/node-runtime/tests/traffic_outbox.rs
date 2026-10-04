@@ -90,6 +90,52 @@ fn not_sent_retries_exact_batch_but_crashed_sending_requires_reconciliation() {
     assert_eq!(next.traffic[&100], [5, 6]);
 }
 #[test]
+fn status_summary_exposes_operator_state_without_guessing_delivery() {
+    let dir = Directory::new();
+    let mut outbox = dir.open();
+    outbox.collect(&sample('a', 1, [12, 34])).unwrap();
+    let status = outbox.status();
+    assert_eq!(status["summary"]["state"], "pending");
+    assert_eq!(status["summary"]["next_action"], "report");
+    assert_eq!(status["summary"]["pending_users"], 1);
+    assert_eq!(
+        status["summary"]["pending_bytes"],
+        serde_json::json!([12, 34])
+    );
+    assert!(
+        !status["summary"]["requires_reconciliation"]
+            .as_bool()
+            .unwrap()
+    );
+
+    let batch = outbox.prepare().unwrap().unwrap();
+    let status = outbox.status();
+    assert_eq!(status["summary"]["state"], "prepared");
+    assert_eq!(status["summary"]["next_action"], "send");
+    assert_eq!(status["summary"]["batch_users"], 1);
+    assert_eq!(
+        status["summary"]["batch_bytes"],
+        serde_json::json!([12, 34])
+    );
+    outbox.sending(batch.id).unwrap();
+    let status = outbox.status();
+    assert_eq!(status["summary"]["state"], "sending");
+    assert_eq!(status["summary"]["next_action"], "await_report_result");
+
+    outbox.finish(batch.id, ReportOutcome::Uncertain).unwrap();
+    let status = outbox.status();
+    assert_eq!(status["summary"]["state"], "uncertain");
+    assert_eq!(
+        status["summary"]["next_action"],
+        "inspect_panel_then_traffic_resolve"
+    );
+    assert!(
+        status["summary"]["requires_reconciliation"]
+            .as_bool()
+            .unwrap()
+    );
+}
+#[test]
 fn counter_maximum_is_split_into_signed_panel_batches_without_wrapping() {
     let dir = Directory::new();
     let mut outbox = dir.open();

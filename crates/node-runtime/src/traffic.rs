@@ -395,8 +395,46 @@ impl Outbox {
         self.commit(book)
     }
     pub fn status(&self) -> serde_json::Value {
+        let mut pending_bytes = [0_u64; 2];
+        for bytes in self.book.pending.values() {
+            pending_bytes[0] = pending_bytes[0].saturating_add(bytes[0]);
+            pending_bytes[1] = pending_bytes[1].saturating_add(bytes[1]);
+        }
+        let (state, next_action, requires_reconciliation, batch_users, batch_bytes) =
+            match self.book.flight.as_ref() {
+                None if self.book.pending.is_empty() => ("idle", "none", false, 0, [0_i64, 0_i64]),
+                None => ("pending", "report", false, 0, [0_i64, 0_i64]),
+                Some(batch) => {
+                    let mut bytes = [0_i64; 2];
+                    for value in batch.traffic.values() {
+                        bytes[0] = bytes[0].saturating_add(value[0]);
+                        bytes[1] = bytes[1].saturating_add(value[1]);
+                    }
+                    match batch.stage {
+                        Stage::Prepared => ("prepared", "send", false, batch.traffic.len(), bytes),
+                        Stage::Sending => (
+                            "sending",
+                            "await_report_result",
+                            false,
+                            batch.traffic.len(),
+                            bytes,
+                        ),
+                        Stage::Uncertain => (
+                            "uncertain",
+                            "inspect_panel_then_traffic_resolve",
+                            true,
+                            batch.traffic.len(),
+                            bytes,
+                        ),
+                    }
+                }
+            };
         serde_json::json!({"destination":self.book.destination,"pending":self.book.pending,
-            "batch":self.book.flight,"epochs":self.book.receipts.len(),"io_failed":self.failed})
+            "batch":self.book.flight,"epochs":self.book.receipts.len(),"io_failed":self.failed,
+            "summary":{"state":state,"next_action":next_action,
+            "requires_reconciliation":requires_reconciliation,
+            "pending_users":self.book.pending.len(),"pending_bytes":pending_bytes,
+            "batch_users":batch_users,"batch_bytes":batch_bytes}})
     }
     pub fn abandon_sending(&mut self) -> Result<(), TrafficError> {
         if let Some(batch) = &self.book.flight
